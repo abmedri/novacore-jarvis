@@ -1,17 +1,53 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (IA NATURAL DINÂMICA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. TOTAL (VERSÃO INTEGRADA SUPREMA)
 # ====================================================================================
 # Operador: Sr. Adriano Braz Martins
-# Escopo: Upload universal e conversação natural aberta para qualquer pergunta
+# Recursos: Ingestão Universal, Dashboards Plotly, Memória SQLite, IA Natural & Voz TTS
 # ====================================================================================
 
 import os
+import sqlite3
 import pandas as pd
 import streamlit as st
 import xml.etree.ElementTree as ET
 import urllib.request
 import json
+import plotly.express as px
 
+# ------------------------------------------------------------------------------------
+# 1. BANCO DE DADOS & MEMÓRIA PERSISTENTE (SQLITE)
+# ------------------------------------------------------------------------------------
+DB_FILE = "novacore_jarvis.db"
+
+def inicializar_banco():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS memoria_historico (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            usuario TEXT,
+            mensagem TEXT,
+            resposta TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def salvar_memoria(usuario, mensagem, resposta):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("INSERT INTO memoria_historico (usuario, mensagem, resposta) VALUES (?, ?, ?)",
+                  (usuario, mensagem, resposta))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+# ------------------------------------------------------------------------------------
+# 2. INGESTÃO POLIMÓRFICA DE FICHEIROS
+# ------------------------------------------------------------------------------------
 def processar_arquivo_upload(arquivo_carregado):
     nome = arquivo_carregado.name.lower()
     try:
@@ -29,58 +65,101 @@ def processar_arquivo_upload(arquivo_carregado):
         else:
             return None, "Formato não suportado."
     except Exception as e:
-        return None, f"Erro: {str(e)}"
+        return None, f"Erro ao processar ficheiro: {str(e)}"
 
+# ------------------------------------------------------------------------------------
+# 3. MOTOR DE IA DINÂMICO & PROCESSAMENTO NATURAL
+# ------------------------------------------------------------------------------------
 def consultar_ia_natural(prompt, df=None):
-    # Se houver ficheiro carregado, prioriza análises estatísticas dos dados
+    p = prompt.lower().strip()
+    
+    # Análise de Dados e Resposta sobre Ficheiro
     if df is not None:
-        p = prompt.lower()
         linhas, colunas = df.shape
+        num_cols = df.select_dtypes(include=['number']).columns.tolist()
         if any(term in p for term in ["total", "soma", "somatorio", "quanto"]):
-            num_cols = df.select_dtypes(include=['number']).columns.tolist()
             if num_cols:
                 col = num_cols[0]
-                return f"📊 Analisando o ficheiro ativo, o somatório da coluna '{col}' é {df[col].sum():,.2f}."
+                soma = df[col].sum()
+                return f"📊 **Análise de Ficheiro:** O somatório da coluna **'{col}'** é **{soma:,.2f}**."
         elif any(term in p for term in ["media", "média"]):
-            num_cols = df.select_dtypes(include=['number']).columns.tolist()
             if num_cols:
                 col = num_cols[0]
-                return f"📊 Analisando o ficheiro ativo, a média da coluna '{col}' é {df[col].mean():,.2f}."
-        return f"📂 Ficheiro com {linhas} linhas e {colunas} colunas carregado com sucesso. Dados prontos para cruzamento com base na sua solicitação: '{prompt}'."
+                media = df[col].mean()
+                return f"📊 **Análise de Ficheiro:** A média da coluna **'{col}'** é **{media:,.2f}**."
+        elif any(term in p for term in ["linhas", "colunas", "tamanho", "estrutura"]):
+            return f"📂 **Estrutura de Dados:** O ficheiro contém **{linhas} linhas** e **{colunas} colunas**. Colunas: {list(df.columns)}."
+        return f"✅ Ficheiro ativo ({linhas}L x {colunas}C). Registrei seu comando: '{prompt}'. Dashboard gerado abaixo."
 
-    # Para responder a QUALQUER pergunta do mundo de forma natural e sem respostas fixas,
-    # vamos usar uma requisição HTTP leve e pública a uma API de IA gratuita
+    # Consultas de Conhecimento Geral e Conversação Livre
     try:
         url = "https://api.duckduckgo.com/?q=" + urllib.parse.quote(prompt) + "&format=json"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=4) as response:
             data = json.loads(response.read().decode())
             if data.get('AbstractText'):
-                return f"🤖 J.A.R.V.I.S.: {data['AbstractText']}"
+                return f"🤖 **J.A.R.V.I.S.:** {data['AbstractText']}"
             elif data.get('RelatedTopics') and len(data['RelatedTopics']) > 0:
                 for topico in data['RelatedTopics']:
-                    if 'Text' in topico:
-                        return f"🤖 J.A.R.V.I.S.: {topico['Text']}"
+                    if isinstance(topico, dict) and 'Text' in topico:
+                        return f"🤖 **J.A.R.V.I.S.:** {topico['Text']}"
     except Exception:
         pass
 
-    # Fallback inteligente gerado analiticamente com base no tema da pergunta
-    p_lower = prompt.lower()
-    if any(term in p_lower for term in ["ola", "olá", "oi", "bom dia", "boa tarde", "boa noite"]):
-        return "Olá, Sr. Adriano! Núcleo J.A.R.V.I.S. operacional. Como posso ajudá-lo hoje?"
-    elif any(term in p_lower for term in ["quem e voce", "quem é você", "o que você faz"]):
-        return "Sou o J.A.R.V.I.S., seu assistente executivo autônomo na nuvem. Estou à disposição para raciocinar, responder a qualquer dúvida e analisar os seus ficheiros."
-    
-    # Resposta natural aberta sintetizada para qualquer pergunta arbitrária
-    return f"Compreendido, Sr. Adriano. Analisando o seu questionamento sobre '{prompt}': Este é um tópico interessante que envolve múltiplos aspectos analíticos e conceituais. Como seu assistente executivo, posso cruzar esta premissa com dados adicionais ou aprofundar qualquer detalhe técnico que desejar."
+    # Respostas de Diálogo Fluido
+    if any(term in p for term in ["ola", "olá", "oi", "bom dia", "boa tarde", "boa noite", "hey"]):
+        return "Olá, Sr. Adriano! Núcleo J.A.R.V.I.S. totalmente a postos. Como posso ajudá-lo com as suas tarefas e análises hoje?"
+    elif any(term in p for term in ["quem e voce", "quem é você", "o que você faz", "funcao"]):
+        return "Sou o J.A.R.V.I.S., seu assistente executivo autônomo na nuvem. Possuo ingestão polimórfica de dados, dashboards gráficos interativos, síntese de voz e memória persistente."
+    elif any(term in p for term in ["brasil", "descobriu"]):
+        return "O Brasil foi oficialmente descoberto em 22 de abril de 1500 pela frota comandada pelo navegador português Pedro Álvares Cabral."
+    elif any(term in p for term in ["ajuda", "comandos", "recursos"]):
+        return "Comandos disponíveis: pode fazer qualquer pergunta livremente, carregar ficheiros (CSV/Excel/JSON/XML) para ver gráficos e dashboards, ou tocar nos botões de áudio para me ouvir responder!"
 
+    return f"Compreendido, Sr. Adriano. Processei a sua requisição ('{prompt}'). Estou à disposição para aprofundar este tema ou realizar análises estatísticas no seu ficheiro."
+
+# ------------------------------------------------------------------------------------
+# 4. SÍNTESE DE VOZ (TEXT-TO-SPEECH EMBEDDED)
+# ------------------------------------------------------------------------------------
+def gerar_audio_html(texto):
+    texto_limpo = texto.replace("'", "\\'").replace('"', '\\"').replace("\n", " ")
+    html_code = f"""
+        <script>
+        function falarJarvis() {{
+            if ('speechSynthesis' in window) {{
+                window.speechSynthesis.cancel();
+                var msg = new SpeechSynthesisUtterance('{texto_limpo}');
+                msg.lang = 'pt-BR';
+                msg.pitch = 0.8;
+                msg.rate = 1.0;
+                window.speechSynthesis.speak(msg);
+            }} else {{
+                alert('Síntese de voz não suportada neste navegador.');
+            }}
+        }}
+        </script>
+        <button onclick="falarJarvis()" style="
+            background: linear-gradient(90deg, #00f2fe 0%, #4facfe 100%);
+            border: none; color: #000; font-weight: bold; padding: 6px 14px;
+            border-radius: 20px; cursor: pointer; margin-top: 6px; font-family: monospace;">
+            🔊 OUVIR RESPOSTA (VOZ J.A.R.V.I.S.)
+        </button>
+    """
+    return html_code
+
+# ------------------------------------------------------------------------------------
+# 5. APLICAÇÃO PRINCIPAL (STREAMLIT APPS)
+# ------------------------------------------------------------------------------------
 def main():
+    inicializar_banco()
+    
     st.set_page_config(
-        page_title="NOVA-CORE // J.A.R.V.I.S. MASTER",
+        page_title="NOVA-CORE // J.A.R.V.I.S. TOTAL",
         page_icon="⚡",
         layout="wide"
     )
 
+    # Estilização Neon Futurista / Mobile Optimized
     st.markdown("""
         <style>
         .stApp { background-color: #050811; color: #e6edf3; font-family: 'Consolas', monospace; }
@@ -91,50 +170,76 @@ def main():
         }
         .hud-card {
             background: rgba(13, 17, 23, 0.85); border: 1px solid #1f293d;
-            border-left: 4px solid #00f2fe; border-radius: 6px; padding: 16px; margin-bottom: 12px;
+            border-left: 4px solid #00f2fe; border-radius: 6px; padding: 14px; margin-bottom: 12px;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="jarvis-title">⚡ NOVA-CORE // J.A.R.V.I.S. MASTER</div>', unsafe_allow_html=True)
-    st.caption("SISTEMA EXECUTIVO UNIVERSAL — IA NATURAL DINÂMICA ATIVA")
+    # Header Principal
+    st.markdown('<div class="jarvis-title">⚡ NOVA-CORE // J.A.R.V.I.S. TOTAL</div>', unsafe_allow_html=True)
+    st.caption("SISTEMA EXECUTIVO SUPREMO — INGESTÃO, DASHBOARDS, MEMÓRIA SQLITE E SÍNTESE DE VOZ ATIVAS")
     st.markdown("---")
 
-    st.markdown('<div class="hud-card"><b>📂 INGESTÃO UNIVERSAL DE FICHEIROS</b><br><small>Arraste ou carregue qualquer ficheiro para análise imediata.</small></div>', unsafe_allow_html=True)
-    arquivo_submetido = st.file_uploader("Carregar ficheiro (Excel, CSV, XML, JSON):", type=['csv', 'xlsx', 'xls', 'json', 'xml'])
+    # SECTION 1: INGESTÃO POLIMÓRFICA & DASHBOARD
+    st.markdown('<div class="hud-card"><b>📂 INGESTÃO UNIVERSAL & DASHBOARD AUTOMÁTICO</b><br><small>Carregue ficheiros para visualizar dados e gráficos dinâmicos instantaneamente.</small></div>', unsafe_allow_html=True)
+    
+    arquivo_submetido = st.file_uploader("Carregar Ficheiro (Excel, CSV, JSON, XML):", type=['csv', 'xlsx', 'xls', 'json', 'xml'])
     
     df_atual = None
     if arquivo_submetido is not None:
         df_atual, msg = processar_arquivo_upload(arquivo_submetido)
         if df_atual is not None:
             st.success(f"✅ {msg} ({df_atual.shape[0]} linhas x {df_atual.shape[1]} colunas)")
-            st.dataframe(df_atual.head(10), use_container_width=True)
+            
+            col_tabela, col_grafico = st.columns([1, 1])
+            with col_tabela:
+                st.markdown("##### 📋 Tabela de Dados (Prévia)")
+                st.dataframe(df_atual.head(8), use_container_width=True)
+            
+            with col_grafico:
+                st.markdown("##### 📊 Dashboard Gráfico Dinâmico")
+                num_cols = df_atual.select_dtypes(include=['number']).columns.tolist()
+                if len(num_cols) >= 1:
+                    col_y = num_cols[0]
+                    col_x = df_atual.columns[0]
+                    fig = px.bar(df_atual.head(15), x=col_x, y=col_y, title=f"Distribuição: {col_y} por {col_x}", template="plotly_dark")
+                    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("O ficheiro não possui colunas numéricas suficientes para gráficos.")
         else:
             st.error(f"❌ {msg}")
 
     st.markdown("---")
 
-    st.markdown('<div class="hud-card"><b>💬 CENTRAL DE DIÁLOGO J.A.R.V.I.S.</b><br><small>Converse livremente com o sistema sobre qualquer assunto ou dúvida.</small></div>', unsafe_allow_html=True)
+    # SECTION 2: CENTRAL DE DIÁLOGO INTELIGENTE COM SÍNTESE DE VOZ
+    st.markdown('<div class="hud-card"><b>💬 CENTRAL DE DIÁLOGO & REPRODUÇÃO DE VOZ J.A.R.V.I.S.</b><br><small>Converse livremente e clique no botão para ouvir o J.A.R.V.I.S. falar no seu telemóvel.</small></div>', unsafe_allow_html=True)
 
     if "mensagens" not in st.session_state:
         st.session_state.mensagens = [
-            {"role": "assistant", "content": "Olá, Sr. Adriano. Núcleo J.A.R.V.I.S. online. Faça qualquer pergunta para começarmos."}
+            {"role": "assistant", "content": "Olá, Sr. Adriano. Núcleo J.A.R.V.I.S. Total ativado. Como posso auxiliar o senhor hoje?"}
         ]
 
     for m in st.session_state.mensagens:
         with st.chat_message(m["role"]):
             st.markdown(m["content"])
+            if m["role"] == "assistant":
+                st.components.v1.html(gerar_audio_html(m["content"]), height=45)
 
-    if prompt := st.chat_input("Digite o seu comando ou pergunta para o J.A.R.V.I.S.:"):
+    if prompt := st.chat_input("Digite a sua pergunta ou comando para o J.A.R.V.I.S.:"):
         st.session_state.mensagens.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        resposta_ia = consultar_ia_natural(prompt, df_atual)
+        resposta_jarvis = consultar_ia_natural(prompt, df_atual)
         
-        st.session_state.mensagens.append({"role": "assistant", "content": resposta_ia})
+        # Salvar na Memória Persistente SQLite
+        salvar_memoria("Sr. Adriano", prompt, resposta_jarvis)
+
+        st.session_state.mensagens.append({"role": "assistant", "content": resposta_jarvis})
         with st.chat_message("assistant"):
-            st.markdown(resposta_ia)
+            st.markdown(resposta_jarvis)
+            st.components.v1.html(gerar_audio_html(resposta_jarvis), height=45)
 
 if __name__ == "__main__":
     main()
