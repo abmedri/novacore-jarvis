@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. TOTAL (ROBUSTO CONTRA ERROS DE ENCODING)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. TOTAL (ROBUSTO PARA CSV COM SEPARADOR ';')
 # ====================================================================================
 
 import os
@@ -43,14 +43,28 @@ def processar_arquivo_upload(arquivo_carregado):
     nome = arquivo_carregado.name.lower()
     try:
         if nome.endswith('.csv'):
-            # Tenta ler com diferentes encodings comuns em ficheiros CSV (utf-8, latin-1, cp1252)
             for enc in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
                 try:
                     arquivo_carregado.seek(0)
-                    return pd.read_csv(arquivo_carregado, encoding=enc), f"CSV processado com sucesso (encoding: {enc})."
-                except UnicodeDecodeError:
+                    # Tenta ler com separador ';' e converte automaticamente colunas numéricas se possível
+                    df = pd.read_csv(arquivo_carregado, encoding=enc, sep=';', low_memory=False)
+                    # Se tiver apenas 1 coluna, tenta ler com vírgula comum
+                    if df.shape[1] <= 1:
+                        arquivo_carregado.seek(0)
+                        df = pd.read_csv(arquivo_carregado, encoding=enc, sep=',', low_memory=False)
+                    
+                    # Tentar converter colunas que pareçam números
+                    for col in df.columns:
+                        if df[col].dtype == object:
+                            try:
+                                convertido = df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                                df[col] = pd.to_numeric(convertido)
+                            except Exception:
+                                pass
+                    return df, f"CSV processado com sucesso (encoding: {enc})."
+                except Exception:
                     continue
-            return None, "Erro de codificação: Não foi possível decodificar o ficheiro CSV."
+            return None, "Erro: Não foi possível decodificar o ficheiro CSV."
         elif nome.endswith(('.xls', '.xlsx')):
             return pd.read_excel(arquivo_carregado), "Excel processado com sucesso."
         elif nome.endswith('.json'):
@@ -75,15 +89,15 @@ def consultar_ia_natural(prompt, df=None):
             if num_cols:
                 col = num_cols[0]
                 soma = df[col].sum()
-                return f"📊 **Análise de Ficheiro:** O somatório da coluna **'{col}'** é **{soma:,.2f}**."
+                return f"📊 **Análise de Ficheiro:** O somatório da coluna numérica **'{col}'** é **{soma:,.2f}**."
         elif any(term in p for term in ["media", "média"]):
             if num_cols:
                 col = num_cols[0]
                 media = df[col].mean()
-                return f"📊 **Análise de Ficheiro:** A média da coluna **'{col}'** é **{media:,.2f}**."
+                return f"📊 **Análise de Ficheiro:** A média da coluna numérica **'{col}'** é **{media:,.2f}**."
         elif any(term in p for term in ["linhas", "colunas", "tamanho", "estrutura"]):
-            return f"📂 **Estrutura de Dados:** O ficheiro contém **{linhas} linhas** e **{colunas} colunas**. Colunas: {list(df.columns)}."
-        return f"✅ Ficheiro ativo ({linhas}L x {colunas}C). Registrei seu comando: '{prompt}'. Dashboard gerado abaixo."
+            return f"📂 **Estrutura de Dados:** O ficheiro contém **{linhas} linhas** e **{colunas} colunas**. Colunas numéricas detetadas: {num_cols}."
+        return f"✅ Ficheiro ativo ({linhas}L x {colunas}C). Comando registado: '{prompt}'. Dashboard atualizado abaixo."
 
     try:
         url = "https://api.duckduckgo.com/?q=" + urllib.parse.quote(prompt) + "&format=json"
@@ -100,18 +114,18 @@ def consultar_ia_natural(prompt, df=None):
         pass
 
     if any(term in p for term in ["ola", "olá", "oi", "bom dia", "boa tarde", "boa noite", "hey"]):
-        return "Olá, Sr. Adriano! Núcleo J.A.R.V.I.S. totalmente a postos. Como posso ajudá-lo com as suas tarefas e análises hoje?"
+        return "Olá, Sr. Adriano! Núcleo J.A.R.V.I.S. totalmente operacional. Como posso ajudá-lo com as suas análises hoje?"
     elif any(term in p for term in ["quem e voce", "quem é você", "o que você faz", "funcao"]):
-        return "Sou o J.A.R.V.I.S., seu assistente executivo autônomo na nuvem. Possuo ingestão polimórfica robusta, dashboards gráficos interativos, síntese de voz e memória persistente."
+        return "Sou o J.A.R.V.I.S., seu assistente executivo autônomo na nuvem. Possuo ingestão universal, dashboards interativos, síntese de voz e memória persistente."
     elif any(term in p for term in ["brasil", "descobriu"]):
         return "O Brasil foi oficialmente descoberto em 22 de abril de 1500 pela frota comandada pelo navegador português Pedro Álvares Cabral."
     elif any(term in p for term in ["ajuda", "comandos", "recursos"]):
-        return "Comandos disponíveis: pode fazer qualquer pergunta livremente, carregar ficheiros para ver gráficos e dashboards, ou tocar nos botões de áudio para me ouvir responder!"
+        return "Comandos disponíveis: pode fazer perguntas livremente, carregar ficheiros para ver dashboards estatísticos, ou tocar nos botões de áudio para me ouvir responder!"
 
-    return f"Compreendido, Sr. Adriano. Processei a sua requisição ('{prompt}'). Estou à disposição para aprofundar este tema ou realizar análises estatísticas no seu ficheiro."
+    return f"Compreendido, Sr. Adriano. Processei a sua requisição ('{prompt}'). Estou à disposição para aprofundar este tema ou realizar análises no seu ficheiro."
 
 def gerar_audio_html(texto):
-    texto_limpo = texto.replace("'", "\\\\\\'").replace('"', '\\\\"').replace("\n", " ")
+    texto_limpo = texto.replace("'", "\\\\\'").replace('"', '\\\\"').replace("\n", " ")
     html_code = f"""
         <script>
         function falarJarvis() {{
@@ -189,7 +203,7 @@ def main():
                     fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    st.info("O ficheiro não possui colunas numéricas suficientes para gráficos.")
+                    st.info("O ficheiro carregado não possui colunas numéricas detetadas para montagem automática de gráficos.")
         else:
             st.error(f"❌ {msg}")
 
@@ -223,3 +237,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
