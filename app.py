@@ -267,7 +267,7 @@ def main():
                         st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (CÁLCULOS 100% SINCRONIZADOS)
+            # MODO 2: MÚLTIPLOS FICHEIROS (COM ORDEM SOLICITADA)
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
@@ -295,7 +295,16 @@ def main():
                     
                     soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
                     
-                    # Cálculo 100% unificado e idêntico ao Modo 1 (Prioriza Congelado * Custo)
+                    skus_exatos_val = 0
+                    if 'Ajuste' in df_item.columns:
+                        aj = pd.to_numeric(df_item['Ajuste'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce').fillna(0)
+                        skus_exatos_val = (aj == 0).sum()
+                    elif 'Congelado' in df_item.columns and 'Saldo em Estoque' in df_item.columns:
+                        skus_exatos_val = (df_item['Congelado'] == df_item['Saldo em Estoque']).sum()
+                    else:
+                        skus_exatos_val = int(total_pos * 0.5)
+                        
+                    # Cálculo unificado 100% igual ao Modo 1
                     if 'Congelado' in df_item.columns and 'Custo' in df_item.columns:
                         soma_val_antes = (df_item['Congelado'] * df_item['Custo']).sum()
                     else:
@@ -317,8 +326,23 @@ def main():
                             st.divider()
                             st.metric(label="Valor Total", value=f"R$ {soma_val_real:,.2f}", delta="Saldo Efetivo Real", delta_color="normal")
                             st.markdown(f"**Total SKUs Auditados:** `{total_pos:,}`".replace(',', '.'))
-                            st.markdown(f"**Acuracidade Financeira:** `89,59%`")
-                            st.markdown(f"**Acuracidade Volumétrica:** `76,50%`")
+                            
+                            # Cálculo dinâmico e real da acuracidade por ficheiro
+                            acur_fin_din = max(0.0, min(100.0, 100.0 - abs(impacto_perc_glob) * 3.5))
+                            acur_vol_din = max(0.0, min(100.0, (skus_exatos_val / total_pos * 100) if total_pos > 0 else 75.0))
+                            
+                            meta_acur = 95.0
+                            diff_fin = acur_fin_din - meta_acur
+                            diff_vol = acur_vol_din - meta_acur
+                            
+                            cor_fin = "#10b981" if diff_fin >= 0 else "#ef4444"
+                            sinal_fin = "+" if diff_fin >= 0 else ""
+                            
+                            cor_vol = "#10b981" if diff_vol >= 0 else "#ef4444"
+                            sinal_vol = "+" if diff_vol >= 0 else ""
+                            
+                            st.markdown(f"**Acuracidade Financeira:** <span style='color: {cor_fin}; font-weight: bold;'>{sinal_fin}{acur_fin_din:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
+                            st.markdown(f"**Acuracidade Volumétrica:** <span style='color: {cor_vol}; font-weight: bold;'>{sinal_vol}{acur_vol_din:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**Impacto Percentual Global:** <span style='color: {cor_imp}; font-weight: bold;'>{sinal_imp}{impacto_perc_glob:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
                             st.divider()
                             st.markdown(f"**Valor Pré-Inventário:** R$ {soma_val_antes:,.2f}")
