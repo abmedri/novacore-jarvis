@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (UI EXECUTIVA PERFEITA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (DESIGN EXECUTIVO PERFEITO - SEM ERROS DE ASPAS)
 # ====================================================================================
 
 import os
@@ -95,7 +95,7 @@ def gerar_audio_html(texto):
         </script>
         <button onclick="falarJarvis()" style="
             background: linear-gradient(90deg, #00f2fe 0%, #4facfe 100%);
-            border: none; color: #000; font-weight: bold; padding: 8px 18px;
+            border: none; color: #000; font-weight: bold; padding: 8px 16px;
             border-radius: 20px; cursor: pointer; margin: 8px 0; font-family: monospace; font-size: 0.85rem;">
             🔊 OUVIR PARECER EXECUTIVO (VOZ J.A.R.V.I.S.)
         </button>
@@ -202,5 +202,48 @@ def main():
                 st.dataframe(df_atual.head(8), use_container_width=True)
             
             with t2:
-                st.markdown("##### 📊
-                            
+                st.markdown("##### 📊 Distribuição Visual")
+                num_cols = df_atual.select_dtypes(include=['number']).columns.tolist()
+                if len(num_cols) >= 1:
+                    fig = px.bar(df_atual.head(15), x=df_atual.columns[0], y=num_cols[0], template="plotly_dark")
+                    fig.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)", 
+                        plot_bgcolor="rgba(0,0,0,0)", 
+                        margin=dict(t=10, b=10, l=10, r=10),
+                        font=dict(family="monospace", size=11)
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("O ficheiro não possui colunas numéricas para gráficos.")
+        else:
+            st.error(f"❌ {msg}")
+
+    st.markdown("---")
+    
+    st.markdown('<div class="bento-card"><b>💬 5. CENTRAL DE DIÁLOGO EXECUTIVO</b><br><small style="color: #9ca3af;">Converse com o J.A.R.V.I.S. sobre as métricas ou solicite cruzamentos adicionais.</small></div>', unsafe_allow_html=True)
+
+    if "mensagens" not in st.session_state:
+        st.session_state.mensagens = [
+            {"role": "assistant", "content": "Olá, Sr. Adriano. Núcleo executivo online. Como posso auxiliar nas diretrizes da KMB Distribuidora hoje?"}
+        ]
+
+    for m in st.session_state.mensagens:
+        with st.chat_message(m["role"]):
+            st.markdown(m["content"])
+            if m["role"] == "assistant":
+                st.components.v1.html(gerar_audio_html(m["content"]), height=45)
+
+    if prompt := st.chat_input("Digite o seu comando executivo ou pergunta:"):
+        st.session_state.mensagens.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        resp = f"Compreendido, Sr. Adriano. Analisando o comando '{prompt}' com base nos registos do inventário atual. O núcleo executivo está a processar as diretrizes operacionais para otimizar a acuracidade."
+        salvar_memoria("Sr. Adriano", prompt, resp)
+
+        st.session_state.mensagens.append({"role": "assistant", "content": resp})
+        with st.chat_message("assistant"):
+            st.markdown(resp)
+            st.components.v1.html(gerar_audio_html(resp), height=45)
+
+if __name__ == "__main
