@@ -193,7 +193,7 @@ def main():
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"{impacto_perc:.2f}% Desvio", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
                 with col_kpi2:
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {soma_depois:,.2f}", "Saldo Final Efetivo", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Impacto Percentual Global", f"{impacto_perc:.2f}%", "Variação Apurada", eh_negativo=(impacto_perc < 0), eh_positivo=(impacto_perc >= 0)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Impacto Geral", f"{impacto_perc:.2f}%", "Variação Apurada", eh_negativo=(impacto_perc < 0), eh_positivo=(impacto_perc >= 0)), unsafe_allow_html=True)
 
                 st.markdown("---")
 
@@ -364,7 +364,7 @@ def main():
                             st.markdown(f"**Valor Falta + Sobra (Soma Absoluta):** <span style='color: #ef4444; font-weight: bold;'>R$ {soma_absoluta_val:,.2f} ({perc_valor_somado:.2f}%)</span>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**Acuracidade Financeira:** <span style='color: {cor_fin}; font-weight: bold;'>{sinal_fin}{acur_fin_din:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**Acuracidade Volumétrica:** <span style='color: {cor_vol}; font-weight: bold;'>{sinal_vol}{acur_vol_din:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
-                            st.markdown(f"**Impacto Global:** <span style='color: {cor_imp}; font-weight: bold;'>{sinal_imp}{impacto_perc_glob:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
+                            st.markdown(f"**Impacto Geral:** <span style='color: {cor_imp}; font-weight: bold;'>{sinal_imp}{impacto_perc_glob:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
                             st.divider()
                             st.markdown(f"**Valor Pré-Inventário:** R$ {soma_val_antes:,.2f}")
 
@@ -499,7 +499,7 @@ Total de Inventários Analisados: {len(lista_dfs)}
   - Subtítulo: Relatório de Desvios, Acuracidade e Parecer Técnico
 
 - **Slide 2: Sumário de Inventários Auditados**
-  - Comparativo lado a lado dos volumes de SKUs, Valores Reais e Impacto Global.
+  - Comparativo lado a lado dos volumes de SKUs, Valores Reais e Impacto Geral.
 
 - **Slide 3: Painel de Acuracidade (Financeira vs. Volumétrica)**
   - Avaliação de desempenho frente à meta corporativa de 95%.
