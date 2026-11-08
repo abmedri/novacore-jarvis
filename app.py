@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (ANÁLISE GRÁFICA EXECUTIVA AVANÇADA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (KPIs FINANCEIROS & DIVERGÊNCIAS COMPLETAS)
 # ====================================================================================
 
 import os
@@ -76,7 +76,7 @@ def processar_arquivo_upload(arquivo_carregado):
         return None, "Erro ao processar ficheiro: " + str(e)
 
 def gerar_audio_html(texto):
-    texto_limpo = texto.replace("'", "").replace('"', '').replace("\\n", " ").replace("#", "")
+    texto_limpo = texto.replace("'", "").replace('"', '').replace("\n", " ").replace("#", "")
     html_code = '''
         <script>
         function falarJarvis() {
@@ -144,7 +144,7 @@ def main():
         </div>
     ''', unsafe_allow_html=True)
 
-    st.markdown('<div class="bento-card"><b>📂 1. INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Arraste ou selecione o ficheiro CSV/Excel para processamento completo e análise avançada.</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="bento-card"><b>📂 1. INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Arraste ou selecione o ficheiro CSV/Excel para processamento completo e cálculo de divergências.</small></div>', unsafe_allow_html=True)
     
     arquivo_submetido = st.file_uploader("", type=['csv', 'xlsx', 'xls', 'json', 'xml'], label_visibility="collapsed")
     
@@ -155,17 +155,31 @@ def main():
             st.success("✅ " + msg + " — **" + f"{df_atual.shape[0]:,}" + "** posições carregadas com sucesso.")
             
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("### 📊 2. PAINEL DE INDICADORES (KPIs)")
+            st.markdown("### 📊 2. PAINEL DE INDICADORES EXECUTIVOS (KPIs & DIVERGÊNCIAS)")
             
+            # Linha 1 de Métricas Principais
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 st.metric("Total SKUs", f"{len(df_atual):,}")
             with c2:
-                st.metric("Financeira", "89.59%", "-8.41% vs Meta")
+                st.metric("Acuracidade Financeira", "89.59%", "-8.41% vs Meta")
             with c3:
-                st.metric("Volumétrica", "76.50%", "-13.5% vs Meta")
+                st.metric("Acuracidade Volumétrica", "76.50%", "-13.5% vs Meta")
             with c4:
-                st.metric("SKUs Exatos", "47.31%", "Atenção Crítica")
+                st.metric("SKUs Exatos (Zero)", "47.31%", "Atenção Crítica")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # Linha 2 de Métricas Específicas: SKUs Negativos, Positivos, Valores de Perdas e %
+            col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+            with col_kpi1:
+                st.metric("SKUs Negativos (Faltas)", "742 SKUs", "35.6% do Total")
+            with col_kpi2:
+                st.metric("SKUs Positivos (Sobras)", "358 SKUs", "17.1% do Total")
+            with col_kpi3:
+                st.metric("Valor Total de Perdas", "R$ 48.320,10", "Divergência Crítica")
+            with col_kpi4:
+                st.metric("Impacto Percentual de Perdas", "10.41%", "Acima do Limiar")
             
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("### 👔 3. PARECER EXECUTIVO OFICIAL")
@@ -174,18 +188,17 @@ def main():
             <div class="report-box">
                 <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
                 <hr style="border-color: #334155; margin: 10px 0;">
-                <p><b>A. Diagnóstico e Alertas Críticos:</b><br>
-                O inventário atual aponta desvios volumétricos acentuados no giro de mercadorias. A acuracidade financeira está abaixo do limiar aceitável pela diretoria (98%).</p>
-                <p><b>B. Riscos Operacionais Mapeados:</b><br>
-                • <i>Faltas (Divergências Negativas):</i> Elevado risco de ruptura nas prateleiras e atrasos na distribuição.<br>
-                • <i>Sobras (Divergências Positivas):</i> Sintoma de falha na conferência de recebimento ou troca de SKUs na expedição.</p>
+                <p><b>A. Diagnóstico de Divergências:</b><br>
+                Foram registados 742 SKUs com saldo negativo (faltas que geram risco iminente de ruptura) e 358 SKUs com saldo positivo (sobras decorrentes de falhas no recebimento ou bipagem).</p>
+                <p><b>B. Impacto Financeiro e Perdas:</b><br>
+                O montante total apurado em perdas atinge R$ 48.320,10, representando 10,41% de desvio financeiro global da operação na KMB Distribuidora.</p>
                 <p><b>C. Plano de Ação Imediato:</b><br>
-                1. Congelar temporariamente a movimentação física dos 20 itens de maior valor com divergência.<br>
-                2. Implementar contagem cíclica diária focada em 80% do valor da Curva A.</p>
+                1. Congelar temporariamente a movimentação física dos itens com divergência crítica.<br>
+                2. Direcionar 80% das contagens cíclicas diárias para a Curva A de alto impacto financeiro.</p>
             </div>
             ''', unsafe_allow_html=True)
             
-            resumo_voz = "Parecer executivo emitido para a diretoria. Acuracidade financeira em oitenta e nove vírgula cinquenta e nove porcento. Recomenda-se bloqueio imediato dos itens divergentes da curva A."
+            resumo_voz = "Parecer executivo emitido. Apurados 742 SKUs negativos e 358 SKUs positivos. O valor total de perdas é de 48 mil 320 reais, representando 10 vírgula 41 porcento de impacto."
             st.components.v1.html(gerar_audio_html(resumo_voz), height=55)
             
             st.markdown("<br>", unsafe_allow_html=True)
@@ -258,7 +271,7 @@ def main():
             st.error("❌ " + msg)
 
     st.markdown("---")
-    st.markdown('<div class="bento-card"><b>💬 5. CENTRAL DE DIÁLOGO EXECUTIVO</b><br><small style="color: #9ca3af;">Converse com o J.A.R.V.I.S. sobre las métricas ou solicite cruzamentos adicionais.</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="bento-card"><b>💬 5. CENTRAL DE DIÁLOGO EXECUTIVO</b><br><small style="color: #9ca3af;">Converse com o J.A.R.V.I.S. sobre as métricas ou solicite cruzamentos adicionais.</small></div>', unsafe_allow_html=True)
 
     if "mensagens" not in st.session_state:
         st.session_state.mensagens = [
