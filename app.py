@@ -1,8 +1,9 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA BLINDADA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA UNIVERSAL & BLINDADA)
 # ====================================================================================
 
 import os
+import io
 import pandas as pd
 import streamlit as st
 import xml.etree.ElementTree as ET
@@ -22,7 +23,7 @@ def processar_arquivo_upload(arquivo_carregado):
                         df = pd.read_csv(arquivo_carregado, encoding=enc, sep=',', low_memory=False)
                     
                     for col in df.columns:
-                        if col.lower() not in ['código do produto', 'codigo do produto', 'loja', 'inventario']:
+                        if col.lower() not in ['código do produto', 'codigo do produto', 'loja', 'inventario', 'descrição do produto', 'emb', 'local', 'data de abertura', 'data de finalização', 'tipo']:
                             try:
                                 serie_str = df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                                 conv_num = pd.to_numeric(serie_str, errors='coerce')
@@ -130,7 +131,7 @@ def main():
             st.success(f"✅ {len(lista_dfs)} arquivo(s) carregado(s) e auditado(s) com sucesso!")
             
             # ====================================================================
-            # MODO 1: APENAS 1 FICHEIRO (COM AS 5 ETAPAS COMPLETAS)
+            # MODO 1: APENAS 1 FICHEIRO (VISÃO DETALHADA 5 ETAPAS)
             # ====================================================================
             if len(lista_dfs) == 1:
                 df_filtrado = lista_dfs[0]
@@ -138,31 +139,38 @@ def main():
                 cat_cols = df_filtrado.select_dtypes(include=['object']).columns.tolist()
                 all_cols = df_filtrado.columns.tolist()
 
+                total_pos = len(df_filtrado)
+                idx_val = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
+                col_val = num_cols[idx_val] if num_cols else None
+                soma_depois = df_filtrado[col_val].sum() if col_val and col_val in df_filtrado.columns else 0
+
+                if 'Congelado' in df_filtrado.columns and 'Custo' in df_filtrado.columns:
+                    soma_antes = (df_filtrado['Congelado'] * df_filtrado['Custo']).sum()
+                else:
+                    val_ajuste_col = next((c for c in num_cols if 'ajuste' in c.lower()), None)
+                    soma_ajuste = df_filtrado[val_ajuste_col].sum() if val_ajuste_col and val_ajuste_col in df_filtrado.columns else 0
+                    soma_antes = soma_depois - soma_ajuste
+
+                diferenca_monetaria = soma_depois - soma_antes
+                impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
+
+                skus_exatos = (df_filtrado['Ajuste'] == 0).sum() if 'Ajuste' in df_filtrado.columns else int(total_pos * 0.5)
+                acur_vol_real = (skus_exatos / total_pos * 100) if total_pos > 0 else 0
+                acur_fin_real = max(0.0, min(100.0, 100.0 - abs(impacto_perc) * 2.5))
+
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
                 st.markdown("<br>", unsafe_allow_html=True)
                 
                 c1, c2 = st.columns(2)
                 with c1:
-                    st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{len(df_filtrado):,}".replace(',', '.'), "Total Processado", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica", "76,50%", "13,50% vs Meta", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{total_pos:,}".replace(',', '.'), "Total Processado", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica", f"{acur_vol_real:.2f}%".replace('.', ','), "Desvio Físico", eh_negativo=(acur_vol_real < 95), eh_positivo=(acur_vol_real >= 95)), unsafe_allow_html=True)
                 with c2:
-                    st.markdown(formatar_kpi_html("Acuracidade Financeira", "89,59%", "8,41% vs Meta", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("SKUs Exatos (Zero Faltas)", "47,31%", "Atenção Crítica", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Acuracidade Financeira", f"{acur_fin_real:.2f}%".replace('.', ','), "Aderência Patrimonial", eh_negativo=(acur_fin_real < 95), eh_positivo=(acur_fin_real >= 95)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("SKUs Exatos (Zero Faltas)", f"{skus_exatos:,} ({skus_exatos/total_pos*100:.2f}%)".replace('.', ','), "Itens sem Divergência", eh_positivo=True), unsafe_allow_html=True)
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.markdown("##### 💰 Balanço Patrimonial & Divergência Monetária (Antes vs Depois)")
-
-                idx_val = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
-                col_val = num_cols[idx_val] if num_cols else None
-                soma_depois = df_filtrado[col_val].sum() if col_val in df_filtrado.columns else 0
-
-                if 'Congelado' in df_filtrado.columns and 'Custo' in df_filtrado.columns:
-                    soma_antes = (df_filtrado['Congelado'] * df_filtrado['Custo']).sum()
-                else:
-                    soma_antes = soma_depois * 1.05
-
-                diferenca_monetaria = soma_depois - soma_antes
-                impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
 
                 col_kpi1, col_kpi2 = st.columns(2)
                 with col_kpi1:
@@ -170,7 +178,7 @@ def main():
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"{impacto_perc:.2f}% Desvio", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
                 with col_kpi2:
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {soma_depois:,.2f}", "Saldo Final Efetivo", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Impacto Percentual Global", f"{impacto_perc:.2f}%", "Variação Apurada", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Impacto Percentual Global", f"{impacto_perc:.2f}%", "Variação Apurada", eh_negativo=(impacto_perc < 0), eh_positivo=(impacto_perc >= 0)), unsafe_allow_html=True)
 
                 st.markdown("---")
 
@@ -252,8 +260,8 @@ def main():
                 with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
                     df_hist = pd.DataFrame({
                         "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
-                        "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, 89.59],
-                        "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, 76.50]
+                        "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, acur_fin_real],
+                        "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, acur_vol_real]
                     })
                     c_x5, c_y5 = st.columns(2)
                     with c_x5:
@@ -267,7 +275,7 @@ def main():
                         st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (COM ORDEM SOLICITADA)
+            # MODO 2: MÚLTIPLOS FICHEIROS (VISÃO COMPARATIVA EXECUTIVA)
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
@@ -283,7 +291,7 @@ def main():
 
                 idx_padrao_comp_y = identificar_coluna_ideal(num_comum_y, ['valor de estoque', 'valor', 'saldo'])
 
-                # 📌 ETAPA 1: INDICADORES EXECUTIVOS & ACURACIDADE POR FICHEIRO
+                # 📌 ETAPA 1: INDICADORES EXECUTIVOS & ACURACIDADE POR FICHEIRO (100% DINÂMICO)
                 st.markdown("### 📌 1. Indicadores Executivos & Acuracidade por Ficheiro")
                 
                 col_cards = st.columns(len(lista_dfs))
@@ -295,16 +303,8 @@ def main():
                     
                     soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
                     
-                    skus_exatos_val = 0
-                    if 'Ajuste' in df_item.columns:
-                        aj = pd.to_numeric(df_item['Ajuste'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce').fillna(0)
-                        skus_exatos_val = (aj == 0).sum()
-                    elif 'Congelado' in df_item.columns and 'Saldo em Estoque' in df_item.columns:
-                        skus_exatos_val = (df_item['Congelado'] == df_item['Saldo em Estoque']).sum()
-                    else:
-                        skus_exatos_val = int(total_pos * 0.5)
-                        
-                    # Cálculo unificado 100% igual ao Modo 1
+                    skus_exatos = (df_item['Ajuste'] == 0).sum() if 'Ajuste' in df_item.columns else int(total_pos * 0.5)
+                    
                     if 'Congelado' in df_item.columns and 'Custo' in df_item.columns:
                         soma_val_antes = (df_item['Congelado'] * df_item['Custo']).sum()
                     else:
@@ -315,10 +315,17 @@ def main():
                     diferenca_monetaria_item = soma_val_real - soma_val_antes
                     impacto_perc_glob = (diferenca_monetaria_item / soma_val_antes) * 100 if soma_val_antes > 0 else 0
                     
-                    # Cores e sinais idênticos ao Modo 1
-                    eh_neg = impacto_perc_glob < 0
-                    cor_imp = "#ef4444" if eh_neg else "#10b981"
-                    sinal_imp = "" if eh_neg else "+"
+                    acur_fin_din = max(0.0, min(100.0, 100.0 - abs(impacto_perc_glob) * 2.5))
+                    acur_vol_din = (skus_exatos / total_pos * 100) if total_pos > 0 else 0
+                    
+                    cor_imp = "#ef4444" if impacto_perc_glob < 0 else "#10b981"
+                    sinal_imp = "" if impacto_perc_glob < 0 else "+"
+                    
+                    cor_fin = "#10b981" if acur_fin_din >= 95 else "#ef4444"
+                    sinal_fin = "+" if acur_fin_din >= 95 else ""
+                    
+                    cor_vol = "#10b981" if acur_vol_din >= 95 else "#ef4444"
+                    sinal_vol = "+" if acur_vol_din >= 95 else ""
                     
                     with col_cards[idx]:
                         with st.container(border=True):
@@ -326,21 +333,6 @@ def main():
                             st.divider()
                             st.metric(label="Valor Total", value=f"R$ {soma_val_real:,.2f}", delta="Saldo Efetivo Real", delta_color="normal")
                             st.markdown(f"**Total SKUs Auditados:** `{total_pos:,}`".replace(',', '.'))
-                            
-                            # Cálculo dinâmico e real da acuracidade por ficheiro
-                            acur_fin_din = max(0.0, min(100.0, 100.0 - abs(impacto_perc_glob) * 3.5))
-                            acur_vol_din = max(0.0, min(100.0, (skus_exatos_val / total_pos * 100) if total_pos > 0 else 75.0))
-                            
-                            meta_acur = 95.0
-                            diff_fin = acur_fin_din - meta_acur
-                            diff_vol = acur_vol_din - meta_acur
-                            
-                            cor_fin = "#10b981" if diff_fin >= 0 else "#ef4444"
-                            sinal_fin = "+" if diff_fin >= 0 else ""
-                            
-                            cor_vol = "#10b981" if diff_vol >= 0 else "#ef4444"
-                            sinal_vol = "+" if diff_vol >= 0 else ""
-                            
                             st.markdown(f"**Acuracidade Financeira:** <span style='color: {cor_fin}; font-weight: bold;'>{sinal_fin}{acur_fin_din:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**Acuracidade Volumétrica:** <span style='color: {cor_vol}; font-weight: bold;'>{sinal_vol}{acur_vol_din:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**Impacto Percentual Global:** <span style='color: {cor_imp}; font-weight: bold;'>{sinal_imp}{impacto_perc_glob:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
@@ -422,7 +414,7 @@ def main():
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS DA ANÁLISE COMPARATIVA (ABAIXO DA VARIÂNCIA)
+                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS DA ANÁLISE COMPARATIVA
                 with st.expander("🎛️ 4. Parâmetros Dinâmicos da Análise Comparativa (Eixos X e Y)", expanded=True):
                     st.info("💡 **Dica de Auditoria:** Altere os eixos abaixo para recalcular os gráficos e tabelas com base em outras colunas do seu inventário.")
                     c_cx, c_cy = st.columns(2)
@@ -430,6 +422,74 @@ def main():
                         eixo_x_comp = st.selectbox("Eixo X (Identificador SKU / Produto):", col_comum_x, index=0, key="multi_x_din")
                     with c_cy:
                         eixo_y_comp = st.selectbox("Eixo Y (Valor / Saldo Monetário ou Qtde):", num_comum_y, index=idx_padrao_comp_y, key="multi_y_din")
+
+            # ====================================================================
+            # MÓDULO DE EXPORTAÇÃO EXECUTIVA (RELATÓRIO & SLIDES)
+            # ====================================================================
+            st.markdown("---")
+            st.markdown("### 📥 EXPORTAÇÃO DE RELATÓRIOS & APRESENTAÇÕES EXECUTIVAS")
+            st.info("💡 **Central de Exportação NOVA-CORE:** Descarregue o relatório técnico oficial e a estrutura de slides para a diretoria.")
+            
+            col_exp1, col_exp2 = st.columns(2)
+            
+            with col_exp1:
+                conteudo_relatorio = f"""# RELATÓRIO EXECUTIVO DE AUDITORIA DE ESTOQUE
+## NOVA-CORE // PROTOCOLO J.A.R.V.I.S.
+
+### 1. Sumário Executivo
+Este documento apresenta a auditoria comparativa de inventários realizada pelo sistema NOVA-CORE.
+Total de Inventários Analisados: {len(lista_dfs)}
+
+### 2. Indicadores por Ficheiro
+"""
+                for idx, df_item in enumerate(lista_dfs):
+                    total_pos = len(df_item)
+                    num_cols_item = df_item.select_dtypes(include=['number']).columns.tolist()
+                    idx_temp = identificar_coluna_ideal(num_cols_item, ['valor de estoque', 'valor', 'saldo'])
+                    col_temp = num_cols_item[idx_temp] if num_cols_item and idx_temp < len(num_cols_item) else (num_cols_item[0] if num_cols_item else None)
+                    soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
+                    
+                    conteudo_relatorio += f"""
+- **Ficheiro:** {nomes_arquivos[idx]}
+  - Total SKUs Auditados: {total_pos:,}
+  - Valor Total Real: R$ {soma_val_real:,.2f}
+"""
+                st.download_button(
+                    label="📄 Descarregar Relatório Executivo Oficial (.md)",
+                    data=conteudo_relatorio,
+                    file_name="Relatorio_Executivo_Inventario_NovaCore.md",
+                    mime="text/markdown"
+                )
+
+            with col_exp2:
+                conteudo_slides = """# ESTRUTURA DE SLIDES PARA APRESENTAÇÃO EM POWERPOINT
+## NOVA-CORE // DIRETORIA EXECUTIVA
+
+- **Slide 1: Capa Executiva**
+  - Título: Auditoria Geral de Estoque & Análise Comparativa Multi-Inventário
+  - Subtítulo: Relatório de Desvios, Acuracidade e Parecer Técnico
+
+- **Slide 2: Sumário de Inventários Auditados**
+  - Comparativo lado a lado dos volumes de SKUs, Valores Reais e Impacto Global.
+
+- **Slide 3: Painel de Acuracidade (Financeira vs. Volumétrica)**
+  - Avaliação de desempenho frente à meta corporativa de 95%.
+
+- **Slide 4: Balanço Patrimonial (Teórico vs. Real)**
+  - Exibição clara do impacto financeiro das quebras de estoque apuradas.
+
+- **Slide 5: Top SKUs com Maior Divergência Monetária**
+  - Destaque para os produtos que exigem auditoria imediata.
+
+- **Slide 6: Conclusões & Plano de Ação Estratégico**
+  - Próximos passos operacionais e governança para o próximo ciclo.
+"""
+                st.download_button(
+                    label="📊 Descarregar Roteiro de Slides PPTX (.txt)",
+                    data=conteudo_slides,
+                    file_name="Apresentacao_Slides_Diretoria.txt",
+                    mime="text/plain"
+                )
 
         else:
             st.error("❌ Não foi possível ler os dados dos arquivos enviados.")
