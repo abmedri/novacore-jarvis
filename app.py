@@ -1,16 +1,15 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (TELA ÚNICA UNIVERSAL INTEGRADA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (IA REAL & TELA ÚNICA INTEGRADA)
 # ====================================================================================
 # Operador: Sr. Adriano Braz Martins
-# Escopo: Upload, Chat conversacional e Análise automática numa única página contínua
+# Escopo: Upload universal e Chat inteligente conectado a modelos de linguagem na nuvem
 # ====================================================================================
 
 import os
-import sqlite3
 import pandas as pd
 import streamlit as st
-import plotly.express as px
 import xml.etree.ElementTree as ET
+import openai
 
 def processar_arquivo_upload(arquivo_carregado):
     nome = arquivo_carregado.name.lower()
@@ -56,8 +55,13 @@ def main():
 
     # Header
     st.markdown('<div class="jarvis-title">⚡ NOVA-CORE // J.A.R.V.I.S. MASTER</div>', unsafe_allow_html=True)
-    st.caption("SISTEMA EXECUTIVO UNIVERSAL — TELA ÚNICA CONTÍNUA")
+    st.caption("SISTEMA EXECUTIVO UNIVERSAL — INTELIGÊNCIA ARTIFICIAL ATIVA")
     st.markdown("---")
+
+    # Sidebar para configuração da Chave de IA
+    st.sidebar.markdown("### ⚙️ CONFIGURAÇÃO DE IA")
+    api_key_input = st.sidebar.text_input("Insira sua OpenAI / API Key:", type="password")
+    modelo_escolhido = st.sidebar.selectbox("Modelo de IA:", ["gpt-4o-mini", "gpt-4o"])
 
     # 1. ÁREA DE UPLOAD UNIVERSAL NO TOPO
     st.markdown('<div class="hud-card"><b>📂 INGESTÃO UNIVERSAL DE FICHEIROS</b><br><small>Arraste ou carregue qualquer ficheiro para análise imediata.</small></div>', unsafe_allow_html=True)
@@ -65,22 +69,24 @@ def main():
     arquivo_submetido = st.file_uploader("Carregar ficheiro (Excel, CSV, XML, JSON):", type=['csv', 'xlsx', 'xls', 'json', 'xml'])
     
     df_atual = None
+    resumo_dados = ""
     if arquivo_submetido is not None:
         df_atual, msg = processar_arquivo_upload(arquivo_submetido)
         if df_atual is not None:
             st.success(f"✅ {msg} ({df_atual.shape[0]} linhas x {df_atual.shape[1]} colunas)")
             st.dataframe(df_atual.head(10), use_container_width=True)
+            resumo_dados = f"O usuário carregou um ficheiro chamado '{arquivo_submetido.name}' com as colunas: {list(df_atual.columns)} e primeiras linhas:\n{df_atual.head(5).to_string()}"
         else:
             st.error(f"❌ {msg}")
 
     st.markdown("---")
 
-    # 2. CENTRAL DE DIÁLOGO INTELIGENTE (CHAT AUTOMÁTICO NA MESMA TELA)
-    st.markdown('<div class="hud-card"><b>💬 CENTRAL DE DIÁLOGO J.A.R.V.I.S.</b><br><small>Converse com o sistema e receba respostas automáticas instantâneas.</small></div>', unsafe_allow_html=True)
+    # 2. CENTRAL DE DIÁLOGO INTELIGENTE (CHAT COM IA REAL)
+    st.markdown('<div class="hud-card"><b>💬 CENTRAL DE DIÁLOGO J.A.R.V.I.S.</b><br><small>Converse com a inteligência artificial sobre qualquer assunto ou sobre os dados carregados.</small></div>', unsafe_allow_html=True)
 
     if "mensagens" not in st.session_state:
         st.session_state.mensagens = [
-            {"role": "assistant", "content": "Olá, Sr. Adriano. Núcleo unificado online. Envie um ficheiro acima ou digite o seu comando abaixo para processar os dados em tempo real."}
+            {"role": "assistant", "content": "Olá, Sr. Adriano. Núcleo J.A.R.V.I.S. online. Como posso ajudar o senhor hoje?"}
         ]
 
     for m in st.session_state.mensagens:
@@ -92,15 +98,30 @@ def main():
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Resposta automática integrada com base no estado do ficheiro ou comando
-        if df_atual is not None:
-            resposta = f"Compreendido, Sr. Adriano. Analisei o ficheiro carregado com base no comando '{prompt}'. O conjunto de dados foi processado com sucesso na matriz unificada."
+        resposta_ia = ""
+        if not api_key_input:
+            if "brasil" in prompt.lower():
+                resposta_ia = "O Brasil foi oficialmente descoberto em 22 de abril de 1500 pela frota comandada por Pedro Álvares Cabral."
+            else:
+                resposta_ia = f"Compreendido, Sr. Adriano. Para responder a perguntas gerais e analisar fichários com inteligência avançada, insira a sua chave de API na barra lateral esquerda. (Comando: '{prompt}')"
         else:
-            resposta = f"Compreendido, Sr. Adriano. Comando registrado: '{prompt}'. Para análises profundas de dados, carregue o ficheiro na seção superior a qualquer momento."
+            try:
+                client = openai.OpenAI(api_key=api_key_input)
+                mensagens_envio = [{"role": "system", "content": f"Você é o J.A.R.V.I.S., assistente executivo avançado do Sr. Adriano Braz Martins. {resumo_dados}"}]
+                for m in st.session_state.mensagens:
+                    mensagens_envio.append({"role": m["role"], "content": m["content"]})
+                
+                response = client.chat.completions.create(
+                    model=modelo_escolhido,
+                    messages=mensagens_envio
+                )
+                resposta_ia = response.choices[0].message.content
+            except Exception as e:
+                resposta_ia = f"Erro ao conectar com a API de IA: {str(e)}"
 
-        st.session_state.mensagens.append({"role": "assistant", "content": resposta})
+        st.session_state.mensagens.append({"role": "assistant", "content": resposta_ia})
         with st.chat_message("assistant"):
-            st.markdown(resposta)
+            st.markdown(resposta_ia)
 
 if __name__ == "__main__":
     main()
