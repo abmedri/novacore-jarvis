@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA DEFINITIVA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA BLINDADA)
 # ====================================================================================
 
 import os
@@ -21,12 +21,12 @@ def processar_arquivo_upload(arquivo_carregado):
                         arquivo_carregado.seek(0)
                         df = pd.read_csv(arquivo_carregado, encoding=enc, sep=',', low_memory=False)
                     
-                    # Converter colunas numéricas com vírgula para float imediatamente
+                    # Limpeza e conversão rigorosa de colunas numéricas com vírgula/ponto
                     for col in df.columns:
-                        if df[col].dtype == object:
+                        if col.lower() not in ['código do produto', 'codigo do produto', 'loja', 'inventario']:
                             try:
-                                conv = df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-                                conv_num = pd.to_numeric(conv, errors='coerce')
+                                serie_str = df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                                conv_num = pd.to_numeric(serie_str, errors='coerce')
                                 if conv_num.notna().sum() > 0:
                                     df[col] = conv_num
                             except Exception:
@@ -36,7 +36,8 @@ def processar_arquivo_upload(arquivo_carregado):
                     continue
             return None, "Erro: Não foi possível decodificar o ficheiro CSV."
         elif nome.endswith(('.xls', '.xlsx')):
-            return pd.read_excel(arquivo_carregado), "Excel processado com sucesso."
+            df = pd.read_excel(arquivo_carregado)
+            return df, "Excel processado com sucesso."
         elif nome.endswith('.json'):
             return pd.read_json(arquivo_carregado), "JSON processado com sucesso."
         elif nome.endswith('.xml'):
@@ -49,12 +50,10 @@ def processar_arquivo_upload(arquivo_carregado):
     except Exception as e:
         return None, "Erro ao processar ficheiro: " + str(e)
 
-def identificar_coluna_ideal(colunas_numericas):
-    palavras_chave = ['valor', 'estoque', 'total', 'saldo', 'custo', 'preco', 'preço', 'qtd', 'quantidade']
-    for idx, col in enumerate(colunas_numericas):
-        col_lower = col.lower()
-        if any(p in col_lower for p in palavras_chave):
-            if 'codigo' not in col_lower and 'código' not in col_lower:
+def identificar_coluna_ideal(colunas_numericas, palavras_alvo):
+    for palavra in palavras_alvo:
+        for idx, col in enumerate(colunas_numericas):
+            if palavra in col.lower() and 'codigo' not in col.lower() and 'código' not in col.lower():
                 return idx
     return 0
 
@@ -152,25 +151,37 @@ def main():
                     st.markdown(formatar_kpi_html("SKUs Exatos (Zero Faltas)", "47,31%", "Atenção Crítica", eh_negativo=True), unsafe_allow_html=True)
 
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("##### 💰 Balanço Patrimonial & Divergência Monetária")
+                st.markdown("##### 💰 Balanço Patrimonial & Divergência Monetária (Antes vs Depois)")
 
-                idx_padrao_y = identificar_coluna_ideal(num_cols)
-                col_y_val = num_cols[idx_padrao_y] if num_cols else None
-                soma_real = df_filtrado[col_y_val].sum() if col_y_val in df_filtrado.columns else 0
+                # Cálculo exato baseado nas colunas do ficheiro de inventário
+                # Valor de Estoque (Depois)
+                idx_val = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
+                col_val = num_cols[idx_val] if num_cols else None
+                soma_depois = df_filtrado[col_val].sum() if col_val in df_filtrado.columns else 0
+
+                # Cálculo do Valor Antes (Teórico / Congelado x Custo)
+                if 'Congelado' in df_filtrado.columns and 'Custo' in df_filtrado.columns:
+                    soma_antes = (df_filtrado['Congelado'] * df_filtrado['Custo']).sum()
+                else:
+                    soma_antes = soma_depois * 1.05  # fallback estimativa
+
+                diferenca_monetaria = soma_depois - soma_antes
+                impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
 
                 col_kpi1, col_kpi2 = st.columns(2)
                 with col_kpi1:
-                    st.markdown(formatar_kpi_html("Estoque Auditado (Físico)", f"R$ {soma_real:,.2f}", "Base Processada", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Valor Total de Perdas", f"R$ {soma_real * 0.05:,.2f}", "Divergência Estimada", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {soma_antes:,.2f}", "Saldo Inicial Congelado", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"{impacto_perc:.2f}% Desvio", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
                 with col_kpi2:
-                    st.markdown(formatar_kpi_html("Estoque Teórico (Sistema)", f"R$ {soma_real * 1.05:,.2f}", "Referência Contábil", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Impacto Percentual", "5,00%", "Desvio Global", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {soma_depois:,.2f}", "Saldo Final Efetivo", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Impacto Percentual Global", f"{impacto_perc:.2f}%", "Variação Apurada", eh_negativo=True), unsafe_allow_html=True)
 
                 st.markdown("---")
 
                 # ETAPA 2: CURVA ABC
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     if len(num_cols) >= 1:
+                        idx_padrao_y = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
                         c_x2, c_y2 = st.columns(2)
                         with c_x2:
                             eixo_x_abc = st.selectbox("Eixo X (Identificador/SKU/Produto):", all_cols, index=0, key="abc_x_din")
@@ -211,9 +222,10 @@ def main():
                 # ETAPA 3: COBERTURA
                 with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
                     if len(num_cols) >= 1:
+                        idx_cob = identificar_coluna_ideal(num_cols, ['saldo', 'quantidade', 'estoque'])
                         c_x3, c_y3 = st.columns(2)
                         with c_x3:
-                            eixo_x_cob = st.selectbox("Eixo X (Métrica de Cobertura/Estoque):", num_cols, index=idx_padrao_y, key="cob_x_din")
+                            eixo_x_cob = st.selectbox("Eixo X (Métrica de Cobertura/Estoque):", num_cols, index=idx_cob, key="cob_x_din")
                         with c_y3:
                             eixo_y_cob = st.selectbox("Eixo Y (Frequência / Contagem de SKUs):", ["Contagem de SKUs"] + num_cols, index=0, key="cob_y_din")
                         
@@ -228,11 +240,12 @@ def main():
                 # ETAPA 4: GIRO POR CATEGORIA
                 with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
                     if len(cat_cols) >= 1 and len(num_cols) >= 1:
+                        idx_giro = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
                         c_x4, c_y4 = st.columns(2)
                         with c_x4:
                             eixo_x_giro = st.selectbox("Eixo X (Categoria / Grupo):", cat_cols, key="giro_x_din")
                         with c_y4:
-                            eixo_y_giro = st.selectbox("Eixo Y (Valor Somado / Métrica):", num_cols, index=idx_padrao_y, key="giro_y_din")
+                            eixo_y_giro = st.selectbox("Eixo Y (Valor Somado / Métrica):", num_cols, index=idx_giro, key="giro_y_din")
                         
                         df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().sort_values(by=eixo_y_giro, ascending=False).head(15)
                         fig_giro = px.bar(df_giro, x=eixo_x_giro, y=eixo_y_giro, color=eixo_y_giro, color_continuous_scale="Blues", template="plotly_dark", title=f"Análise por {eixo_x_giro}")
@@ -272,11 +285,11 @@ def main():
                 if not num_comum_y:
                     num_comum_y = lista_dfs[0].select_dtypes(include=['number']).columns.tolist()
 
-                idx_padrao_comp_y = identificar_coluna_ideal(num_comum_y)
+                idx_padrao_comp_y = identificar_coluna_ideal(num_comum_y, ['valor de estoque', 'valor', 'saldo'])
 
                 # 🎛️ ETAPA 1: PARÂMETROS DINÂMICOS NO TOPO
                 with st.expander("🎛️ 1. Parâmetros Dinâmicos da Análise Comparativa (Eixos X e Y)", expanded=True):
-                    st.info("💡 **Dica de Auditoria:** Certifique-se de que o **Eixo Y** esteja apontando para uma coluna de **Valor Monetário** ou **Quantidade** (ex: `Valor de Estoque(R$)`).")
+                    st.info("💡 **Dica de Auditoria:** Certifique-se de que o **Eixo Y** esteja apontando para uma coluna de **Valor Monetário** (ex: `Valor de Estoque(R$)`).")
                     c_cx, c_cy = st.columns(2)
                     with c_cx:
                         eixo_x_comp = st.selectbox("Eixo X (Identificador SKU / Produto):", col_comum_x, index=0, key="multi_x_din")
