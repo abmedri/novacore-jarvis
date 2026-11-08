@@ -154,14 +154,12 @@ def main():
                 diferenca_monetaria = soma_depois - soma_antes
                 impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
 
-                # Indicadores de SKUs
                 qtd_falta = (df_filtrado['Ajuste'] < 0).sum() if 'Ajuste' in df_filtrado.columns else 0
                 qtd_sobra = (df_filtrado['Ajuste'] > 0).sum() if 'Ajuste' in df_filtrado.columns else 0
                 qtd_exatos = (df_filtrado['Ajuste'] == 0).sum() if 'Ajuste' in df_filtrado.columns else int(total_pos * 0.5)
                 total_divergencias = qtd_falta + qtd_sobra
                 perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0
 
-                # Indicadores Financeiros de Falta e Sobra Somados (Absoluto)
                 col_val_aju = 'Valor de Ajuste(R$)' if 'Valor de Ajuste(R$)' in df_filtrado.columns else None
                 val_falta_fin = df_filtrado[df_filtrado['Ajuste'] < 0][col_val_aju].sum() if col_val_aju else 0
                 val_sobra_fin = df_filtrado[df_filtrado['Ajuste'] > 0][col_val_aju].sum() if col_val_aju else 0
@@ -443,14 +441,37 @@ def main():
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS DA ANÁLISE COMPARATIVA
+                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS & GRÁFICO COMPARATIVO PERSONALIZADO
                 with st.expander("🎛️ 4. Parâmetros Dinâmicos da Análise Comparativa (Eixos X e Y)", expanded=True):
-                    st.info("💡 **Dica de Auditoria:** Altere os eixos abaixo para recalcular os gráficos e tabelas com base em outras colunas do seu inventário.")
+                    st.info("💡 **Dica de Auditoria:** Altere os eixos abaixo para recalcular instantaneamente o cruzamento e o gráfico comparativo entre os inventários.")
                     c_cx, c_cy = st.columns(2)
                     with c_cx:
                         eixo_x_comp = st.selectbox("Eixo X (Identificador SKU / Produto):", col_comum_x, index=0, key="multi_x_din")
                     with c_cy:
                         eixo_y_comp = st.selectbox("Eixo Y (Valor / Saldo Monetário ou Qtde):", num_comum_y, index=idx_padrao_comp_y, key="multi_y_din")
+                    
+                    if len(lista_dfs) >= 2 and eixo_x_comp and eixo_y_comp:
+                        df_d1 = lista_dfs[0][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
+                        df_d2 = lista_dfs[1][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
+                        df_comp_din = pd.merge(df_d1, df_d2, on=eixo_x_comp, how='outer', suffixes=(f" ({nomes_arquivos[0]})", f" ({nomes_arquivos[1]})")).fillna(0)
+                        
+                        col_sk1 = f"{eixo_y_comp} ({nomes_arquivos[0]})"
+                        col_sk2 = f"{eixo_y_comp} ({nomes_arquivos[1]})"
+                        
+                        df_comp_din['Diferença Dinâmica'] = df_comp_din[col_sk2] - df_comp_din[col_sk1]
+                        
+                        st.markdown(f"##### 📊 Visualização Dinâmica: {eixo_y_comp} por {eixo_x_comp}")
+                        fig_din = px.bar(
+                            df_comp_din.sort_values(by='Diferença Dinâmica', ascending=False).head(25),
+                            x=eixo_x_comp,
+                            y='Diferença Dinâmica',
+                            color='Diferença Dinâmica',
+                            color_continuous_scale="RdYlGn_r",
+                            template="plotly_dark",
+                            title=f"Top Variações Dinâmicas para {eixo_y_comp}"
+                        )
+                        fig_din.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_din, use_container_width=True)
 
             # ====================================================================
             # MÓDULO DE EXPORTAÇÃO EXECUTIVA (RELATÓRIO & SLIDES)
