@@ -267,7 +267,7 @@ def main():
                         st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (COM ORDEM E CÁLCULO DINÂMICO)
+            # MODO 2: MÚLTIPLOS FICHEIROS (COM ORDEM SOLICITADA)
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
@@ -286,6 +286,7 @@ def main():
                 # 📌 ETAPA 1: INDICADORES EXECUTIVOS & ACURACIDADE POR FICHEIRO
                 st.markdown("### 📌 1. Indicadores Executivos & Acuracidade por Ficheiro")
                 
+                # Definimos temporariamente valores para exibir nos cards antes dos parâmetros dinâmicos se refinarem
                 col_cards = st.columns(len(lista_dfs))
                 for idx, df_item in enumerate(lista_dfs):
                     total_pos = len(df_item)
@@ -308,6 +309,11 @@ def main():
                     acur_fin = max(0.0, min(100.0, 100.0 - abs(pct_exatos - 100) * 0.3))
                     acur_vol = max(0.0, min(100.0, 100.0 - abs(pct_exatos - 100) * 0.5))
                     
+                    # Cálculo do Valor Pré-Inventário (Antes)
+                    val_ajuste_col = next((c for c in num_cols_item if 'ajuste' in c.lower()), None)
+                    soma_ajuste = df_item[val_ajuste_col].sum() if val_ajuste_col and val_ajuste_col in df_item.columns else 0
+                    soma_val_antes = soma_val_real - soma_ajuste
+                    
                     with col_cards[idx]:
                         with st.container(border=True):
                             st.markdown(f"#### 📄 {nomes_arquivos[idx]}")
@@ -318,7 +324,7 @@ def main():
                             st.markdown(f"**Acuracidade Volumétrica:** `{acur_vol:.2f}%`".replace('.', ','))
                             st.markdown(f"**SKUs Exatos (Zero Desvio):** `{pct_exatos:.2f}%` ({skus_exatos_val})".replace('.', ','))
                             st.divider()
-                            st.markdown(f"**Valor Pós-Inventário:** R$ {soma_val_real:,.2f}")
+                            st.markdown(f"**Valor Pré-Inventário:** R$ {soma_val_antes:,.2f}")
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -364,6 +370,7 @@ def main():
                 st.markdown("### 🔍 3. Auditoria de Variância Item a Item")
                 
                 if len(lista_dfs) >= 2:
+                    # Usa colunas padrão para a variabilidade inicial antes do menu de parâmetros
                     x_padrao_var = col_comum_x[0]
                     y_padrao_var = num_comum_y[idx_padrao_comp_y]
                     
