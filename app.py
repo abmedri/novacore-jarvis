@@ -283,7 +283,7 @@ def main():
 
                 idx_padrao_comp_y = identificar_coluna_ideal(num_comum_y, ['valor de estoque', 'valor', 'saldo'])
 
-                # 📌 ETAPA 1: INDICADORES EXECUTIVOS & ACURACIDADE POR FICHEIRO (COM CÁLCULO DINÂMICO INDIVIDUAL)
+                # 📌 ETAPA 1: INDICADORES EXECUTIVOS & ACURACIDADE POR FICHEIRO
                 st.markdown("### 📌 1. Indicadores Executivos & Acuracidade por Ficheiro")
                 
                 col_cards = st.columns(len(lista_dfs))
@@ -294,7 +294,6 @@ def main():
                     col_temp = num_cols_item[idx_temp] if num_cols_item and idx_temp < len(num_cols_item) else (num_cols_item[0] if num_cols_item else None)
                     
                     soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
-                    media_val = df_item[col_temp].mean() if col_temp and col_temp in df_item.columns else 0
                     
                     skus_exatos_val = 0
                     if 'Ajuste' in df_item.columns:
@@ -319,7 +318,7 @@ def main():
                             st.markdown(f"**Acuracidade Volumétrica:** `{acur_vol:.2f}%`".replace('.', ','))
                             st.markdown(f"**SKUs Exatos (Zero Desvio):** `{pct_exatos:.2f}%` ({skus_exatos_val})".replace('.', ','))
                             st.divider()
-                            st.markdown(f"**Média por SKU:** R$ {media_val:,.2f}")
+                            st.markdown(f"**Valor Pós-Inventário:** R$ {soma_val_real:,.2f}")
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
