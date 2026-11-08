@@ -1,8 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. TOTAL (VERSÃO INTEGRADA SUPREMA)
-# ====================================================================================
-# Operador: Sr. Adriano Braz Martins
-# Recursos: Ingestão Universal, Dashboards Plotly, Memória SQLite, IA Natural & Voz TTS
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. TOTAL (ROBUSTO CONTRA ERROS DE ENCODING)
 # ====================================================================================
 
 import os
@@ -14,9 +11,6 @@ import urllib.request
 import json
 import plotly.express as px
 
-# ------------------------------------------------------------------------------------
-# 1. BANCO DE DADOS & MEMÓRIA PERSISTENTE (SQLITE)
-# ------------------------------------------------------------------------------------
 DB_FILE = "novacore_jarvis.db"
 
 def inicializar_banco():
@@ -45,14 +39,18 @@ def salvar_memoria(usuario, mensagem, resposta):
     except Exception:
         pass
 
-# ------------------------------------------------------------------------------------
-# 2. INGESTÃO POLIMÓRFICA DE FICHEIROS
-# ------------------------------------------------------------------------------------
 def processar_arquivo_upload(arquivo_carregado):
     nome = arquivo_carregado.name.lower()
     try:
         if nome.endswith('.csv'):
-            return pd.read_csv(arquivo_carregado), "CSV processado com sucesso."
+            # Tenta ler com diferentes encodings comuns em ficheiros CSV (utf-8, latin-1, cp1252)
+            for enc in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+                try:
+                    arquivo_carregado.seek(0)
+                    return pd.read_csv(arquivo_carregado, encoding=enc), f"CSV processado com sucesso (encoding: {enc})."
+                except UnicodeDecodeError:
+                    continue
+            return None, "Erro de codificação: Não foi possível decodificar o ficheiro CSV."
         elif nome.endswith(('.xls', '.xlsx')):
             return pd.read_excel(arquivo_carregado), "Excel processado com sucesso."
         elif nome.endswith('.json'):
@@ -67,13 +65,9 @@ def processar_arquivo_upload(arquivo_carregado):
     except Exception as e:
         return None, f"Erro ao processar ficheiro: {str(e)}"
 
-# ------------------------------------------------------------------------------------
-# 3. MOTOR DE IA DINÂMICO & PROCESSAMENTO NATURAL
-# ------------------------------------------------------------------------------------
 def consultar_ia_natural(prompt, df=None):
     p = prompt.lower().strip()
     
-    # Análise de Dados e Resposta sobre Ficheiro
     if df is not None:
         linhas, colunas = df.shape
         num_cols = df.select_dtypes(include=['number']).columns.tolist()
@@ -91,7 +85,6 @@ def consultar_ia_natural(prompt, df=None):
             return f"📂 **Estrutura de Dados:** O ficheiro contém **{linhas} linhas** e **{colunas} colunas**. Colunas: {list(df.columns)}."
         return f"✅ Ficheiro ativo ({linhas}L x {colunas}C). Registrei seu comando: '{prompt}'. Dashboard gerado abaixo."
 
-    # Consultas de Conhecimento Geral e Conversação Livre
     try:
         url = "https://api.duckduckgo.com/?q=" + urllib.parse.quote(prompt) + "&format=json"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -106,23 +99,19 @@ def consultar_ia_natural(prompt, df=None):
     except Exception:
         pass
 
-    # Respostas de Diálogo Fluido
     if any(term in p for term in ["ola", "olá", "oi", "bom dia", "boa tarde", "boa noite", "hey"]):
         return "Olá, Sr. Adriano! Núcleo J.A.R.V.I.S. totalmente a postos. Como posso ajudá-lo com as suas tarefas e análises hoje?"
     elif any(term in p for term in ["quem e voce", "quem é você", "o que você faz", "funcao"]):
-        return "Sou o J.A.R.V.I.S., seu assistente executivo autônomo na nuvem. Possuo ingestão polimórfica de dados, dashboards gráficos interativos, síntese de voz e memória persistente."
+        return "Sou o J.A.R.V.I.S., seu assistente executivo autônomo na nuvem. Possuo ingestão polimórfica robusta, dashboards gráficos interativos, síntese de voz e memória persistente."
     elif any(term in p for term in ["brasil", "descobriu"]):
         return "O Brasil foi oficialmente descoberto em 22 de abril de 1500 pela frota comandada pelo navegador português Pedro Álvares Cabral."
     elif any(term in p for term in ["ajuda", "comandos", "recursos"]):
-        return "Comandos disponíveis: pode fazer qualquer pergunta livremente, carregar ficheiros (CSV/Excel/JSON/XML) para ver gráficos e dashboards, ou tocar nos botões de áudio para me ouvir responder!"
+        return "Comandos disponíveis: pode fazer qualquer pergunta livremente, carregar ficheiros para ver gráficos e dashboards, ou tocar nos botões de áudio para me ouvir responder!"
 
     return f"Compreendido, Sr. Adriano. Processei a sua requisição ('{prompt}'). Estou à disposição para aprofundar este tema ou realizar análises estatísticas no seu ficheiro."
 
-# ------------------------------------------------------------------------------------
-# 4. SÍNTESE DE VOZ (TEXT-TO-SPEECH EMBEDDED)
-# ------------------------------------------------------------------------------------
 def gerar_audio_html(texto):
-    texto_limpo = texto.replace("'", "\\'").replace('"', '\\"').replace("\n", " ")
+    texto_limpo = texto.replace("'", "\\\\\\'").replace('"', '\\\\"').replace("\n", " ")
     html_code = f"""
         <script>
         function falarJarvis() {{
@@ -147,9 +136,6 @@ def gerar_audio_html(texto):
     """
     return html_code
 
-# ------------------------------------------------------------------------------------
-# 5. APLICAÇÃO PRINCIPAL (STREAMLIT APPS)
-# ------------------------------------------------------------------------------------
 def main():
     inicializar_banco()
     
@@ -159,7 +145,6 @@ def main():
         layout="wide"
     )
 
-    # Estilização Neon Futurista / Mobile Optimized
     st.markdown("""
         <style>
         .stApp { background-color: #050811; color: #e6edf3; font-family: 'Consolas', monospace; }
@@ -175,12 +160,10 @@ def main():
         </style>
     """, unsafe_allow_html=True)
 
-    # Header Principal
     st.markdown('<div class="jarvis-title">⚡ NOVA-CORE // J.A.R.V.I.S. TOTAL</div>', unsafe_allow_html=True)
     st.caption("SISTEMA EXECUTIVO SUPREMO — INGESTÃO, DASHBOARDS, MEMÓRIA SQLITE E SÍNTESE DE VOZ ATIVAS")
     st.markdown("---")
 
-    # SECTION 1: INGESTÃO POLIMÓRFICA & DASHBOARD
     st.markdown('<div class="hud-card"><b>📂 INGESTÃO UNIVERSAL & DASHBOARD AUTOMÁTICO</b><br><small>Carregue ficheiros para visualizar dados e gráficos dinâmicos instantaneamente.</small></div>', unsafe_allow_html=True)
     
     arquivo_submetido = st.file_uploader("Carregar Ficheiro (Excel, CSV, JSON, XML):", type=['csv', 'xlsx', 'xls', 'json', 'xml'])
@@ -212,7 +195,6 @@ def main():
 
     st.markdown("---")
 
-    # SECTION 2: CENTRAL DE DIÁLOGO INTELIGENTE COM SÍNTESE DE VOZ
     st.markdown('<div class="hud-card"><b>💬 CENTRAL DE DIÁLOGO & REPRODUÇÃO DE VOZ J.A.R.V.I.S.</b><br><small>Converse livremente e clique no botão para ouvir o J.A.R.V.I.S. falar no seu telemóvel.</small></div>', unsafe_allow_html=True)
 
     if "mensagens" not in st.session_state:
@@ -232,8 +214,6 @@ def main():
             st.markdown(prompt)
 
         resposta_jarvis = consultar_ia_natural(prompt, df_atual)
-        
-        # Salvar na Memória Persistente SQLite
         salvar_memoria("Sr. Adriano", prompt, resposta_jarvis)
 
         st.session_state.mensagens.append({"role": "assistant", "content": resposta_jarvis})
@@ -243,4 +223,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
