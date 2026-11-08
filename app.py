@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (ETAPAS ESTRITAMENTE NA VERTICAL)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (KPIS AJUSTADOS COM FONTE RESPONSIVA)
 # ====================================================================================
 
 import os
@@ -78,13 +78,27 @@ def main():
     padding: 20px;
     margin-bottom: 15px;
 }
+
+/* AJUSTE RESPONSIVO CRÍTICO PARA OS KPIS (EVITA CORTAR O TEXTO E NÚMEROS) */
+[data-testid="stMetricValue"] {
+    font-size: clamp(1.1rem, 2.2vw, 1.8rem) !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+}
+[data-testid="stMetricLabel"] {
+    font-size: clamp(0.75rem, 1.2vw, 0.95rem) !important;
+    white-space: normal !important;
+}
+[data-testid="stMetricDelta"] {
+    font-size: clamp(0.7rem, 1vw, 0.85rem) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
     st.markdown("""
 <div class="main-header">
     <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
-    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (ETAPAS EMPILHADAS NA VERTICAL & KPIs PRESERVADOS)</div>
+    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (KPIS AJUSTADOS)</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -122,45 +136,39 @@ def main():
             all_cols = df_filtrado.columns.tolist()
 
             # ----------------------------------------------------
-            # ETAPA 1: VISÃO GERAL & PARECER (SEMPRE ABERTO NA VERTICAL)
+            # ETAPA 1: VISÃO GERAL & PARECER
             # ----------------------------------------------------
             st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
+            st.markdown("<br>", unsafe_allow_html=True)
             
-            # Linha 1 de KPIs oficiais preservados
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2 = st.columns(2)
             with c1:
                 st.metric("Total SKUs Auditados", f"{len(df_filtrado):,}".replace(',', '.'))
+                st.metric("Acuracidade Volumétrica", "76,50%", "-13,5% vs Meta")
             with c2:
                 st.metric("Acuracidade Financeira", "89,59%", "-8,41% vs Meta")
-            with c3:
-                st.metric("Acuracidade Volumétrica", "76,50%", "-13,5% vs Meta")
-            with c4:
                 st.metric("SKUs Exatos (Zero Faltas)", "47,31%", "Atenção Crítica")
 
             st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("##### 💰 Balanço Patrimonial & Divergência Monetária")
 
-            # Linha 2 de KPIs
-            col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+            col_kpi1, col_kpi2 = st.columns(2)
             with col_kpi1:
                 st.metric("Estoque Antes (Teórico)", "R$ 464.200,00", "Base de Sistema")
+                st.metric("Valor Total de Perdas", "R$ 48.320,10", "Divergência Líquida")
             with col_kpi2:
                 st.metric("Estoque Depois (Físico)", "R$ 415.879,90", "Balanço Auditado")
-            with col_kpi3:
-                st.metric("Valor Total de Perdas", "R$ 48.320,10", "Divergência Líquida")
-            with col_kpi4:
                 st.metric("Impacto Percentual", "10,41%", "Desvio Global")
 
             st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("##### 📦 Distribuição Física dos SKUs Auditados")
 
-            # Linha 3 de KPIs
-            col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+            col_s1, col_s2 = st.columns(2)
             with col_s1:
                 st.metric("SKUs Negativos (Faltas)", "742 SKUs", "35,6% do Total")
+                st.metric("SKUs Sem Divergência", "984 SKUs", "47,31% Exatos")
             with col_s2:
                 st.metric("SKUs Positivos (Sobras)", "358 SKUs", "17,1% do Total")
-            with col_s3:
-                st.metric("SKUs Sem Divergência", "984 SKUs", "47,31% Exatos")
-            with col_s4:
                 st.metric("Status Operacional", "Crítico", "Requer Intervenção")
 
             st.markdown("<br>", unsafe_allow_html=True)
@@ -184,7 +192,7 @@ def main():
             st.markdown("---")
 
             # ----------------------------------------------------
-            # ETAPA 2: ACURACIDADE & CURVA ABC (EXPANDível NA VERTICAL)
+            # ETAPA 2: ACURACIDADE & CURVA ABC
             # ----------------------------------------------------
             with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                 if len(num_cols) >= 1:
@@ -233,7 +241,7 @@ def main():
                     st.info("O ficheiro não possui colunas numéricas suficientes.")
 
             # ----------------------------------------------------
-            # ETAPA 3: RUPTURA & COBERTURA (EXPANDível NA VERTICAL)
+            # ETAPA 3: RUPTURA & COBERTURA
             # ----------------------------------------------------
             with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
                 if len(num_cols) >= 1:
@@ -260,7 +268,7 @@ def main():
                     st.plotly_chart(fig_cob, use_container_width=True)
 
             # ----------------------------------------------------
-            # ETAPA 4: CAUSA RAIZ & PROCESSOS (EXPANDível NA VERTICAL)
+            # ETAPA 4: CAUSA RAIZ & PROCESSOS
             # ----------------------------------------------------
             with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
                 if len(cat_cols) >= 1 and len(num_cols) >= 1:
@@ -288,7 +296,7 @@ def main():
                     st.info("São necessárias colunas de categoria e valor para este diagnóstico.")
 
             # ----------------------------------------------------
-            # ETAPA 5: SIMULAÇÃO & TENDÊNCIA (EXPANDível NA VERTICAL)
+            # ETAPA 5: SIMULAÇÃO & TENDÊNCIA
             # ----------------------------------------------------
             with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
                 col_sim1, col_sim2 = st.columns(2)
@@ -335,4 +343,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-                
+    
