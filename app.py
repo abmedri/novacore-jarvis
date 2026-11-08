@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (DESIGN EXECUTIVO PERFEITO - SEM ERROS DE ASPAS)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (EXECUTIVO SUPREMO)
 # ====================================================================================
 
 import os
@@ -16,7 +16,7 @@ DB_FILE = "novacore_jarvis.db"
 def inicializar_banco():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("""
+    c.execute('''
         CREATE TABLE IF NOT EXISTS memoria_historico (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -24,7 +24,7 @@ def inicializar_banco():
             mensagem TEXT,
             resposta TEXT
         )
-    """)
+    ''')
     conn.commit()
     conn.close()
 
@@ -58,7 +58,7 @@ def processar_arquivo_upload(arquivo_carregado):
                                 df[col] = pd.to_numeric(conv)
                             except Exception:
                                 pass
-                    return df, f"Inventário processado com sucesso (Encoding: {enc})."
+                    return df, "Inventário processado com sucesso (Encoding: " + enc + ")."
                 except Exception:
                     continue
             return None, "Erro: Não foi possível decodificar o ficheiro CSV."
@@ -74,24 +74,24 @@ def processar_arquivo_upload(arquivo_carregado):
         else:
             return None, "Formato não suportado."
     except Exception as e:
-        return None, f"Erro ao processar ficheiro: {str(e)}"
+        return None, "Erro ao processar ficheiro: " + str(e)
 
 def gerar_audio_html(texto):
-    texto_limpo = texto.replace("'", "").replace('"', '').replace("\n", " ").replace("#", "")
-    html_code = f"""
+    texto_limpo = texto.replace("'", "").replace('"', '').replace("\\n", " ").replace("#", "")
+    html_code = '''
         <script>
-        function falarJarvis() {{
-            if ('speechSynthesis' in window) {{
+        function falarJarvis() {
+            if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
-                var msg = new SpeechSynthesisUtterance('{texto_limpo}');
+                var msg = new SpeechSynthesisUtterance("''' + texto_limpo + '''");
                 msg.lang = 'pt-BR';
                 msg.pitch = 0.8;
                 msg.rate = 1.0;
                 window.speechSynthesis.speak(msg);
-            }} else {{
+            } else {
                 alert('Síntese de voz não suportada.');
-            }}
-        }}
+            }
+        }
         </script>
         <button onclick="falarJarvis()" style="
             background: linear-gradient(90deg, #00f2fe 0%, #4facfe 100%);
@@ -99,7 +99,7 @@ def gerar_audio_html(texto):
             border-radius: 20px; cursor: pointer; margin: 8px 0; font-family: monospace; font-size: 0.85rem;">
             🔊 OUVIR PARECER EXECUTIVO (VOZ J.A.R.V.I.S.)
         </button>
-    """
+    '''
     return html_code
 
 def main():
@@ -111,13 +111,10 @@ def main():
         layout="wide"
     )
 
-    st.markdown("""
+    st.markdown('''
         <style>
         .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
-        
-        .main-header {
-            padding: 1.2rem 0; border-bottom: 1px solid #1f293d; margin-bottom: 1.5rem;
-        }
+        .main-header { padding: 1.2rem 0; border-bottom: 1px solid #1f293d; margin-bottom: 1.5rem; }
         .jarvis-title {
             font-size: 1.7rem; font-weight: 800; letter-spacing: 1.5px;
             background: linear-gradient(90deg, #00f2fe 0%, #3b82f6 100%);
@@ -139,14 +136,14 @@ def main():
             padding: 20px;
         }
         </style>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
 
-    st.markdown("""
+    st.markdown('''
         <div class="main-header">
             <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
             <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE & ACURACIDADE</div>
         </div>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
 
     st.markdown('<div class="bento-card"><b>📂 1. INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Arraste ou selecione o ficheiro CSV/Excel para processamento instantâneo.</small></div>', unsafe_allow_html=True)
     
@@ -156,7 +153,7 @@ def main():
     if arquivo_submetido is not None:
         df_atual, msg = processar_arquivo_upload(arquivo_submetido)
         if df_atual is not None:
-            st.success(f"✅ {msg} — **{df_atual.shape[0]:,}** posições carregadas com sucesso.")
+            st.success("✅ " + msg + " — **" + f"{df_atual.shape[0]:,}" + "** posições carregadas com sucesso.")
             
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("### 📊 2. PAINEL DE INDICADORES (KPIs)")
@@ -172,10 +169,9 @@ def main():
                 st.metric("SKUs Exatos", "47.31%", "Atenção Crítica")
             
             st.markdown("<br>", unsafe_allow_html=True)
-            
             st.markdown("### 👔 3. PARECER EXECUTIVO OFICIAL")
             
-            st.markdown("""
+            st.markdown('''
             <div class="report-box">
                 <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
                 <hr style="border-color: #334155; margin: 10px 0;">
@@ -188,7 +184,7 @@ def main():
                 1. Congelar temporariamente a movimentação física dos 20 itens de maior valor com divergência.<br>
                 2. Implementar contagem cíclica diária focada em 80% do valor da Curva A.</p>
             </div>
-            """, unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
             
             resumo_voz = "Parecer executivo emitido para a diretoria. Acuracidade financeira em oitenta e nove vírgula cinquenta e nove porcento. Recomenda-se bloqueio imediato dos itens divergentes da curva A."
             st.components.v1.html(gerar_audio_html(resumo_voz), height=55)
@@ -216,10 +212,9 @@ def main():
                 else:
                     st.info("O ficheiro não possui colunas numéricas para gráficos.")
         else:
-            st.error(f"❌ {msg}")
+            st.error("❌ " + msg)
 
     st.markdown("---")
-    
     st.markdown('<div class="bento-card"><b>💬 5. CENTRAL DE DIÁLOGO EXECUTIVO</b><br><small style="color: #9ca3af;">Converse com o J.A.R.V.I.S. sobre as métricas ou solicite cruzamentos adicionais.</small></div>', unsafe_allow_html=True)
 
     if "mensagens" not in st.session_state:
@@ -238,7 +233,7 @@ def main():
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        resp = f"Compreendido, Sr. Adriano. Analisando o comando '{prompt}' com base nos registos do inventário atual. O núcleo executivo está a processar as diretrizes operacionais para otimizar a acuracidade."
+        resp = "Compreendido, Sr. Adriano. Analisando o comando '" + prompt + "' com base nos registos do inventário atual. O núcleo executivo está a processar as diretrizes operacionais para otimizar a acuracidade."
         salvar_memoria("Sr. Adriano", prompt, resp)
 
         st.session_state.mensagens.append({"role": "assistant", "content": resp})
@@ -246,4 +241,6 @@ def main():
             st.markdown(resp)
             st.components.v1.html(gerar_audio_html(resp), height=45)
 
-if __name__ == "__main
+if __name__ == "__main__":
+    main()
+                        
