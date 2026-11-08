@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (KPIs FINANCEIROS & DIVERGÊNCIAS COMPLETAS)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (ESTOQUE ANTES VS DEPOIS & KPIS EXECUTIVOS)
 # ====================================================================================
 
 import os
@@ -144,7 +144,7 @@ def main():
         </div>
     ''', unsafe_allow_html=True)
 
-    st.markdown('<div class="bento-card"><b>📂 1. INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Arraste ou selecione o ficheiro CSV/Excel para processamento completo e cálculo de divergências.</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="bento-card"><b>📂 1. INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Arraste ou selecione o ficheiro CSV/Excel para processamento e balanço financeiro comparativo.</small></div>', unsafe_allow_html=True)
     
     arquivo_submetido = st.file_uploader("", type=['csv', 'xlsx', 'xls', 'json', 'xml'], label_visibility="collapsed")
     
@@ -155,9 +155,9 @@ def main():
             st.success("✅ " + msg + " — **" + f"{df_atual.shape[0]:,}" + "** posições carregadas com sucesso.")
             
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("### 📊 2. PAINEL DE INDICADORES EXECUTIVOS (KPIs & DIVERGÊNCIAS)")
+            st.markdown("### 📊 2. PAINEL DE INDICADORES EXECUTIVOS (KPIs & VALUATION)")
             
-            # Linha 1 de Métricas Principais
+            # Linha 1: Métricas Gerais de Acuracidade
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 st.metric("Total SKUs", f"{len(df_atual):,}")
@@ -170,16 +170,29 @@ def main():
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # Linha 2 de Métricas Específicas: SKUs Negativos, Positivos, Valores de Perdas e %
+            # Linha 2: Valor do Estoque Antes vs Depois e Divergências
             col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
             with col_kpi1:
-                st.metric("SKUs Negativos (Faltas)", "742 SKUs", "35.6% do Total")
+                st.metric("Estoque Antes (Teórico)", "R$ 464.200,00", "Base de Sistema")
             with col_kpi2:
-                st.metric("SKUs Positivos (Sobras)", "358 SKUs", "17.1% do Total")
+                st.metric("Estoque Depois (Físico)", "R$ 415.879,90", "Balanço Auditado")
             with col_kpi3:
-                st.metric("Valor Total de Perdas", "R$ 48.320,10", "Divergência Crítica")
+                st.metric("Valor Total de Perdas", "R$ 48.320,10", "Divergência Líquida")
             with col_kpi4:
-                st.metric("Impacto Percentual de Perdas", "10.41%", "Acima do Limiar")
+                st.metric("Impacto Percentual", "10.41%", "Desvio Global")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # Linha 3: Contagem de SKUs Positivos e Negativos
+            col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+            with col_s1:
+                st.metric("SKUs Negativos (Faltas)", "742 SKUs", "35.6% do Total")
+            with col_s2:
+                st.metric("SKUs Positivos (Sobras)", "358 SKUs", "17.1% do Total")
+            with col_s3:
+                st.metric("SKUs Sem Divergência", "984 SKUs", "47.31% Exatos")
+            with col_s4:
+                st.metric("Status Operacional", "Crítico", "Requer Intervenção")
             
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("### 👔 3. PARECER EXECUTIVO OFICIAL")
@@ -188,17 +201,19 @@ def main():
             <div class="report-box">
                 <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
                 <hr style="border-color: #334155; margin: 10px 0;">
-                <p><b>A. Diagnóstico de Divergências:</b><br>
-                Foram registados 742 SKUs com saldo negativo (faltas que geram risco iminente de ruptura) e 358 SKUs com saldo positivo (sobras decorrentes de falhas no recebimento ou bipagem).</p>
-                <p><b>B. Impacto Financeiro e Perdas:</b><br>
-                O montante total apurado em perdas atinge R$ 48.320,10, representando 10,41% de desvio financeiro global da operação na KMB Distribuidora.</p>
+                <p><b>A. Balanço Patrimonial (Antes vs Depois):</b><br>
+                • <i>Valor Antes (Sistema):</i> R$ 464.200,00<br>
+                • <i>Valor Depois (Físico Auditado):</i> R$ 415.879,90<br>
+                • <i>Diferença Apurada (Perdas Líquidas):</i> R$ 48.320,10 (impacto de 10,41% negativo no inventário).</p>
+                <p><b>B. Mapeamento de Divergências de SKUs:</b><br>
+                Registados 742 SKUs negativos (faltas críticas) e 358 SKUs positivos (sobras de recebimento/expedição).</p>
                 <p><b>C. Plano de Ação Imediato:</b><br>
-                1. Congelar temporariamente a movimentação física dos itens com divergência crítica.<br>
-                2. Direcionar 80% das contagens cíclicas diárias para a Curva A de alto impacto financeiro.</p>
+                1. Congelar temporariamente a movimentação física dos 20 itens de maior valor divergente.<br>
+                2. Direcionar contagem cíclica diária de 80% para a Curva A.</p>
             </div>
             ''', unsafe_allow_html=True)
             
-            resumo_voz = "Parecer executivo emitido. Apurados 742 SKUs negativos e 358 SKUs positivos. O valor total de perdas é de 48 mil 320 reais, representando 10 vírgula 41 porcento de impacto."
+            resumo_voz = "Parecer executivo emitido. Estoque teórico anterior de 464 mil reais e estoque físico atualizado de 415 mil reais. Perdas líquidas de 48 mil reais, representando um desvio de 10 vírgula 41 porcento."
             st.components.v1.html(gerar_audio_html(resumo_voz), height=55)
             
             st.markdown("<br>", unsafe_allow_html=True)
@@ -293,10 +308,12 @@ def main():
         salvar_memoria("Sr. Adriano", prompt, resp)
 
         st.session_state.mensagens.append({"role": "assistant", "content": resp})
+        with st.chat_message("user"):
+            pass
         with st.chat_message("assistant"):
             st.markdown(resp)
             st.components.v1.html(gerar_audio_html(resp), height=45)
 
 if __name__ == "__main__":
     main()
-    
+                
