@@ -1,7 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (AUDITORIA EXECUTIVA LIMPA E RESPONSIVA)
-# ====================================================================================
-# Operador: Sr. Adriano Braz Martins
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (AUDITORIA EXECUTIVA LIMPA)
 # ====================================================================================
 
 import os
@@ -79,8 +77,8 @@ def processar_arquivo_upload(arquivo_carregado):
         return None, f"Erro ao processar ficheiro: {str(e)}"
 
 def gerar_audio_html(texto):
-    texto_limpo = texto.replace("'", "\\'").replace('"', '\\"').replace("\n", " ").replace("#", "")
-    html_code = f\"\"\"
+    texto_limpo = texto.replace("'", "").replace('"', '').replace("\n", " ").replace("#", "")
+    html_code = f"""
         <script>
         function falarJarvis() {{
             if ('speechSynthesis' in window) {{
@@ -101,7 +99,7 @@ def gerar_audio_html(texto):
             border-radius: 20px; cursor: pointer; margin: 10px 0; font-family: monospace;">
             🔊 OUVIR PARECER EXECUTIVO (VOZ J.A.R.V.I.S.)
         </button>
-    \"\"\"
+    """
     return html_code
 
 def main():
@@ -113,7 +111,7 @@ def main():
         layout="wide"
     )
 
-    st.markdown(\"\"\"
+    st.markdown("""
         <style>
         .stApp { background-color: #050811; color: #e6edf3; font-family: 'Consolas', monospace; }
         .jarvis-title {
@@ -126,7 +124,7 @@ def main():
             border-left: 4px solid #00f2fe; border-radius: 6px; padding: 14px; margin-bottom: 12px;
         }
         </style>
-    \"\"\", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     st.markdown('<div class="jarvis-title">⚡ NOVA-CORE // AUDITORIA EXECUTIVA</div>', unsafe_allow_html=True)
     st.caption("PAINEL DE ACURACIDADE E SUPORTE À DIRETORIA")
@@ -145,7 +143,6 @@ def main():
             st.markdown("---")
             st.markdown("### 📊 INDICADORES DE ACURACIDADE DE ESTOQUE")
             
-            # 4 Métricas Executivas Principais em Cards
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 st.metric("Total SKUs", f"{len(df_atual):,}")
@@ -158,31 +155,28 @@ def main():
             
             st.markdown("---")
             
-            # Relatório Executivo Formatado Limpo
             st.markdown("### 👔 PARECER EXECUTIVO PARA A DIRETORIA")
-            st.markdown(\"\"\"
+            st.markdown("""
             * **Data de Emissão:** Novembro de 2026  
             * **Auditor Responsável:** J.A.R.V.I.S. / Sr. Adriano Braz Martins  
 
             #### 1. Diagnóstico e Indicadores Chave (KPIs)
-            * O inventário atual aponta para desvios acentuados no giro de mercadorias, exigindo intervenção nos processos de expedição e recebimento da KMB Distribuidora.
+            * O inventário atual aponta para desvios acentuados no giro de mercadorias, exigindo intervenção nos processos de expedição e recebimento.
             
             #### 2. Impacto Financeiro e Riscos
             * **Divergências Negativas (Faltas):** Risco iminente de ruptura de vendas.
-            * **Divergências Positivas (Sobras):** Indicativo de falha na bipagem de entrada ou erros de alocação física nos corredores.
+            * **Divergências Positivas (Sobras):** Indicativo de falha na bipagem de entrada ou erros de alocação física.
 
             #### 3. Plano de Ação Recomendado
-            1. **Bloqueio Imediato:** Congelar a movimentação dos 20 SKUs de maior valor monetário com divergência.
+            1. **Bloqueio Imediato:** Congelar a movimentação dos 20 SKUs de maior valor com divergência.
             2. **Inventário Cíclico Diário:** Direcionar 80% do esforço de contagem para a Curva A.
-            \"\"\")
+            """)
             
-            # Botão de Voz para o Relatório Executivo
             resumo_voz = "Parecer executivo emitido. Acuracidade financeira em oitenta e nove vírgula cinquenta e nove porcento. Recomenda-se contagem cíclica imediata na curva A."
             st.components.v1.html(gerar_audio_html(resumo_voz), height=55)
             
             st.markdown("---")
             
-            # Visualização Limpa: Tabela e Gráfico lado a lado
             t1, t2 = st.columns([1, 1])
             with t1:
                 st.markdown("##### 📋 Prévia dos Dados")
@@ -229,3 +223,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
