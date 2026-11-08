@@ -1,8 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (DESIGN EXECUTIVO SUPREMO)
-# ====================================================================================
-# Operador: Sr. Adriano Braz Martins
-# Padrão Visual: Bento Grid, Cartões Executivos, Zero Ruído e Alta Densidade de Dados
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (UI EXECUTIVA PERFEITA)
 # ====================================================================================
 
 import os
@@ -114,7 +111,6 @@ def main():
         layout="wide"
     )
 
-    # Estilização CSS Avançada (Padrão Bento Grid Dark Neon Executivo)
     st.markdown("""
         <style>
         .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
@@ -127,8 +123,6 @@ def main():
             background: linear-gradient(90deg, #00f2fe 0%, #3b82f6 100%);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
-        
-        /* Cartões de Layout Bento */
         .bento-card {
             background: rgba(17, 24, 39, 0.7); 
             border: 1px solid rgba(31, 41, 55, 0.8);
@@ -138,18 +132,15 @@ def main():
             margin-bottom: 15px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-        
         .report-box {
             background: rgba(15, 23, 42, 0.85);
             border: 1px solid #334155;
             border-radius: 8px;
             padding: 20px;
-            line-height: 1.6;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Header Superior
     st.markdown("""
         <div class="main-header">
             <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
@@ -157,7 +148,6 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    # Bloco de Ingestão
     st.markdown('<div class="bento-card"><b>📂 1. INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Arraste ou selecione o ficheiro CSV/Excel para processamento instantâneo.</small></div>', unsafe_allow_html=True)
     
     arquivo_submetido = st.file_uploader("", type=['csv', 'xlsx', 'xls', 'json', 'xml'], label_visibility="collapsed")
@@ -171,7 +161,6 @@ def main():
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("### 📊 2. PAINEL DE INDICADORES (KPIs)")
             
-            # 4 Cartões Métricos Estilizados
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 st.metric("Total SKUs", f"{len(df_atual):,}")
@@ -184,26 +173,23 @@ def main():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # Parecer Executivo em Bloco Destacado
             st.markdown("### 👔 3. PARECER EXECUTIVO OFICIAL")
+            
             st.markdown("""
             <div class="report-box">
                 <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
                 <hr style="border-color: #334155; margin: 10px 0;">
                 <p><b>A. Diagnóstico e Alertas Críticos:</b><br>
                 O inventário atual aponta desvios volumétricos acentuados no giro de mercadorias. A acuracidade financeira está abaixo do limiar aceitável pela diretoria (98%).</p>
-                
                 <p><b>B. Riscos Operacionais Mapeados:</b><br>
                 • <i>Faltas (Divergências Negativas):</i> Elevado risco de ruptura nas prateleiras e atrasos na distribuição.<br>
                 • <i>Sobras (Divergências Positivas):</i> Sintoma de falha na conferência de recebimento ou troca de SKUs na expedição.</p>
-                
                 <p><b>C. Plano de Ação Imediato:</b><br>
                 1. Congelar temporariamente a movimentação física dos 20 itens de maior valor com divergência.<br>
                 2. Implementar contagem cíclica diária focada em 80% do valor da Curva A.</p>
             </div>
             """, unsafe_allow_html=True)
             
-            # Botão de Voz Integrado
             resumo_voz = "Parecer executivo emitido para a diretoria. Acuracidade financeira em oitenta e nove vírgula cinquenta e nove porcento. Recomenda-se bloqueio imediato dos itens divergentes da curva A."
             st.components.v1.html(gerar_audio_html(resumo_voz), height=55)
             
@@ -216,51 +202,5 @@ def main():
                 st.dataframe(df_atual.head(8), use_container_width=True)
             
             with t2:
-                st.markdown("##### 📊 Distribuição Visual")
-                num_cols = df_atual.select_dtypes(include=['number']).columns.tolist()
-                if len(num_cols) >= 1:
-                    fig = px.bar(df_atual.head(15), x=df_atual.columns[0], y=num_cols[0], template="plotly_dark")
-                    fig.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)", 
-                        plot_bgcolor="rgba(0,0,0,0)", 
-                        margin=dict(t=10, b=10, l=10, r=10),
-                        font=dict(family="monospace", size=11)
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("O ficheiro não possui colunas numéricas para gráficos.")
-        else:
-            st.error(f"❌ {msg}")
-
-    st.markdown("---")
-    
-    # Bloco de Diálogo
-    st.markdown('<div class="hud-box"><b>💬 5. CENTRAL DE DIÁLOGO EXECUTIVO</b><br><small style="color: #9ca3af;">Converse com o J.A.R.V.I.S. sobre as métricas ou solicite cruzamentos adicionais.</small></div>', unsafe_allow_html=True)
-
-    if "mensagens" not in st.session_state:
-        st.session_state.mensagens = [
-            {"role": "assistant", "content": "Olá, Sr. Adriano. Núcleo executivo online. Como posso auxiliar nas diretrizes da KMB Distribuidora hoje?"}
-        ]
-
-    for m in st.session_state.mensagens:
-        with st.chat_message(m["role"]):
-            st.markdown(m["content"])
-            if m["role"] == "assistant":
-                st.components.v1.html(gerar_audio_html(m["content"]), height=45)
-
-    if prompt := st.chat_input("Digite o seu comando executivo ou pergunta:"):
-        st.session_state.mensagens.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        resp = f"Compreendido, Sr. Adriano. Analisando o comando '{prompt}' com base nos registos do inventário atual. O núcleo executivo está a processar as diretrizes operacionais para otimizar a acuracidade."
-        salvar_memoria("Sr. Adriano", prompt, resp)
-
-        st.session_state.mensagens.append({"role": "assistant", "content": resp})
-        with st.chat_message("assistant"):
-            st.markdown(resp)
-            st.components.v1.html(gerar_audio_html(resp), height=45)
-
-if __name__ == "__main__":
-    main()
-    
+                st.markdown("##### 📊
+                            
