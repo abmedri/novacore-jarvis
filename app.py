@@ -154,8 +154,14 @@ def main():
                 diferenca_monetaria = soma_depois - soma_antes
                 impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
 
-                skus_exatos = (df_filtrado['Ajuste'] == 0).sum() if 'Ajuste' in df_filtrado.columns else int(total_pos * 0.5)
-                acur_vol_real = (skus_exatos / total_pos * 100) if total_pos > 0 else 0
+                # Novos Indicadores Calculados
+                qtd_falta = (df_filtrado['Ajuste'] < 0).sum() if 'Ajuste' in df_filtrado.columns else 0
+                qtd_sobra = (df_filtrado['Ajuste'] > 0).sum() if 'Ajuste' in df_filtrado.columns else 0
+                qtd_exatos = (df_filtrado['Ajuste'] == 0).sum() if 'Ajuste' in df_filtrado.columns else int(total_pos * 0.5)
+                
+                total_divergencias = qtd_falta + qtd_sobra
+                perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0
+                acur_vol_real = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0
                 acur_fin_real = max(0.0, min(100.0, 100.0 - abs(impacto_perc) * 2.5))
 
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
@@ -164,10 +170,12 @@ def main():
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{total_pos:,}".replace(',', '.'), "Total Processado", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica", f"{acur_vol_real:.2f}%".replace('.', ','), "Desvio Físico", eh_negativo=(acur_vol_real < 95), eh_positivo=(acur_vol_real >= 95)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{qtd_falta:,} ({(qtd_falta/total_pos*100):.2f}%)".replace('.', ','), "Quebra de Estoque", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Total Falta + Sobra (Divergências)", f"{total_divergencias:,} itens".replace(',', '.'), f"{perc_divergencia:.2f}% Taxa de Erro".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
                 with c2:
-                    st.markdown(formatar_kpi_html("Acuracidade Financeira", f"{acur_fin_real:.2f}%".replace('.', ','), "Aderência Patrimonial", eh_negativo=(acur_fin_real < 95), eh_positivo=(acur_fin_real >= 95)), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("SKUs Exatos (Zero Faltas)", f"{skus_exatos:,} ({skus_exatos/total_pos*100:.2f}%)".replace('.', ','), "Itens sem Divergência", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{qtd_sobra:,} ({(qtd_sobra/total_pos*100):.2f}%)".replace('.', ','), "Excesso Detectado", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica Real", f"{acur_vol_real:.2f}%".replace('.', ','), "Meta Corporativa 95%", eh_negativo=(acur_vol_real < 95), eh_positivo=(acur_vol_real >= 95)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Acuracidade Financeira Real", f"{acur_fin_real:.2f}%".replace('.', ','), "Aderência Patrimonial", eh_negativo=(acur_fin_real < 95), eh_positivo=(acur_fin_real >= 95)), unsafe_allow_html=True)
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.markdown("##### 💰 Balanço Patrimonial & Divergência Monetária (Antes vs Depois)")
@@ -303,7 +311,12 @@ def main():
                     
                     soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
                     
-                    skus_exatos = (df_item['Ajuste'] == 0).sum() if 'Ajuste' in df_item.columns else int(total_pos * 0.5)
+                    qtd_falta = (df_item['Ajuste'] < 0).sum() if 'Ajuste' in df_item.columns else 0
+                    qtd_sobra = (df_item['Ajuste'] > 0).sum() if 'Ajuste' in df_item.columns else 0
+                    qtd_exatos = (df_item['Ajuste'] == 0).sum() if 'Ajuste' in df_item.columns else int(total_pos * 0.5)
+                    
+                    total_divergências = qtd_falta + qtd_sobra
+                    perc_divergencia = (total_divergências / total_pos * 100) if total_pos > 0 else 0
                     
                     if 'Congelado' in df_item.columns and 'Custo' in df_item.columns:
                         soma_val_antes = (df_item['Congelado'] * df_item['Custo']).sum()
@@ -316,7 +329,7 @@ def main():
                     impacto_perc_glob = (diferenca_monetaria_item / soma_val_antes) * 100 if soma_val_antes > 0 else 0
                     
                     acur_fin_din = max(0.0, min(100.0, 100.0 - abs(impacto_perc_glob) * 2.5))
-                    acur_vol_din = (skus_exatos / total_pos * 100) if total_pos > 0 else 0
+                    acur_vol_din = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0
                     
                     cor_imp = "#ef4444" if impacto_perc_glob < 0 else "#10b981"
                     sinal_imp = "" if impacto_perc_glob < 0 else "+"
@@ -333,9 +346,12 @@ def main():
                             st.divider()
                             st.metric(label="Valor Total", value=f"R$ {soma_val_real:,.2f}", delta="Saldo Efetivo Real", delta_color="normal")
                             st.markdown(f"**Total SKUs Auditados:** `{total_pos:,}`".replace(',', '.'))
+                            st.markdown(f"**Produtos com Falta:** <span style='color: #ef4444; font-weight: bold;'>{qtd_falta:,} ({(qtd_falta/total_pos*100):.2f}%)</span>".replace('.', ','), unsafe_allow_html=True)
+                            st.markdown(f"**Produtos com Sobra:** <span style='color: #ef4444; font-weight: bold;'>{qtd_sobra:,} ({(qtd_sobra/total_pos*100):.2f}%)</span>".replace('.', ','), unsafe_allow_html=True)
+                            st.markdown(f"**Total Falta + Sobra:** <span style='color: #ef4444; font-weight: bold;'>{total_divergências:,} ({perc_divergencia:.2f}%)</span>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**Acuracidade Financeira:** <span style='color: {cor_fin}; font-weight: bold;'>{sinal_fin}{acur_fin_din:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**Acuracidade Volumétrica:** <span style='color: {cor_vol}; font-weight: bold;'>{sinal_vol}{acur_vol_din:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
-                            st.markdown(f"**Impacto Percentual Global:** <span style='color: {cor_imp}; font-weight: bold;'>{sinal_imp}{impacto_perc_glob:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
+                            st.markdown(f"**Impacto Global:** <span style='color: {cor_imp}; font-weight: bold;'>{sinal_imp}{impacto_perc_glob:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
                             st.divider()
                             st.markdown(f"**Valor Pré-Inventário:** R$ {soma_val_antes:,.2f}")
 
