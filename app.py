@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (EXECUTIVO SUPREMO)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (ANÁLISE GRÁFICA EXECUTIVA AVANÇADA)
 # ====================================================================================
 
 import os
@@ -7,9 +7,8 @@ import sqlite3
 import pandas as pd
 import streamlit as st
 import xml.etree.ElementTree as ET
-import urllib.request
-import json
 import plotly.express as px
+import plotly.graph_objects as go
 
 DB_FILE = "novacore_jarvis.db"
 
@@ -145,7 +144,7 @@ def main():
         </div>
     ''', unsafe_allow_html=True)
 
-    st.markdown('<div class="bento-card"><b>📂 1. INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Arraste ou selecione o ficheiro CSV/Excel para processamento instantâneo.</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="bento-card"><b>📂 1. INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Arraste ou selecione o ficheiro CSV/Excel para processamento completo e análise avançada.</small></div>', unsafe_allow_html=True)
     
     arquivo_submetido = st.file_uploader("", type=['csv', 'xlsx', 'xls', 'json', 'xml'], label_visibility="collapsed")
     
@@ -190,32 +189,76 @@ def main():
             st.components.v1.html(gerar_audio_html(resumo_voz), height=55)
             
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("### 📈 4. ANÁLISE GRÁFICA & MATRIZ DE DADOS")
+            st.markdown("### 📈 4. CENTRAL DE INTELIGÊNCIA GRÁFICA & MATRIZ DE DADOS")
             
-            t1, t2 = st.columns([1, 1])
-            with t1:
-                st.markdown("##### 📋 Prévia Estruturada")
-                st.dataframe(df_atual.head(8), use_container_width=True)
+            num_cols = df_atual.select_dtypes(include=['number']).columns.tolist()
+            cat_cols = df_atual.select_dtypes(include=['object']).columns.tolist()
             
-            with t2:
-                st.markdown("##### 📊 Distribuição Visual")
-                num_cols = df_atual.select_dtypes(include=['number']).columns.tolist()
-                if len(num_cols) >= 1:
-                    fig = px.bar(df_atual.head(15), x=df_atual.columns[0], y=num_cols[0], template="plotly_dark")
-                    fig.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)", 
-                        plot_bgcolor="rgba(0,0,0,0)", 
-                        margin=dict(t=10, b=10, l=10, r=10),
-                        font=dict(family="monospace", size=11)
+            if len(num_cols) >= 1:
+                tab_g1, tab_g2, tab_g3, tab_tabela = st.tabs(["📊 Distribuição de Valores", "📈 Dispersão Avançada", "🍩 Proporção de Categorias", "📋 Prévia Completa"])
+                
+                with tab_g1:
+                    st.markdown("##### Análise de Frequência e Volume por Item")
+                    col_Y = st.selectbox("Métrica para o Gráfico de Barras:", num_cols, index=0)
+                    fig_bar = px.bar(
+                        df_atual.head(25), 
+                        x=df_atual.columns[0], 
+                        y=col_Y, 
+                        color=col_Y,
+                        color_continuous_scale="Tealgrn",
+                        template="plotly_dark",
+                        title=f"Top 25 SKUs - {col_Y}"
                     )
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("O ficheiro não possui colunas numéricas para gráficos.")
+                    fig_bar.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(t=30, b=20, l=20, r=20))
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                
+                with tab_g2:
+                    st.markdown("##### Gráfico de Dispersão Executivo (Correlação)")
+                    if len(num_cols) >= 2:
+                        col_X = st.selectbox("Eixo X:", num_cols, index=0)
+                        col_Y2 = st.selectbox("Eixo Y:", num_cols, index=1 if len(num_cols) > 1 else 0)
+                        fig_scatter = px.scatter(
+                            df_atual, 
+                            x=col_X, 
+                            y=col_Y2, 
+                            color=num_cols[0],
+                            color_continuous_scale="Viridis",
+                            template="plotly_dark",
+                            title=f"Correlação: {col_X} vs {col_Y2}"
+                        )
+                        fig_scatter.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(t=30, b=20, l=20, r=20))
+                        st.plotly_chart(fig_scatter, use_container_width=True)
+                    else:
+                        st.info("São necessárias pelo menos duas colunas numéricas para o gráfico de dispersão.")
+                
+                with tab_g3:
+                    st.markdown("##### Distribuição Proporcional")
+                    if len(cat_cols) >= 1:
+                        col_cat = st.selectbox("Categoria para Agrupamento:", cat_cols)
+                        df_grouped = df_atual.groupby(col_cat).size().reset_index(name='Contagem').head(15)
+                        fig_pie = px.pie(
+                            df_grouped, 
+                            names=col_cat, 
+                            values='Contagem', 
+                            hole=0.4,
+                            template="plotly_dark",
+                            title=f"Proporção de Registos por {col_cat}"
+                        )
+                        fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(t=30, b=20, l=20, r=20))
+                        st.plotly_chart(fig_pie, use_container_width=True)
+                    else:
+                        st.info("Não há colunas textuais/categóricas suficientes para o gráfico de rosca.")
+                
+                with tab_tabela:
+                    st.markdown("##### Matriz de Dados Completa e Auditada")
+                    st.dataframe(df_atual, use_container_width=True, height=400)
+            else:
+                st.info("O ficheiro não possui colunas numéricas suficientes para gerar gráficos avançados.")
         else:
             st.error("❌ " + msg)
 
     st.markdown("---")
-    st.markdown('<div class="bento-card"><b>💬 5. CENTRAL DE DIÁLOGO EXECUTIVO</b><br><small style="color: #9ca3af;">Converse com o J.A.R.V.I.S. sobre as métricas ou solicite cruzamentos adicionais.</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="bento-card"><b>💬 5. CENTRAL DE DIÁLOGO EXECUTIVO</b><br><small style="color: #9ca3af;">Converse com o J.A.R.V.I.S. sobre las métricas ou solicite cruzamentos adicionais.</small></div>', unsafe_allow_html=True)
 
     if "mensagens" not in st.session_state:
         st.session_state.mensagens = [
@@ -243,4 +286,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-                        
+    
