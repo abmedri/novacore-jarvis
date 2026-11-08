@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (PLATAFORMA ESTRUTURADA EM 5 ETAPAS LOGÍSTICAS)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (PLATAFORMA VERTICAL DE AUDITORIA EXECUTIVA)
 # ====================================================================================
 
 import os
@@ -76,6 +76,7 @@ def main():
     border: 1px solid #334155;
     border-radius: 8px;
     padding: 20px;
+    margin-bottom: 15px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -83,13 +84,12 @@ def main():
     st.markdown("""
 <div class="main-header">
     <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
-    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE & ACURACIDADE (FLUXO EM 5 ETAPAS)</div>
+    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (LAYOUT VERTICAL)</div>
 </div>
 """, unsafe_allow_html=True)
 
-    st.sidebar.markdown("### 🎛️ CONTROLES & FILTROS DE AUDITORIA")
-    
-    st.markdown('<div class="bento-card"><b>📂 INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Carregue o arquivo CSV/Excel para desbloquear as 5 Etapas de Auditoria Executiva.</small></div>', unsafe_allow_html=True)
+    st.sidebar.markdown("### 🎛️ CONTROLES & FILTROS")
+    st.markdown('<div class="bento-card"><b>📂 INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Carregue o arquivo CSV/Excel para iniciar a auditoria vertical.</small></div>', unsafe_allow_html=True)
     
     arquivo_submetido = st.file_uploader("", type=['csv', 'xlsx', 'xls', 'json', 'xml'], label_visibility="collapsed")
     
@@ -104,11 +104,9 @@ def main():
             )
             
             df_filtrado = df_atual.copy()
-            
             st.success("✅ " + msg + " — **" + f"{df_filtrado.shape[0]:,}".replace(',', '.') + "** posições carregadas.")
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # Exportação de Relatório Executivo
             st.sidebar.markdown("---")
             st.sidebar.markdown("### 📥 RELATÓRIOS EXECUTIVOS")
             csv_data = df_filtrado.to_csv(index=False, sep=';', encoding='utf-8-sig')
@@ -123,7 +121,7 @@ def main():
             cat_cols = df_filtrado.select_dtypes(include=['object']).columns.tolist()
             all_cols = df_filtrado.columns.tolist()
 
-            # DIVISÃO ORGANIZADA EM 5 ETAPAS LÓGICAS (MÓDULOS)
+            # DISPOSIÇÃO VERTICAL EM ABAS EMPILHADAS (5 ETAPAS)
             etapa1, etapa2, etapa3, etapa4, etapa5 = st.tabs([
                 "ETAPA 1: Visão Geral & Parecer",
                 "ETAPA 2: Acuracidade & Curva ABC",
@@ -133,58 +131,33 @@ def main():
             ])
 
             # ----------------------------------------------------
-            # ETAPA 1: VISÃO GERAL & PARECER EXECUTIVO
+            # ETAPA 1: VERTICAL EMPILHADA
             # ----------------------------------------------------
             with etapa1:
-                st.markdown("#### 📌 ETAPA 1: Painel Executivo e Parecer do Auditor")
+                st.markdown("#### 📌 ETAPA 1: Painel Executivo (Disposição Vertical)")
                 st.markdown("<br>", unsafe_allow_html=True)
                 
-                c1, c2, c3, c4 = st.columns(4)
-                with c1:
-                    st.metric("Total SKUs Auditados", f"{len(df_filtrado):,}".replace(',', '.'))
-                with c2:
-                    st.metric("Acuracidade Financeira", "89,59%", "-8,41% vs Meta")
-                with c3:
-                    st.metric("Acuracidade Volumétrica", "76,50%", "-13,5% vs Meta")
-                with c4:
-                    st.metric("SKUs Exatos (Zero Faltas)", "47,31%", "Atenção Crítica")
+                # Layout estritamente vertical usando blocos empilhados (cartões bento)
+                st.markdown('<div class="report-box"><b>📊 Acuracidade Geral do Inventário</b><br>'
+                            '• Acuracidade Financeira: <b>89,59%</b> (-8,41% vs Meta)<br>'
+                            '• Acuracidade Volumétrica: <b>76,50%</b> (-13,5% vs Meta)<br>'
+                            '• SKUs Exatos (Zero Faltas): <b>47,31%</b> (Atenção Crítica)</div>', unsafe_allow_html=True)
 
-                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<div class="report-box"><b>💰 Balanço Patrimonial & Valuation</b><br>'
+                            '• Estoque Antes (Teórico): <b>R$ 464.200,00</b><br>'
+                            '• Estoque Depois (Físico): <b>R$ 415.879,90</b><br>'
+                            '• Valor Total de Perdas: <b>R$ 48.320,10</b> (Impacto de 10,41%)</div>', unsafe_allow_html=True)
 
-                col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
-                with col_kpi1:
-                    st.metric("Estoque Antes (Teórico)", "R$ 464.200,00", "Base de Sistema")
-                with col_kpi2:
-                    st.metric("Estoque Depois (Físico)", "R$ 415.879,90", "Balanço Auditado")
-                with col_kpi3:
-                    st.metric("Valor Total de Perdas", "R$ 48.320,10", "Divergência Líquida")
-                with col_kpi4:
-                    st.metric("Impacto Percentual", "10,41%", "Desvio Global")
+                st.markdown('<div class="report-box"><b>📦 Mapeamento de Posições (SKUs)</b><br>'
+                            '• SKUs Negativos (Faltas): <b>742 SKUs</b> (35,6% do Total)<br>'
+                            '• SKUs Positivos (Sobras): <b>358 SKUs</b> (17,1% do Total)<br>'
+                            '• SKUs Sem Divergência: <b>984 SKUs</b> (47,31% Exatos)</div>', unsafe_allow_html=True)
 
-                st.markdown("<br>", unsafe_allow_html=True)
-
-                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-                with col_s1:
-                    st.metric("SKUs Negativos (Faltas)", "742 SKUs", "35,6% do Total")
-                with col_s2:
-                    st.metric("SKUs Positivos (Sobras)", "358 SKUs", "17,1% do Total")
-                with col_s3:
-                    st.metric("SKUs Sem Divergência", "984 SKUs", "47,31% Exatos")
-                with col_s4:
-                    st.metric("Status Operacional", "Crítico", "Requer Intervenção")
-
-                st.markdown("<br>", unsafe_allow_html=True)
                 st.markdown("""
 <div class="report-box">
-    <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
+    <p><b>Parecer do Auditor (J.A.R.V.I.S. / Sr. Adriano Braz Martins):</b></p>
     <hr style="border-color: #334155; margin: 10px 0;">
-    <p><b>A. Balanço Patrimonial (Antes vs Depois):</b><br>
-    • <i>Valor Antes (Sistema):</i> R$ 464.200,00<br>
-    • <i>Valor Depois (Físico Auditado):</i> R$ 415.879,90<br>
-    • <i>Diferença Apurada (Perdas Líquidas):</i> R$ 48.320,10 (impacto de 10,41% negativo no inventário).</p>
-    <p><b>B. Mapeamento de Divergências de SKUs:</b><br>
-    Registados 742 SKUs negativos (faltas críticas) e 358 SKUs positivos (sobras de recebimento/expedição).</p>
-    <p><b>C. Plano de Ação Imediato:</b><br>
+    <p><b>Plano de Ação Imediato:</b><br>
     1. Congelar temporariamente a movimentação física dos 20 itens de maior valor divergente (Curva A).<br>
     2. Direcionar contagem cíclica diária de 80% para os itens com divergência negativa crítica.</p>
 </div>
@@ -241,60 +214,35 @@ def main():
                     st.info("O ficheiro não possui colunas numéricas suficientes.")
 
             # ----------------------------------------------------
-            # ETAPA 3: RUPTURA & COBERTURA OPERACIONAL
+            # ETAPA 3: RUPTURA & COBERTURA
             # ----------------------------------------------------
             with etapa3:
-                st.markdown("#### ⏱️ ETAPA 3: Prevenção de Ruptura & Dias de Cobertura")
+                st.markdown("#### ⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura")
                 if len(num_cols) >= 1:
-                    sub_tab1, sub_tab2 = st.tabs(["⏱️ Dias de Cobertura", "⚠️ Matriz de Criticidade"])
+                    col_estoque_qtd = st.selectbox("Selecione a coluna de Estoque Físico:", num_cols, index=0, key="cob_qtd_mod")
+                    vazao_diaria = st.slider("Média estimada de consumo/saída diária por SKU (unidades):", min_value=1, max_value=500, value=25, key="vazao_mod")
                     
-                    with sub_tab1:
-                        col_estoque_qtd = st.selectbox("Selecione a coluna de Estoque Físico:", num_cols, index=0, key="cob_qtd_mod")
-                        vazao_diaria = st.slider("Média estimada de consumo/saída diária por SKU (unidades):", min_value=1, max_value=500, value=25, key="vazao_mod")
-                        
-                        df_cob = df_filtrado.copy()
-                        df_cob['Dias_Cobertura'] = df_cob[col_estoque_qtd] / vazao_diaria
-                        
-                        fig_cob = px.histogram(
-                            df_cob,
-                            x='Dias_Cobertura',
-                            nbins=30,
-                            color_discrete_sequence=['#00f2fe'],
-                            template="plotly_dark",
-                            title="Distribuição de Dias de Cobertura antes de Ruptura Total"
-                        )
-                        fig_cob.update_layout(
-                            paper_bgcolor="rgba(0,0,0,0)", 
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            xaxis_title="Dias de Autonomia",
-                            yaxis_title="Quantidade de SKUs"
-                        )
-                        st.plotly_chart(fig_cob, use_container_width=True)
-
-                    with sub_tab2:
-                        if len(num_cols) >= 2:
-                            col_x_crit = st.selectbox("Eixo X (Volume/Quantidade):", num_cols, index=0, key="crit_x_mod")
-                            col_y_crit = st.selectbox("Eixo Y (Divergência/Valor):", num_cols, index=1 if len(num_cols) > 1 else 0, key="crit_y_mod")
-                            
-                            fig_crit = px.scatter(
-                                df_filtrado, 
-                                x=col_x_crit, 
-                                y=col_y_crit, 
-                                color=num_cols[0],
-                                color_continuous_scale="Viridis",
-                                template="plotly_dark",
-                                title=f"Mapeamento de Risco: {col_x_crit} vs {col_y_crit}"
-                            )
-                            fig_crit.update_layout(
-                                paper_bgcolor="rgba(0,0,0,0)", 
-                                plot_bgcolor="rgba(0,0,0,0)", 
-                                xaxis=dict(tickformat=',.0f'),
-                                yaxis=dict(tickformat=',.0f')
-                            )
-                            st.plotly_chart(fig_crit, use_container_width=True)
+                    df_cob = df_filtrado.copy()
+                    df_cob['Dias_Cobertura'] = df_cob[col_estoque_qtd] / vazao_diaria
+                    
+                    fig_cob = px.histogram(
+                        df_cob,
+                        x='Dias_Cobertura',
+                        nbins=30,
+                        color_discrete_sequence=['#00f2fe'],
+                        template="plotly_dark",
+                        title="Distribuição de Dias de Cobertura antes de Ruptura Total"
+                    )
+                    fig_cob.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)", 
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        xaxis_title="Dias de Autonomia",
+                        yaxis_title="Quantidade de SKUs"
+                    )
+                    st.plotly_chart(fig_cob, use_container_width=True)
 
             # ----------------------------------------------------
-            # ETAPA 4: CAUSA RAIZ & INTELIGÊNCIA PROCESSUAL
+            # ETAPA 4: CAUSA RAIZ & PROCESSOS
             # ----------------------------------------------------
             with etapa4:
                 st.markdown("#### 🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria")
@@ -320,55 +268,52 @@ def main():
                     )
                     st.plotly_chart(fig_giro, use_container_width=True)
                 else:
-                    st.info("São necessárias colunas de categoria (texto) e valor (número) para este diagnóstico.")
+                    st.info("São necessárias colunas de categoria e valor para este diagnóstico.")
 
             # ----------------------------------------------------
-            # ETAPA 5: SIMULAÇÃO & TENDÊNCIA HISTÓRICA
+            # ETAPA 5: SIMULAÇÃO & TENDÊNCIA
             # ----------------------------------------------------
             with etapa5:
                 st.markdown("#### 🧮 ETAPA 5: Simulador Contábil & Evolução Histórica")
-                sim_tab1, sim_tab2 = st.tabs(["🧮 Simulador What-If", "📈 Evolução Histórica"])
                 
-                with sim_tab1:
-                    col_sim1, col_sim2 = st.columns(2)
-                    with col_sim1:
-                        pct_perdao_sobras = st.slider("Percentual de Regularização de Sobras (%):", 0, 100, 50, key="sim_sob_mod")
-                    with col_sim2:
-                        pct_baixa_faltas = st.slider("Percentual de Baixa Contábil de Faltas (%):", 0, 100, 30, key="sim_fal_mod")
-                        
-                    valor_perda_original = 48320.10
-                    novo_impacto = valor_perda_original * (1 - (pct_baixa_faltas / 100.0))
-                    economia_gerada = valor_perda_original - novo_impacto
+                col_sim1, col_sim2 = st.columns(2)
+                with col_sim1:
+                    pct_perdao_sobras = st.slider("Percentual de Regularização de Sobras (%):", 0, 100, 50, key="sim_sob_mod")
+                with col_sim2:
+                    pct_baixa_faltas = st.slider("Percentual de Baixa Contábil de Faltas (%):", 0, 100, 30, key="sim_fal_mod")
                     
-                    st.markdown(f"""
-                    <div style="background: rgba(30, 41, 59, 0.9); padding: 15px; border-radius: 8px; border-left: 4px solid #00f2fe;">
-                        <b>Resultado da Simulação de Impacto:</b><br>
-                        • Valor Original de Perda Apurada: <b>R$ 48.320,10</b><br>
-                        • Novo Valor de Ajuste Proposto: <b>R$ {novo_impacto:,.2f}</b><br>
-                        • Regularização Aprovada: <b>R$ {economia_gerada:,.2f}</b> recuperados para o balanço.
-                    </div>
-                    """, unsafe_allow_html=True)
+                valor_perda_original = 48320.10
+                novo_impacto = valor_perda_original * (1 - (pct_baixa_faltas / 100.0))
+                economia_gerada = valor_perda_original - novo_impacto
+                
+                st.markdown(f"""
+                <div style="background: rgba(30, 41, 59, 0.9); padding: 15px; border-radius: 8px; border-left: 4px solid #00f2fe; margin-bottom: 20px;">
+                    <b>Resultado da Simulação de Impacto:</b><br>
+                    • Valor Original de Perda Apurada: <b>R$ 48.320,10</b><br>
+                    • Novo Valor de Ajuste Proposto: <b>R$ {novo_impacto:,.2f}</b><br>
+                    • Regularização Aprovada: <b>R$ {economia_gerada:,.2f}</b> recuperados para o balanço.
+                </div>
+                """, unsafe_allow_html=True)
 
-                with sim_tab2:
-                    df_hist = pd.DataFrame({
-                        "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
-                        "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, 89.59],
-                        "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, 76.50]
-                    })
-                    
-                    fig_hist = px.line(
-                        df_hist, 
-                        x="Inventário", 
-                        y=["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"],
-                        markers=True,
-                        template="plotly_dark",
-                        title="Tendência de Melhora da Acuracidade Geral"
-                    )
-                    fig_hist.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)", 
-                        plot_bgcolor="rgba(0,0,0,0)"
-                    )
-                    st.plotly_chart(fig_hist, use_container_width=True)
+                df_hist = pd.DataFrame({
+                    "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
+                    "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, 89.59],
+                    "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, 76.50]
+                })
+                
+                fig_hist = px.line(
+                    df_hist, 
+                    x="Inventário", 
+                    y=["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"],
+                    markers=True,
+                    template="plotly_dark",
+                    title="Tendência de Melhora da Acuracidade Geral"
+                )
+                fig_hist.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)", 
+                    plot_bgcolor="rgba(0,0,0,0)"
+                )
+                st.plotly_chart(fig_hist, use_container_width=True)
 
         else:
             st.error("❌ " + msg)
