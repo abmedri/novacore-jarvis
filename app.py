@@ -156,17 +156,16 @@ def main():
                 col_val = num_cols[idx_val] if num_cols else None
                 soma_depois = df_filtrado[col_val].sum() if col_val in df_filtrado.columns else 0
 
-                if 'Congelado' in df_filtrado.columns and 'Custo' in df_filtrado.columns:
-                    soma_antes = (df_filtrado['Congelado'] * df_filtrado['Custo']).sum()
-                else:
-                    soma_antes = soma_depois * 1.05
+                val_ajuste_col = next((c for c in num_cols if 'ajuste' in c.lower()), None)
+                soma_ajuste = df_filtrado[val_ajuste_col].sum() if val_ajuste_col and val_ajuste_col in df_filtrado.columns else 0
+                soma_antes = soma_depois - soma_ajuste
 
-                diferenca_monetaria = soma_depois - soma_antes
+                diferenca_monetaria = soma_ajuste
                 impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
 
                 col_kpi1, col_kpi2 = st.columns(2)
                 with col_kpi1:
-                    st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {soma_antes:,.2f}", "Saldo Inicial Congelado", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {soma_antes:,.2f}", "Saldo Inicial Teórico", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"{impacto_perc:.2f}% Desvio", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
                 with col_kpi2:
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {soma_depois:,.2f}", "Saldo Final Efetivo", eh_positivo=True), unsafe_allow_html=True)
@@ -267,7 +266,7 @@ def main():
                         st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (COM ORDEM SOLICITADA)
+            # MODO 2: MÚLTIPLOS FICHEIROS (COM CÁLCULOS 100% SINCRONIZADOS)
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
@@ -294,22 +293,8 @@ def main():
                     col_temp = num_cols_item[idx_temp] if num_cols_item and idx_temp < len(num_cols_item) else (num_cols_item[0] if num_cols_item else None)
                     
                     soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
-                    media_val = df_item[col_temp].mean() if col_temp and col_temp in df_item.columns else 0
                     
-                    skus_exatos_val = 0
-                    if 'Ajuste' in df_item.columns:
-                        aj = pd.to_numeric(df_item['Ajuste'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce').fillna(0)
-                        skus_exatos_val = (aj == 0).sum()
-                    elif 'Congelado' in df_item.columns and 'Saldo em Estoque' in df_item.columns:
-                        skus_exatos_val = (df_item['Congelado'] == df_item['Saldo em Estoque']).sum()
-                    else:
-                        skus_exatos_val = int(total_pos * 0.5)
-                        
-                    pct_exatos = (skus_exatos_val / total_pos * 100) if total_pos > 0 else 0
-                    acur_fin = max(0.0, min(100.0, 100.0 - abs(pct_exatos - 100) * 0.3))
-                    acur_vol = max(0.0, min(100.0, 100.0 - abs(pct_exatos - 100) * 0.5))
-                    
-                    # Cálculo do Valor Pré-Inventário (Antes) e Impacto Percentual Global
+                    # Cálculo idêntico ao Modo 1 para Valor Pré-Inventário e Impacto Global
                     val_ajuste_col = next((c for c in num_cols_item if 'ajuste' in c.lower()), None)
                     soma_ajuste = df_item[val_ajuste_col].sum() if val_ajuste_col and val_ajuste_col in df_item.columns else 0
                     soma_val_antes = soma_val_real - soma_ajuste
