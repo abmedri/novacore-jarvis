@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (PLATAFORMA VERTICAL DE AUDITORIA EXECUTIVA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (PLATAFORMA VERTICAL ESTRUTURADA)
 # ====================================================================================
 
 import os
@@ -84,12 +84,12 @@ def main():
     st.markdown("""
 <div class="main-header">
     <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
-    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (LAYOUT VERTICAL)</div>
+    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (ETAPAS NA VERTICAL & KPIs PRESERVADOS)</div>
 </div>
 """, unsafe_allow_html=True)
 
     st.sidebar.markdown("### 🎛️ CONTROLES & FILTROS")
-    st.markdown('<div class="bento-card"><b>📂 INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Carregue o arquivo CSV/Excel para iniciar a auditoria vertical.</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="bento-card"><b>📂 INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Carregue o arquivo CSV/Excel para iniciar a auditoria.</small></div>', unsafe_allow_html=True)
     
     arquivo_submetido = st.file_uploader("", type=['csv', 'xlsx', 'xls', 'json', 'xml'], label_visibility="collapsed")
     
@@ -121,7 +121,7 @@ def main():
             cat_cols = df_filtrado.select_dtypes(include=['object']).columns.tolist()
             all_cols = df_filtrado.columns.tolist()
 
-            # DISPOSIÇÃO VERTICAL EM ABAS EMPILHADAS (5 ETAPAS)
+            # ABAS EM FORMATO VERTICAL/EMPILHADO POR ETAPAS
             etapa1, etapa2, etapa3, etapa4, etapa5 = st.tabs([
                 "ETAPA 1: Visão Geral & Parecer",
                 "ETAPA 2: Acuracidade & Curva ABC",
@@ -131,33 +131,63 @@ def main():
             ])
 
             # ----------------------------------------------------
-            # ETAPA 1: VERTICAL EMPILHADA
+            # ETAPA 1: KPIs COMPLETOS COM CARTÕES E PARECER VERTICAL
             # ----------------------------------------------------
             with etapa1:
-                st.markdown("#### 📌 ETAPA 1: Painel Executivo (Disposição Vertical)")
+                st.markdown("#### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
                 st.markdown("<br>", unsafe_allow_html=True)
                 
-                # Layout estritamente vertical usando blocos empilhados (cartões bento)
-                st.markdown('<div class="report-box"><b>📊 Acuracidade Geral do Inventário</b><br>'
-                            '• Acuracidade Financeira: <b>89,59%</b> (-8,41% vs Meta)<br>'
-                            '• Acuracidade Volumétrica: <b>76,50%</b> (-13,5% vs Meta)<br>'
-                            '• SKUs Exatos (Zero Faltas): <b>47,31%</b> (Atenção Crítica)</div>', unsafe_allow_html=True)
+                # Linha 1 de KPIs (Cartões Nativos do Streamlit)
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    st.metric("Total SKUs Auditados", f"{len(df_filtrado):,}".replace(',', '.'))
+                with c2:
+                    st.metric("Acuracidade Financeira", "89,59%", "-8,41% vs Meta")
+                with c3:
+                    st.metric("Acuracidade Volumétrica", "76,50%", "-13,5% vs Meta")
+                with c4:
+                    st.metric("SKUs Exatos (Zero Faltas)", "47,31%", "Atenção Crítica")
 
-                st.markdown('<div class="report-box"><b>💰 Balanço Patrimonial & Valuation</b><br>'
-                            '• Estoque Antes (Teórico): <b>R$ 464.200,00</b><br>'
-                            '• Estoque Depois (Físico): <b>R$ 415.879,90</b><br>'
-                            '• Valor Total de Perdas: <b>R$ 48.320,10</b> (Impacto de 10,41%)</div>', unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
 
-                st.markdown('<div class="report-box"><b>📦 Mapeamento de Posições (SKUs)</b><br>'
-                            '• SKUs Negativos (Faltas): <b>742 SKUs</b> (35,6% do Total)<br>'
-                            '• SKUs Positivos (Sobras): <b>358 SKUs</b> (17,1% do Total)<br>'
-                            '• SKUs Sem Divergência: <b>984 SKUs</b> (47,31% Exatos)</div>', unsafe_allow_html=True)
+                # Linha 2 de KPIs
+                col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+                with col_kpi1:
+                    st.metric("Estoque Antes (Teórico)", "R$ 464.200,00", "Base de Sistema")
+                with col_kpi2:
+                    st.metric("Estoque Depois (Físico)", "R$ 415.879,90", "Balanço Auditado")
+                with col_kpi3:
+                    st.metric("Valor Total de Perdas", "R$ 48.320,10", "Divergência Líquida")
+                with col_kpi4:
+                    st.metric("Impacto Percentual", "10,41%", "Desvio Global")
 
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                # Linha 3 de KPIs
+                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                with col_s1:
+                    st.metric("SKUs Negativos (Faltas)", "742 SKUs", "35,6% do Total")
+                with col_s2:
+                    st.metric("SKUs Positivos (Sobras)", "358 SKUs", "17,1% do Total")
+                with col_s3:
+                    st.metric("SKUs Sem Divergência", "984 SKUs", "47,31% Exatos")
+                with col_s4:
+                    st.metric("Status Operacional", "Crítico", "Requer Intervenção")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                # Parecer Executivo Oficial em bloco vertical isolado
                 st.markdown("""
 <div class="report-box">
-    <p><b>Parecer do Auditor (J.A.R.V.I.S. / Sr. Adriano Braz Martins):</b></p>
+    <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
     <hr style="border-color: #334155; margin: 10px 0;">
-    <p><b>Plano de Ação Imediato:</b><br>
+    <p><b>A. Balanço Patrimonial (Antes vs Depois):</b><br>
+    • <i>Valor Antes (Sistema):</i> R$ 464.200,00<br>
+    • <i>Valor Depois (Físico Auditado):</i> R$ 415.879,90<br>
+    • <i>Diferença Apurada (Perdas Líquidas):</i> R$ 48.320,10 (impacto de 10,41% negativo no inventário).</p>
+    <p><b>B. Mapeamento de Divergências de SKUs:</b><br>
+    Registados 742 SKUs negativos (faltas críticas) e 358 SKUs positivos (sobras de recebimento/expedição).</p>
+    <p><b>C. Plano de Ação Imediato:</b><br>
     1. Congelar temporariamente a movimentação física dos 20 itens de maior valor divergente (Curva A).<br>
     2. Direcionar contagem cíclica diária de 80% para os itens com divergência negativa crítica.</p>
 </div>
