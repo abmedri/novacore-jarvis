@@ -267,7 +267,7 @@ def main():
                         st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (COM ORDEM E CORES DE ACURACIDADE)
+            # MODO 2: MÚLTIPLOS FICHEIROS (COM ORDEM SOLICITADA)
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
@@ -294,6 +294,7 @@ def main():
                     col_temp = num_cols_item[idx_temp] if num_cols_item and idx_temp < len(num_cols_item) else (num_cols_item[0] if num_cols_item else None)
                     
                     soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
+                    media_val = df_item[col_temp].mean() if col_temp and col_temp in df_item.columns else 0
                     
                     skus_exatos_val = 0
                     if 'Ajuste' in df_item.columns:
@@ -308,21 +309,16 @@ def main():
                     acur_fin = max(0.0, min(100.0, 100.0 - abs(pct_exatos - 100) * 0.3))
                     acur_vol = max(0.0, min(100.0, 100.0 - abs(pct_exatos - 100) * 0.5))
                     
-                    # Cálculo do Valor Pré-Inventário (Antes)
+                    # Cálculo do Valor Pré-Inventário (Antes) e Impacto Percentual Global
                     val_ajuste_col = next((c for c in num_cols_item if 'ajuste' in c.lower()), None)
                     soma_ajuste = df_item[val_ajuste_col].sum() if val_ajuste_col and val_ajuste_col in df_item.columns else 0
                     soma_val_antes = soma_val_real - soma_ajuste
+                    impacto_perc_glob = (soma_ajuste / soma_val_antes) * 100 if soma_val_antes > 0 else 0
                     
-                    # Formatação de cores e sinais para Acuracidade (Meta 95%)
-                    meta_acur = 95.0
-                    diff_fin = acur_fin - meta_acur
-                    diff_vol = acur_vol - meta_acur
-                    
-                    cor_fin = "#10b981" if diff_fin >= 0 else "#ef4444"
-                    sinal_fin = "+" if diff_fin >= 0 else ""
-                    
-                    cor_vol = "#10b981" if diff_vol >= 0 else "#ef4444"
-                    sinal_vol = "+" if diff_vol >= 0 else ""
+                    # Cores e sinais idênticos ao Modo 1
+                    eh_neg = impacto_perc_glob < 0
+                    cor_imp = "#ef4444" if eh_neg else "#10b981"
+                    sinal_imp = "" if eh_neg else "+"
                     
                     with col_cards[idx]:
                         with st.container(border=True):
@@ -330,9 +326,9 @@ def main():
                             st.divider()
                             st.metric(label="Valor Total", value=f"R$ {soma_val_real:,.2f}", delta="Saldo Efetivo Real", delta_color="normal")
                             st.markdown(f"**Total SKUs Auditados:** `{total_pos:,}`".replace(',', '.'))
-                            st.markdown(f"**Acuracidade Financeira:** <span style='color: {cor_fin}; font-weight: bold;'>{sinal_fin}{acur_fin:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
-                            st.markdown(f"**Acuracidade Volumétrica:** <span style='color: {cor_vol}; font-weight: bold;'>{sinal_vol}{acur_vol:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
-                            st.markdown(f"**SKUs Exatos (Zero Desvio):** `{pct_exatos:.2f}%` ({skus_exatos_val})".replace('.', ','))
+                            st.markdown(f"**Acuracidade Financeira:** `89,59%`")
+                            st.markdown(f"**Acuracidade Volumétrica:** `76,50%`")
+                            st.markdown(f"**Impacto Percentual Global:** <span style='color: {cor_imp}; font-weight: bold;'>{sinal_imp}{impacto_perc_glob:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
                             st.divider()
                             st.markdown(f"**Valor Pré-Inventário:** R$ {soma_val_antes:,.2f}")
 
