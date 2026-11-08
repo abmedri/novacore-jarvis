@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (SUPORTE A MÚLTIPLOS ARQUIVOS / COMPARAÇÃO)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (CORREÇÃO DEFINITIVA DAS 5 ETAPAS)
 # ====================================================================================
 
 import os
@@ -28,7 +28,7 @@ def processar_arquivo_upload(arquivo_carregado):
                                 df[col] = pd.to_numeric(conv)
                             except Exception:
                                 pass
-                    return df, "Arquivo processado com sucesso (" + enc + ")."
+                    return df, "Inventário processado com sucesso (" + enc + ")."
                 except Exception:
                     continue
             return None, "Erro: Não foi possível decodificar o ficheiro CSV."
@@ -104,12 +104,12 @@ def main():
     st.markdown("""
 <div class="main-header">
     <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
-    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA & COMPARAÇÃO MULTI-INVENTÁRIO</div>
+    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (5 ETAPAS COMPLETAS)</div>
 </div>
 """, unsafe_allow_html=True)
 
     st.sidebar.markdown("### 🎛️ CONTROLES & FILTROS")
-    st.markdown('<div class="bento-card"><b>📂 INGESTÃO DE MÚLTIPLOS ARQUIVOS</b><br><small style="color: #9ca3af;">Carregue 1, 2 ou 3 arquivos para análise unitária ou comparativa.</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="bento-card"><b>📂 INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Carregue o arquivo CSV/Excel para iniciar a auditoria.</small></div>', unsafe_allow_html=True)
     
     arquivos_submetidos = st.file_uploader("", type=['csv', 'xlsx', 'xls', 'json', 'xml'], accept_multiple_files=True, label_visibility="collapsed")
     
@@ -126,13 +126,14 @@ def main():
         if lista_dfs:
             st.success(f"✅ {len(lista_dfs)} arquivo(s) processado(s) com sucesso!")
             
-            # MODO 1: APENAS 1 ARQUIVO (MODO PADRÃO COMPLETO)
+            # SE HOUVER APENAS 1 FICHEIRO, EXIBE AS 5 ETAPAS COMPLETAS COM EIXOS DINÂMICOS
             if len(lista_dfs) == 1:
                 df_filtrado = lista_dfs[0]
                 num_cols = df_filtrado.select_dtypes(include=['number']).columns.tolist()
                 cat_cols = df_filtrado.select_dtypes(include=['object']).columns.tolist()
                 all_cols = df_filtrado.columns.tolist()
 
+                # ETAPA 1
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
                 st.markdown("<br>", unsafe_allow_html=True)
                 
@@ -155,32 +156,123 @@ def main():
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico)", "R$ 415.879,90", "Balanço Auditado", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Impacto Percentual", "10,41%", "Desvio Global", eh_negativo=True), unsafe_allow_html=True)
 
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("##### 📦 Distribuição Física dos SKUs Auditados")
+
+                col_s1, col_s2 = st.columns(2)
+                with col_s1:
+                    st.markdown(formatar_kpi_html("SKUs Negativos (Faltas)", "742 SKUs", "35,60% do Total", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("SKUs Sem Divergência", "984 SKUs", "47,31% Exatos", eh_positivo=True), unsafe_allow_html=True)
+                with col_s2:
+                    st.markdown(formatar_kpi_html("SKUs Positivos (Sobras)", "358 SKUs", "17,10% do Total", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Status Operacional", "Crítico", "Requer Intervenção", eh_negativo=True), unsafe_allow_html=True)
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("""
+<div class="report-box">
+    <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
+    <hr style="border-color: #334155; margin: 10px 0;">
+    <p><b>A. Balanço Patrimonial (Antes vs Depois):</b><br>
+    • <i>Valor Antes (Sistema):</i> R$ 464.200,00<br>
+    • <i>Valor Depois (Físico Auditado):</i> R$ 415.879,90<br>
+    • <i>Diferença Apurada (Perdas Líquidas):</i> R$ 48.320,10 (impacto de 10,41% negativo no inventário).</p>
+    <p><b>B. Mapeamento de Divergências de SKUs:</b><br>
+    Registados 742 SKUs negativos (faltas críticas) e 358 SKUs positivos (sobras de recebimento/expedição).</p>
+    <p><b>C. Plano de Ação Imediato:</b><br>
+    1. Congelar temporariamente a movimentação física dos 20 itens de maior valor divergente (Curva A).<br>
+    2. Direcionar contagem cíclica diária de 80% para os itens com divergência negativa crítica.</p>
+</div>
+""", unsafe_allow_html=True)
+
                 st.markdown("---")
-                with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC", expanded=True):
+
+                # ETAPA 2
+                with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     if len(num_cols) >= 1:
                         c_x2, c_y2 = st.columns(2)
                         with c_x2:
-                            eixo_x_abc = st.selectbox("Eixo X (SKU/Produto):", all_cols, index=0, key="abc_x1")
+                            eixo_x_abc = st.selectbox("Eixo X (Identificador/SKU/Produto):", all_cols, index=0, key="abc_x_din")
                         with c_y2:
-                            eixo_y_abc = st.selectbox("Eixo Y (Valor/Quantidade):", num_cols, index=0, key="abc_y1")
+                            eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário/Quantidade):", num_cols, index=0, key="abc_y_din")
                         
                         df_abc = df_filtrado.sort_values(by=eixo_y_abc, ascending=False).copy()
                         df_abc['Soma_Acumulada'] = df_abc[eixo_y_abc].cumsum()
                         soma_total = df_abc[eixo_y_abc].sum()
+                        
                         if soma_total > 0:
                             df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
-                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (80%)" if p <= 80 else ("Classe B (15%)" if p <= 95 else "Classe C (5%)"))
+                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (Alto Valor / 80%)" if p <= 80 else ("Classe B (Médio Valor / 15%)" if p <= 95 else "Classe C (Baixo Valor / 5%)"))
                             
-                            fig_abc = px.bar(df_abc.head(40), x=eixo_x_abc, y=eixo_y_abc, color='Classe_ABC', template="plotly_dark", title="Curva ABC")
-                            fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                            opcoes_curvas = ["Todas as Curvas", "Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"]
+                            curva_selecionada = st.selectbox("Filtrar Exibição por Curva ABC:", opcoes_curvas, key="filtro_curva_abc")
+                            
+                            df_abc_plot = df_abc.copy()
+                            if curva_selecionada != "Todas as Curvas":
+                                df_abc_plot = df_abc[df_abc['Classe_ABC'] == curva_selecionada]
+                            
+                            fig_abc = px.bar(df_abc_plot.head(50), x=eixo_x_abc, y=eixo_y_abc, color='Classe_ABC', template="plotly_dark", title=f"Classificação ABC ({curva_selecionada})")
+                            fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'), yaxis=dict(tickformat=',.0f'))
                             st.plotly_chart(fig_abc, use_container_width=True)
 
-            # MODO 2: MÚLTIPLOS ARQUIVOS (COMPARAÇÃO DIRETA ENTRE 2 OU 3 INVENTÁRIOS)
+                # ETAPA 3
+                with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
+                    if len(num_cols) >= 1:
+                        c_x3, c_y3 = st.columns(2)
+                        with c_x3:
+                            eixo_x_cob = st.selectbox("Eixo X (Métrica de Cobertura/Estoque):", num_cols, index=0, key="cob_x_din")
+                        with c_y3:
+                            eixo_y_cob = st.selectbox("Eixo Y (Frequência / Contagem de SKUs):", ["Contagem de SKUs"] + num_cols, index=0, key="cob_y_din")
+                        
+                        vazao_diaria = st.slider("Média estimada de consumo/saída diária por SKU (unidades):", min_value=1, max_value=500, value=25, key="vazao_mod")
+                        df_cob = df_filtrado.copy()
+                        df_cob['Dias_Cobertura'] = df_cob[eixo_x_cob] / vazao_diaria
+                        
+                        fig_cob = px.histogram(df_cob, x='Dias_Cobertura', nbins=30, color_discrete_sequence=['#00f2fe'], template="plotly_dark", title="Distribuição de Dias de Cobertura")
+                        fig_cob.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Dias de Autonomia", yaxis_title="Quantidade de SKUs")
+                        st.plotly_chart(fig_cob, use_container_width=True)
+
+                # ETAPA 4
+                with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
+                    if len(cat_cols) >= 1 and len(num_cols) >= 1:
+                        c_x4, c_y4 = st.columns(2)
+                        with c_x4:
+                            eixo_x_giro = st.selectbox("Eixo X (Categoria / Grupo):", cat_cols, key="giro_x_din")
+                        with c_y4:
+                            eixo_y_giro = st.selectbox("Eixo Y (Valor Somado / Métrica):", num_cols, key="giro_y_din")
+                        
+                        df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().sort_values(by=eixo_y_giro, ascending=False).head(15)
+                        fig_giro = px.bar(df_giro, x=eixo_x_giro, y=eixo_y_giro, color=eixo_y_giro, color_continuous_scale="Blues", template="plotly_dark", title=f"Análise por {eixo_x_giro}")
+                        fig_giro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", yaxis=dict(tickformat=',.0f'))
+                        st.plotly_chart(fig_giro, use_container_width=True)
+
+                # ETAPA 5
+                with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
+                    col_sim1, col_sim2 = st.columns(2)
+                    with col_sim1:
+                        pct_perdao_sobras = st.slider("Percentual de Regularização de Sobras (%):", 0, 100, 50, key="sim_sob_mod")
+                    with col_sim2:
+                        pct_baixa_faltas = st.slider("Percentual de Baixa Contábil de Faltas (%):", 0, 100, 30, key="sim_fal_mod")
+                    
+                    df_hist = pd.DataFrame({
+                        "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
+                        "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, 89.59],
+                        "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, 76.50]
+                    })
+                    c_x5, c_y5 = st.columns(2)
+                    with c_x5:
+                        eixo_x_hist = st.selectbox("Eixo X (Período / Histórico):", df_hist.columns.tolist(), index=0, key="hist_x_din")
+                    with c_y5:
+                        eixo_y_hist = st.multiselect("Eixo Y (Métricas de Acuracidade Histórica):", ["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"], default=["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"], key="hist_y_din")
+                    
+                    if eixo_y_hist:
+                        fig_hist = px.line(df_hist, x=eixo_x_hist, y=eixo_y_hist, markers=True, template="plotly_dark", title="Evolução Histórica")
+                        fig_hist.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_hist, use_container_width=True)
+
+            # SE HOUVER 2 OU MAIS FICHEIROS, EXIBE O MODO DE COMPARAÇÃO
             else:
                 st.markdown("### 📊 MODO DE COMPARAÇÃO MULTI-INVENTÁRIO")
                 st.info(f"Comparando simultaneamente **{len(lista_dfs)} arquivos** carregados: " + ", ".join(nomes_arquivos))
-                
-                # Tabela comparativa de resumo
                 dados_comparacao = []
                 for idx, df_comp in enumerate(lista_dfs):
                     num_c = df_comp.select_dtypes(include=['number']).columns.tolist()
@@ -190,19 +282,10 @@ def main():
                         "Total de Posições (SKUs)": len(df_comp),
                         "Soma Métrica Principal": f"{soma_val:,.2f}"
                     })
-                
                 df_resumo_comp = pd.DataFrame(dados_comparacao)
                 st.dataframe(df_resumo_comp, use_container_width=True)
                 
-                # Gráfico comparativo de volume entre os arquivos
-                fig_comp = px.bar(
-                    df_resumo_comp,
-                    x="Arquivo / Inventário",
-                    y="Total de Posições (SKUs)",
-                    color="Arquivo / Inventário",
-                    template="plotly_dark",
-                    title="Comparativo de Volume de SKUs entre Inventários"
-                )
+                fig_comp = px.bar(df_resumo_comp, x="Arquivo / Inventário", y="Total de Posições (SKUs)", color="Arquivo / Inventário", template="plotly_dark", title="Comparativo de Volume de SKUs")
                 fig_comp.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                 st.plotly_chart(fig_comp, use_container_width=True)
 
@@ -211,4 +294,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
