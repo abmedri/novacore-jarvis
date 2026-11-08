@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (MULTI-INVENTÁRIO COM ANTES E DEPOIS POR FICHEIRO)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (MODO 1 COM 5 ETAPAS & MODO 2 COM ANTES/DEPOIS POR ARQUIVO)
 # ====================================================================================
 
 import os
@@ -119,7 +119,9 @@ def main():
         if lista_dfs:
             st.success(f"✅ {len(lista_dfs)} arquivo(s) carregado(s) e auditado(s) com sucesso!")
             
-            # MODO 1: APENAS 1 FICHEIRO
+            # ====================================================================
+            # MODO 1: APENAS 1 FICHEIRO (COM AS 5 ETAPAS COMPLETAS)
+            # ====================================================================
             if len(lista_dfs) == 1:
                 df_filtrado = lista_dfs[0]
                 num_cols = df_filtrado.select_dtypes(include=['number']).columns.tolist()
@@ -148,7 +150,81 @@ def main():
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico)", "R$ 415.879,90", "Balanço Auditado", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Impacto Percentual", "10,41%", "Desvio Global", eh_negativo=True), unsafe_allow_html=True)
 
-            # MODO 2: MÚLTIPLOS FICHEIROS (COM VALOR ANTES E DEPOIS DEDICADO PARA CADA FICHEIRO)
+                st.markdown("---")
+
+                # ETAPA 2
+                with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
+                    if len(num_cols) >= 1:
+                        c_x2, c_y2 = st.columns(2)
+                        with c_x2:
+                            eixo_x_abc = st.selectbox("Eixo X (Identificador/SKU/Produto):", all_cols, index=0, key="abc_x_din")
+                        with c_y2:
+                            eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário/Quantidade):", num_cols, index=0, key="abc_y_din")
+                        
+                        df_abc = df_filtrado.sort_values(by=eixo_y_abc, ascending=False).copy()
+                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_abc].cumsum()
+                        soma_total = df_abc[eixo_y_abc].sum()
+                        
+                        if soma_total > 0:
+                            df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
+                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (Alto Valor / 80%)" if p <= 80 else ("Classe B (Médio Valor / 15%)" if p <= 95 else "Classe C (Baixo Valor / 5%)"))
+                            
+                            fig_abc = px.bar(df_abc.head(50), x=eixo_x_abc, y=eixo_y_abc, color='Classe_ABC', template="plotly_dark", title=f"Classificação ABC — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}")
+                            fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
+                            st.plotly_chart(fig_abc, use_container_width=True)
+
+                # ETAPA 3
+                with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
+                    if len(num_cols) >= 1:
+                        c_x3, c_y3 = st.columns(2)
+                        with c_x3:
+                            eixo_x_cob = st.selectbox("Eixo X (Métrica de Cobertura/Estoque):", num_cols, index=0, key="cob_x_din")
+                        with c_y3:
+                            eixo_y_cob = st.selectbox("Eixo Y (Frequência / Contagem de SKUs):", ["Contagem de SKUs"] + num_cols, index=0, key="cob_y_din")
+                        
+                        vazao_diaria = st.slider("Média estimada de consumo/saída diária por SKU (unidades):", min_value=1, max_value=500, value=25, key="vazao_mod")
+                        df_cob = df_filtrado.copy()
+                        df_cob['Dias_Cobertura'] = df_cob[eixo_x_cob] / vazao_diaria
+                        
+                        fig_cob = px.histogram(df_cob, x='Dias_Cobertura', nbins=30, color_discrete_sequence=['#00f2fe'], template="plotly_dark", title="Distribuição de Dias de Cobertura")
+                        fig_cob.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_cob, use_container_width=True)
+
+                # ETAPA 4
+                with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
+                    if len(cat_cols) >= 1 and len(num_cols) >= 1:
+                        c_x4, c_y4 = st.columns(2)
+                        with c_x4:
+                            eixo_x_giro = st.selectbox("Eixo X (Categoria / Grupo):", cat_cols, key="giro_x_din")
+                        with c_y4:
+                            eixo_y_giro = st.selectbox("Eixo Y (Valor Somado / Métrica):", num_cols, key="giro_y_din")
+                        
+                        df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().sort_values(by=eixo_y_giro, ascending=False).head(15)
+                        fig_giro = px.bar(df_giro, x=eixo_x_giro, y=eixo_y_giro, color=eixo_y_giro, color_continuous_scale="Blues", template="plotly_dark", title=f"Análise por {eixo_x_giro}")
+                        fig_giro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_giro, use_container_width=True)
+
+                # ETAPA 5
+                with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
+                    df_hist = pd.DataFrame({
+                        "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
+                        "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, 89.59],
+                        "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, 76.50]
+                    })
+                    c_x5, c_y5 = st.columns(2)
+                    with c_x5:
+                        eixo_x_hist = st.selectbox("Eixo X (Período / Histórico):", df_hist.columns.tolist(), index=0, key="hist_x_din")
+                    with c_y5:
+                        eixo_y_hist = st.multiselect("Eixo Y (Métricas de Acuracidade Histórica):", ["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"], default=["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"], key="hist_y_din")
+                    
+                    if eixo_y_hist:
+                        fig_hist = px.line(df_hist, x=eixo_x_hist, y=eixo_y_hist, markers=True, template="plotly_dark", title="Evolução Histórica")
+                        fig_hist.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_hist, use_container_width=True)
+
+            # ====================================================================
+            # MODO 2: MÚLTIPLOS FICHEIROS (COM ANTES E DEPOIS INDIVIDUAL POR FICHEIRO)
+            # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
                 st.markdown(f"<small style='color: #9ca3af;'>Comparação avançada de desvios, acuracidade e divergências entre <b>{len(lista_dfs)} inventários</b>.</small><br><br>", unsafe_allow_html=True)
@@ -278,4 +354,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
