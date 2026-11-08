@@ -267,7 +267,7 @@ def main():
                         st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (COM ORDEM SOLICITADA)
+            # MODO 2: MÚLTIPLOS FICHEIROS (COM ORDEM E CORES DE ACURACIDADE)
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
@@ -286,7 +286,6 @@ def main():
                 # 📌 ETAPA 1: INDICADORES EXECUTIVOS & ACURACIDADE POR FICHEIRO
                 st.markdown("### 📌 1. Indicadores Executivos & Acuracidade por Ficheiro")
                 
-                # Definimos temporariamente valores para exibir nos cards antes dos parâmetros dinâmicos se refinarem
                 col_cards = st.columns(len(lista_dfs))
                 for idx, df_item in enumerate(lista_dfs):
                     total_pos = len(df_item)
@@ -314,14 +313,25 @@ def main():
                     soma_ajuste = df_item[val_ajuste_col].sum() if val_ajuste_col and val_ajuste_col in df_item.columns else 0
                     soma_val_antes = soma_val_real - soma_ajuste
                     
+                    # Formatação de cores e sinais para Acuracidade (Meta 95%)
+                    meta_acur = 95.0
+                    diff_fin = acur_fin - meta_acur
+                    diff_vol = acur_vol - meta_acur
+                    
+                    cor_fin = "#10b981" if diff_fin >= 0 else "#ef4444"
+                    sinal_fin = "+" if diff_fin >= 0 else ""
+                    
+                    cor_vol = "#10b981" if diff_vol >= 0 else "#ef4444"
+                    sinal_vol = "+" if diff_vol >= 0 else ""
+                    
                     with col_cards[idx]:
                         with st.container(border=True):
                             st.markdown(f"#### 📄 {nomes_arquivos[idx]}")
                             st.divider()
                             st.metric(label="Valor Total", value=f"R$ {soma_val_real:,.2f}", delta="Saldo Efetivo Real", delta_color="normal")
                             st.markdown(f"**Total SKUs Auditados:** `{total_pos:,}`".replace(',', '.'))
-                            st.markdown(f"**Acuracidade Financeira:** `{acur_fin:.2f}%`".replace('.', ','))
-                            st.markdown(f"**Acuracidade Volumétrica:** `{acur_vol:.2f}%`".replace('.', ','))
+                            st.markdown(f"**Acuracidade Financeira:** <span style='color: {cor_fin}; font-weight: bold;'>{sinal_fin}{acur_fin:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
+                            st.markdown(f"**Acuracidade Volumétrica:** <span style='color: {cor_vol}; font-weight: bold;'>{sinal_vol}{acur_vol:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**SKUs Exatos (Zero Desvio):** `{pct_exatos:.2f}%` ({skus_exatos_val})".replace('.', ','))
                             st.divider()
                             st.markdown(f"**Valor Pré-Inventário:** R$ {soma_val_antes:,.2f}")
@@ -370,7 +380,6 @@ def main():
                 st.markdown("### 🔍 3. Auditoria de Variância Item a Item")
                 
                 if len(lista_dfs) >= 2:
-                    # Usa colunas padrão para a variabilidade inicial antes do menu de parâmetros
                     x_padrao_var = col_comum_x[0]
                     y_padrao_var = num_comum_y[idx_padrao_comp_y]
                     
