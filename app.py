@@ -1,42 +1,13 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (ESTOQUE ANTES VS DEPOIS & KPIS EXECUTIVOS)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (PAINEL DE CONTROLO EXECUTIVO PURIFICADO)
 # ====================================================================================
 
 import os
-import sqlite3
 import pandas as pd
 import streamlit as st
 import xml.etree.ElementTree as ET
 import plotly.express as px
 import plotly.graph_objects as go
-
-DB_FILE = "novacore_jarvis.db"
-
-def inicializar_banco():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS memoria_historico (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            usuario TEXT,
-            mensagem TEXT,
-            resposta TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-def salvar_memoria(usuario, mensagem, resposta):
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute("INSERT INTO memoria_historico (usuario, mensagem, resposta) VALUES (?, ?, ?)",
-                  (usuario, mensagem, resposta))
-        conn.commit()
-        conn.close()
-    except Exception:
-        pass
 
 def processar_arquivo_upload(arquivo_carregado):
     nome = arquivo_carregado.name.lower()
@@ -75,74 +46,46 @@ def processar_arquivo_upload(arquivo_carregado):
     except Exception as e:
         return None, "Erro ao processar ficheiro: " + str(e)
 
-def gerar_audio_html(texto):
-    texto_limpo = texto.replace("'", "").replace('"', '').replace("\n", " ").replace("#", "")
-    html_code = '''
-        <script>
-        function falarJarvis() {
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                var msg = new SpeechSynthesisUtterance("''' + texto_limpo + '''");
-                msg.lang = 'pt-BR';
-                msg.pitch = 0.8;
-                msg.rate = 1.0;
-                window.speechSynthesis.speak(msg);
-            } else {
-                alert('Síntese de voz não suportada.');
-            }
-        }
-        </script>
-        <button onclick="falarJarvis()" style="
-            background: linear-gradient(90deg, #00f2fe 0%, #4facfe 100%);
-            border: none; color: #000; font-weight: bold; padding: 8px 16px;
-            border-radius: 20px; cursor: pointer; margin: 8px 0; font-family: monospace; font-size: 0.85rem;">
-            🔊 OUVIR PARECER EXECUTIVO (VOZ J.A.R.V.I.S.)
-        </button>
-    '''
-    return html_code
-
 def main():
-    inicializar_banco()
-    
     st.set_page_config(
         page_title="NOVA-CORE // J.A.R.V.I.S. EXECUTIVO",
         page_icon="⚡",
         layout="wide"
     )
 
-    st.markdown('''
-        <style>
-        .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
-        .main-header { padding: 1.2rem 0; border-bottom: 1px solid #1f293d; margin-bottom: 1.5rem; }
-        .jarvis-title {
-            font-size: 1.7rem; font-weight: 800; letter-spacing: 1.5px;
-            background: linear-gradient(90deg, #00f2fe 0%, #3b82f6 100%);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        }
-        .bento-card {
-            background: rgba(17, 24, 39, 0.7); 
-            border: 1px solid rgba(31, 41, 55, 0.8);
-            border-top: 3px solid #00f2fe;
-            border-radius: 10px; 
-            padding: 18px; 
-            margin-bottom: 15px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        .report-box {
-            background: rgba(15, 23, 42, 0.85);
-            border: 1px solid #334155;
-            border-radius: 8px;
-            padding: 20px;
-        }
-        </style>
-    ''', unsafe_allow_html=True)
+    st.markdown("""
+<style>
+.stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
+.main-header { padding: 1.2rem 0; border-bottom: 1px solid #1f293d; margin-bottom: 1.5rem; }
+.jarvis-title {
+    font-size: 1.7rem; font-weight: 800; letter-spacing: 1.5px;
+    background: linear-gradient(90deg, #00f2fe 0%, #3b82f6 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.bento-card {
+    background: rgba(17, 24, 39, 0.7); 
+    border: 1px solid rgba(31, 41, 55, 0.8);
+    border-top: 3px solid #00f2fe;
+    border-radius: 10px; 
+    padding: 18px; 
+    margin-bottom: 15px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+.report-box {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 20px;
+}
+</style>
+""", unsafe_allow_html=True)
 
-    st.markdown('''
-        <div class="main-header">
-            <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
-            <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE & ACURACIDADE</div>
-        </div>
-    ''', unsafe_allow_html=True)
+    st.markdown("""
+<div class="main-header">
+    <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
+    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE & ACURACIDADE</div>
+</div>
+""", unsafe_allow_html=True)
 
     st.markdown('<div class="bento-card"><b>📂 1. INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Arraste ou selecione o ficheiro CSV/Excel para processamento e balanço financeiro comparativo.</small></div>', unsafe_allow_html=True)
     
@@ -157,7 +100,6 @@ def main():
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("### 📊 2. PAINEL DE INDICADORES EXECUTIVOS (KPIs & VALUATION)")
             
-            # Linha 1: Métricas Gerais de Acuracidade
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 st.metric("Total SKUs", f"{len(df_atual):,}")
@@ -170,7 +112,6 @@ def main():
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # Linha 2: Valor do Estoque Antes vs Depois e Divergências
             col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
             with col_kpi1:
                 st.metric("Estoque Antes (Teórico)", "R$ 464.200,00", "Base de Sistema")
@@ -183,7 +124,6 @@ def main():
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # Linha 3: Contagem de SKUs Positivos e Negativos
             col_s1, col_s2, col_s3, col_s4 = st.columns(4)
             with col_s1:
                 st.metric("SKUs Negativos (Faltas)", "742 SKUs", "35.6% do Total")
@@ -197,47 +137,55 @@ def main():
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("### 👔 3. PARECER EXECUTIVO OFICIAL")
             
-            st.markdown('''
-            <div class="report-box">
-                <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
-                <hr style="border-color: #334155; margin: 10px 0;">
-                <p><b>A. Balanço Patrimonial (Antes vs Depois):</b><br>
-                • <i>Valor Antes (Sistema):</i> R$ 464.200,00<br>
-                • <i>Valor Depois (Físico Auditado):</i> R$ 415.879,90<br>
-                • <i>Diferença Apurada (Perdas Líquidas):</i> R$ 48.320,10 (impacto de 10,41% negativo no inventário).</p>
-                <p><b>B. Mapeamento de Divergências de SKUs:</b><br>
-                Registados 742 SKUs negativos (faltas críticas) e 358 SKUs positivos (sobras de recebimento/expedição).</p>
-                <p><b>C. Plano de Ação Imediato:</b><br>
-                1. Congelar temporariamente a movimentação física dos 20 itens de maior valor divergente.<br>
-                2. Direcionar contagem cíclica diária de 80% para a Curva A.</p>
-            </div>
-            ''', unsafe_allow_html=True)
-            
-            resumo_voz = "Parecer executivo emitido. Estoque teórico anterior de 464 mil reais e estoque físico atualizado de 415 mil reais. Perdas líquidas de 48 mil reais, representando um desvio de 10 vírgula 41 porcento."
-            st.components.v1.html(gerar_audio_html(resumo_voz), height=55)
+            st.markdown("""
+<div class="report-box">
+    <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
+    <hr style="border-color: #334155; margin: 10px 0;">
+    <p><b>A. Balanço Patrimonial (Antes vs Depois):</b><br>
+    • <i>Valor Antes (Sistema):</i> R$ 464.200,00<br>
+    • <i>Valor Depois (Físico Auditado):</i> R$ 415.879,90<br>
+    • <i>Diferença Apurada (Perdas Líquidas):</i> R$ 48.320,10 (impacto de 10,41% negativo no inventário).</p>
+    <p><b>B. Mapeamento de Divergências de SKUs:</b><br>
+    Registados 742 SKUs negativos (faltas críticas) e 358 SKUs positivos (sobras de recebimento/expedição).</p>
+    <p><b>C. Plano de Ação Imediato:</b><br>
+    1. Congelar temporariamente a movimentação física dos 20 itens de maior valor divergente.<br>
+    2. Direcionar contagem cíclica diária de 80% para a Curva A.</p>
+</div>
+""", unsafe_allow_html=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("### 📈 4. CENTRAL DE INTELIGÊNCIA GRÁFICA & MATRIZ DE DADOS")
             
             num_cols = df_atual.select_dtypes(include=['number']).columns.tolist()
             cat_cols = df_atual.select_dtypes(include=['object']).columns.tolist()
+            all_cols = df_atual.columns.tolist()
             
             if len(num_cols) >= 1:
                 tab_g1, tab_g2, tab_g3, tab_tabela = st.tabs(["📊 Distribuição de Valores", "📈 Dispersão Avançada", "🍩 Proporção de Categorias", "📋 Prévia Completa"])
                 
                 with tab_g1:
                     st.markdown("##### Análise de Frequência e Volume por Item")
-                    col_Y = st.selectbox("Métrica para o Gráfico de Barras:", num_cols, index=0)
+                    col_X_bar = st.selectbox("Eixo X (Itens/Produtos):", all_cols, index=0)
+                    col_Y_bar = st.selectbox("Eixo Y (Métrica/Quantidade/Valor):", num_cols, index=0)
+                    
+                    df_plot = df_atual.sort_values(by=col_Y_bar, ascending=False).head(30)
+                    
                     fig_bar = px.bar(
-                        df_atual.head(25), 
-                        x=df_atual.columns[0], 
-                        y=col_Y, 
-                        color=col_Y,
+                        df_plot, 
+                        x=col_X_bar, 
+                        y=col_Y_bar, 
+                        color=col_Y_bar,
                         color_continuous_scale="Tealgrn",
                         template="plotly_dark",
-                        title=f"Top 25 SKUs - {col_Y}"
+                        title=f"Top 30 SKUs por {col_Y_bar}"
                     )
-                    fig_bar.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(t=30, b=20, l=20, r=20))
+                    fig_bar.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)", 
+                        plot_bgcolor="rgba(0,0,0,0)", 
+                        margin=dict(t=40, b=30, l=30, r=20),
+                        xaxis=dict(type='category'),
+                        yaxis=dict(rangemode='tozero')
+                    )
                     st.plotly_chart(fig_bar, use_container_width=True)
                 
                 with tab_g2:
@@ -285,35 +233,6 @@ def main():
         else:
             st.error("❌ " + msg)
 
-    st.markdown("---")
-    st.markdown('<div class="bento-card"><b>💬 5. CENTRAL DE DIÁLOGO EXECUTIVO</b><br><small style="color: #9ca3af;">Converse com o J.A.R.V.I.S. sobre as métricas ou solicite cruzamentos adicionais.</small></div>', unsafe_allow_html=True)
-
-    if "mensagens" not in st.session_state:
-        st.session_state.mensagens = [
-            {"role": "assistant", "content": "Olá, Sr. Adriano. Núcleo executivo online. Como posso auxiliar nas diretrizes da KMB Distribuidora hoje?"}
-        ]
-
-    for m in st.session_state.mensagens:
-        with st.chat_message(m["role"]):
-            st.markdown(m["content"])
-            if m["role"] == "assistant":
-                st.components.v1.html(gerar_audio_html(m["content"]), height=45)
-
-    if prompt := st.chat_input("Digite o seu comando executivo ou pergunta:"):
-        st.session_state.mensagens.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        resp = "Compreendido, Sr. Adriano. Analisando o comando '" + prompt + "' com base nos registos do inventário atual. O núcleo executivo está a processar as diretrizes operacionais para otimizar a acuracidade."
-        salvar_memoria("Sr. Adriano", prompt, resp)
-
-        st.session_state.mensagens.append({"role": "assistant", "content": resp})
-        with st.chat_message("user"):
-            pass
-        with st.chat_message("assistant"):
-            st.markdown(resp)
-            st.components.v1.html(gerar_audio_html(resp), height=45)
-
 if __name__ == "__main__":
     main()
-                
+    
