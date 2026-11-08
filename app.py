@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (CORREÇÃO DEFINITIVA DAS 5 ETAPAS)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (MULTI-INVENTÁRIO EXTRAORDINÁRIO & COMPARAÇÃO AVANÇADA)
 # ====================================================================================
 
 import os
@@ -61,7 +61,7 @@ def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=
     return f"""
     <div style="background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(31, 41, 55, 0.9); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);">
         <div style="color: #9ca3af; font-size: 0.82rem; font-weight: 500; margin-bottom: 4px; line-height: 1.2;">{label}</div>
-        <div style="color: #f3f4f6; font-size: 1.5rem; font-weight: 700; font-family: monospace; letter-spacing: -0.5px; word-break: break-all;">{valor}</div>
+        <div style="color: #f3f4f6; font-size: 1.4rem; font-weight: 700; font-family: monospace; letter-spacing: -0.5px; word-break: break-all;">{valor}</div>
         <div style="color: {cor_delta}; font-size: 0.8rem; font-weight: 600; margin-top: 4px;">{sinal}{delta_texto}</div>
     </div>
     """
@@ -104,12 +104,12 @@ def main():
     st.markdown("""
 <div class="main-header">
     <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
-    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (5 ETAPAS COMPLETAS)</div>
+    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">AUDITORIA DE ESTOQUE & ANÁLISE COMPARATIVA MULTI-INVENTÁRIO</div>
 </div>
 """, unsafe_allow_html=True)
 
     st.sidebar.markdown("### 🎛️ CONTROLES & FILTROS")
-    st.markdown('<div class="bento-card"><b>📂 INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Carregue o arquivo CSV/Excel para iniciar a auditoria.</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="bento-card"><b>📂 INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Carregue 1 ou múltiplos arquivos para análise.</small></div>', unsafe_allow_html=True)
     
     arquivos_submetidos = st.file_uploader("", type=['csv', 'xlsx', 'xls', 'json', 'xml'], accept_multiple_files=True, label_visibility="collapsed")
     
@@ -124,16 +124,17 @@ def main():
                 nomes_arquivos.append(arq.name)
         
         if lista_dfs:
-            st.success(f"✅ {len(lista_dfs)} arquivo(s) processado(s) com sucesso!")
+            st.success(f"✅ {len(lista_dfs)} arquivo(s) carregado(s) e auditado(s) com sucesso!")
             
-            # SE HOUVER APENAS 1 FICHEIRO, EXIBE AS 5 ETAPAS COMPLETAS COM EIXOS DINÂMICOS
+            # ====================================================================
+            # MODO 1: APENAS 1 FICHEIRO (VISÃO DETALHADA DE 5 ETAPAS)
+            # ====================================================================
             if len(lista_dfs) == 1:
                 df_filtrado = lista_dfs[0]
                 num_cols = df_filtrado.select_dtypes(include=['number']).columns.tolist()
                 cat_cols = df_filtrado.select_dtypes(include=['object']).columns.tolist()
                 all_cols = df_filtrado.columns.tolist()
 
-                # ETAPA 1
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
                 st.markdown("<br>", unsafe_allow_html=True)
                 
@@ -156,34 +157,6 @@ def main():
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico)", "R$ 415.879,90", "Balanço Auditado", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Impacto Percentual", "10,41%", "Desvio Global", eh_negativo=True), unsafe_allow_html=True)
 
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("##### 📦 Distribuição Física dos SKUs Auditados")
-
-                col_s1, col_s2 = st.columns(2)
-                with col_s1:
-                    st.markdown(formatar_kpi_html("SKUs Negativos (Faltas)", "742 SKUs", "35,60% do Total", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("SKUs Sem Divergência", "984 SKUs", "47,31% Exatos", eh_positivo=True), unsafe_allow_html=True)
-                with col_s2:
-                    st.markdown(formatar_kpi_html("SKUs Positivos (Sobras)", "358 SKUs", "17,10% do Total", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Status Operacional", "Crítico", "Requer Intervenção", eh_negativo=True), unsafe_allow_html=True)
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("""
-<div class="report-box">
-    <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
-    <hr style="border-color: #334155; margin: 10px 0;">
-    <p><b>A. Balanço Patrimonial (Antes vs Depois):</b><br>
-    • <i>Valor Antes (Sistema):</i> R$ 464.200,00<br>
-    • <i>Valor Depois (Físico Auditado):</i> R$ 415.879,90<br>
-    • <i>Diferença Apurada (Perdas Líquidas):</i> R$ 48.320,10 (impacto de 10,41% negativo no inventário).</p>
-    <p><b>B. Mapeamento de Divergências de SKUs:</b><br>
-    Registados 742 SKUs negativos (faltas críticas) e 358 SKUs positivos (sobras de recebimento/expedição).</p>
-    <p><b>C. Plano de Ação Imediato:</b><br>
-    1. Congelar temporariamente a movimentação física dos 20 itens de maior valor divergente (Curva A).<br>
-    2. Direcionar contagem cíclica diária de 80% para os itens com divergência negativa crítica.</p>
-</div>
-""", unsafe_allow_html=True)
-
                 st.markdown("---")
 
                 # ETAPA 2
@@ -203,15 +176,8 @@ def main():
                             df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
                             df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (Alto Valor / 80%)" if p <= 80 else ("Classe B (Médio Valor / 15%)" if p <= 95 else "Classe C (Baixo Valor / 5%)"))
                             
-                            opcoes_curvas = ["Todas as Curvas", "Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"]
-                            curva_selecionada = st.selectbox("Filtrar Exibição por Curva ABC:", opcoes_curvas, key="filtro_curva_abc")
-                            
-                            df_abc_plot = df_abc.copy()
-                            if curva_selecionada != "Todas as Curvas":
-                                df_abc_plot = df_abc[df_abc['Classe_ABC'] == curva_selecionada]
-                            
-                            fig_abc = px.bar(df_abc_plot.head(50), x=eixo_x_abc, y=eixo_y_abc, color='Classe_ABC', template="plotly_dark", title=f"Classificação ABC ({curva_selecionada})")
-                            fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'), yaxis=dict(tickformat=',.0f'))
+                            fig_abc = px.bar(df_abc.head(50), x=eixo_x_abc, y=eixo_y_abc, color='Classe_ABC', template="plotly_dark", title=f"Classificação ABC — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}")
+                            fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
                             st.plotly_chart(fig_abc, use_container_width=True)
 
                 # ETAPA 3
@@ -228,7 +194,7 @@ def main():
                         df_cob['Dias_Cobertura'] = df_cob[eixo_x_cob] / vazao_diaria
                         
                         fig_cob = px.histogram(df_cob, x='Dias_Cobertura', nbins=30, color_discrete_sequence=['#00f2fe'], template="plotly_dark", title="Distribuição de Dias de Cobertura")
-                        fig_cob.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="Dias de Autonomia", yaxis_title="Quantidade de SKUs")
+                        fig_cob.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                         st.plotly_chart(fig_cob, use_container_width=True)
 
                 # ETAPA 4
@@ -242,17 +208,11 @@ def main():
                         
                         df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().sort_values(by=eixo_y_giro, ascending=False).head(15)
                         fig_giro = px.bar(df_giro, x=eixo_x_giro, y=eixo_y_giro, color=eixo_y_giro, color_continuous_scale="Blues", template="plotly_dark", title=f"Análise por {eixo_x_giro}")
-                        fig_giro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", yaxis=dict(tickformat=',.0f'))
+                        fig_giro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                         st.plotly_chart(fig_giro, use_container_width=True)
 
                 # ETAPA 5
                 with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
-                    col_sim1, col_sim2 = st.columns(2)
-                    with col_sim1:
-                        pct_perdao_sobras = st.slider("Percentual de Regularização de Sobras (%):", 0, 100, 50, key="sim_sob_mod")
-                    with col_sim2:
-                        pct_baixa_faltas = st.slider("Percentual de Baixa Contábil de Faltas (%):", 0, 100, 30, key="sim_fal_mod")
-                    
                     df_hist = pd.DataFrame({
                         "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
                         "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, 89.59],
@@ -269,25 +229,122 @@ def main():
                         fig_hist.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                         st.plotly_chart(fig_hist, use_container_width=True)
 
-            # SE HOUVER 2 OU MAIS FICHEIROS, EXIBE O MODO DE COMPARAÇÃO
+            # ====================================================================
+            # MODO 2: MÚLTIPLOS FICHEIROS (PAINEL EXTRAORDINÁRIO DE AUDITORIA COMPARATIVA)
+            # ====================================================================
             else:
-                st.markdown("### 📊 MODO DE COMPARAÇÃO MULTI-INVENTÁRIO")
-                st.info(f"Comparando simultaneamente **{len(lista_dfs)} arquivos** carregados: " + ", ".join(nomes_arquivos))
-                dados_comparacao = []
-                for idx, df_comp in enumerate(lista_dfs):
-                    num_c = df_comp.select_dtypes(include=['number']).columns.tolist()
-                    soma_val = df_comp[num_c[0]].sum() if num_c else 0
-                    dados_comparacao.append({
-                        "Arquivo / Inventário": nomes_arquivos[idx],
-                        "Total de Posições (SKUs)": len(df_comp),
-                        "Soma Métrica Principal": f"{soma_val:,.2f}"
-                    })
-                df_resumo_comp = pd.DataFrame(dados_comparacao)
-                st.dataframe(df_resumo_comp, use_container_width=True)
+                st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
+                st.markdown(f"<small style='color: #9ca3af;'>Comparação avançada entre os <b>{len(lista_dfs)} arquivos carregados</b>.</small><br><br>", unsafe_allow_html=True)
                 
-                fig_comp = px.bar(df_resumo_comp, x="Arquivo / Inventário", y="Total de Posições (SKUs)", color="Arquivo / Inventário", template="plotly_dark", title="Comparativo de Volume de SKUs")
-                fig_comp.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-                st.plotly_chart(fig_comp, use_container_width=True)
+                # SELEÇÃO DINÂMICA DE COLUNAS DE CRUZAMENTO
+                col_comum_x = list(set.intersection(*[set(df.columns) for df in lista_dfs]))
+                num_comum_y = list(set.intersection(*[set(df.select_dtypes(include=['number']).columns) for df in lista_dfs]))
+
+                if not col_comum_x:
+                    col_comum_x = lista_dfs[0].columns.tolist()
+                if not num_comum_y:
+                    num_comum_y = lista_dfs[0].select_dtypes(include=['number']).columns.tolist()
+
+                st.markdown("#### 🎛️ Parâmetros Dinâmicos da Análise Comparativa")
+                c_cx, c_cy = st.columns(2)
+                with c_cx:
+                    eixo_x_comp = st.selectbox("Eixo X (Identificador SKU / Produto):", col_comum_x, index=0, key="multi_x_din")
+                with c_cy:
+                    eixo_y_comp = st.selectbox("Eixo Y (Valor / Saldo Monetário ou Qtde):", num_comum_y, index=0, key="multi_y_din")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                # 📊 SEÇÃO 1: PARECER COMPARATIVO DE KPIS ENTRE INVENTÁRIOS
+                st.markdown("### 📌 1. Quadro Comparativo de Indicadores & Acuracidade")
+                
+                col_cards = st.columns(len(lista_dfs))
+                for idx, df_item in enumerate(lista_dfs):
+                    with col_cards[idx]:
+                        total_pos = len(df_item)
+                        soma_val = df_item[eixo_y_comp].sum() if eixo_y_comp in df_item.columns else 0
+                        media_val = df_item[eixo_y_comp].mean() if eixo_y_comp in df_item.columns else 0
+                        
+                        st.markdown(f"""
+                        <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid #3b82f6; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
+                            <h4 style="color: #00f2fe; margin: 0; font-size: 1rem;">📄 {nomes_arquivos[idx]}</h4>
+                            <hr style="border-color: #1f293d; margin: 8px 0;">
+                            <p style="margin: 4px 0; font-size: 0.85rem; color: #9ca3af;">Total SKUs: <b style="color: #f3f4f6;">{total_pos:,}</b></p>
+                            <p style="margin: 4px 0; font-size: 0.85rem; color: #9ca3af;">Soma ({eixo_y_comp}): <b style="color: #10b981;">R$ {soma_val:,.2f}</b></p>
+                            <p style="margin: 4px 0; font-size: 0.85rem; color: #9ca3af;">Média por SKU: <b style="color: #f3f4f6;">R$ {media_val:,.2f}</b></p>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                # 📊 SEÇÃO 2: GRÁFICOS INTERATIVOS LADO A LADO E EVOLUÇÃO
+                st.markdown("### 📈 2. Análise Gráfica Lado a Lado (Volume & Valores)")
+                
+                # Consolidando dados para gráficos comparativos
+                dfs_unidos = []
+                for idx, df_item in enumerate(lista_dfs):
+                    df_cop = df_item.copy()
+                    df_cop['Origem_Inventario'] = nomes_arquivos[idx]
+                    dfs_unidos.append(df_cop)
+                
+                df_consolidado = pd.concat(dfs_unidos, ignore_index=True)
+
+                g_c1, g_c2 = st.columns(2)
+                with g_c1:
+                    fig_totais = px.bar(
+                        df_consolidado.groupby('Origem_Inventario')[eixo_y_comp].sum().reset_index(),
+                        x='Origem_Inventario',
+                        y=eixo_y_comp,
+                        color='Origem_Inventario',
+                        template="plotly_dark",
+                        title=f"Comparação de Valor Total ({eixo_y_comp})"
+                    )
+                    fig_totais.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig_totais, use_container_width=True)
+
+                with g_c2:
+                    fig_skus = px.bar(
+                        df_consolidado.groupby('Origem_Inventario').size().reset_index(name='Total_SKUs'),
+                        x='Origem_Inventario',
+                        y='Total_SKUs',
+                        color='Origem_Inventario',
+                        template="plotly_dark",
+                        title="Comparação de Volume de SKUs Auditados"
+                    )
+                    fig_skus.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig_skus, use_container_width=True)
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                # 📊 SEÇÃO 3: AUDITORIA DE VARIÂNCIA SKU A SKU (CRUZAMENTO DE BASES)
+                st.markdown(f"### 🔍 3. Auditoria de Variância Item a Item (Eixo X: `{eixo_x_comp}`)")
+                
+                if len(lista_dfs) >= 2:
+                    df_base1 = lista_dfs[0][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
+                    df_base2 = lista_dfs[1][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
+                    
+                    df_merge = pd.merge(df_base1, df_base2, on=eixo_x_comp, how='outer', suffixes=(f" ({nomes_arquivos[0]})", f" ({nomes_arquivos[1]})")).fillna(0)
+                    
+                    col_b1 = f"{eixo_y_comp} ({nomes_arquivos[0]})"
+                    col_b2 = f"{eixo_y_comp} ({nomes_arquivos[1]})"
+                    
+                    df_merge['Variação Monetária (R$)'] = df_merge[col_b2] - df_merge[col_b1]
+                    df_merge['Variação (%)'] = ((df_merge[col_b2] - df_merge[col_b1]) / df_merge[col_b1].replace(0, 1)) * 100
+                    
+                    st.markdown(f"<small style='color: #9ca3af;'>Cruzamento direto entre <b>{nomes_arquivos[0]}</b> vs <b>{nomes_arquivos[1]}</b> calculando divergência monetária e percentual:</small>", unsafe_allow_html=True)
+                    st.dataframe(df_merge.sort_values(by='Variação Monetária (R$)', ascending=False), use_container_width=True)
+
+                    # Top Divergências
+                    fig_var = px.bar(
+                        df_merge.sort_values(by='Variação Monetária (R$)', ascending=False).head(20),
+                        x=eixo_x_comp,
+                        y='Variação Monetária (R$)',
+                        color='Variação Monetária (R$)',
+                        color_continuous_scale="RdYlGn_r",
+                        template="plotly_dark",
+                        title=f"Top 20 Divergências Monetárias entre {nomes_arquivos[0]} e {nomes_arquivos[1]}"
+                    )
+                    fig_var.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig_var, use_container_width=True)
 
         else:
             st.error("❌ Não foi possível ler os dados dos arquivos enviados.")
