@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (MODO 1 E MODO 2 COMPLETOS E CORRIGIDOS)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA DEFINITIVA)
 # ====================================================================================
 
 import os
@@ -21,11 +21,14 @@ def processar_arquivo_upload(arquivo_carregado):
                         arquivo_carregado.seek(0)
                         df = pd.read_csv(arquivo_carregado, encoding=enc, sep=',', low_memory=False)
                     
+                    # Converter colunas numéricas com vírgula para float imediatamente
                     for col in df.columns:
                         if df[col].dtype == object:
                             try:
                                 conv = df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-                                df[col] = pd.to_numeric(conv)
+                                conv_num = pd.to_numeric(conv, errors='coerce')
+                                if conv_num.notna().sum() > 0:
+                                    df[col] = conv_num
                             except Exception:
                                 pass
                     return df, "Inventário processado com sucesso."
@@ -47,10 +50,12 @@ def processar_arquivo_upload(arquivo_carregado):
         return None, "Erro ao processar ficheiro: " + str(e)
 
 def identificar_coluna_ideal(colunas_numericas):
-    palavras_chave = ['valor', 'preco', 'preço', 'custo', 'total', 'saldo', 'qtd', 'quantidade', 'estoque']
+    palavras_chave = ['valor', 'estoque', 'total', 'saldo', 'custo', 'preco', 'preço', 'qtd', 'quantidade']
     for idx, col in enumerate(colunas_numericas):
-        if any(p in col.lower() for p in palavras_chave):
-            return idx
+        col_lower = col.lower()
+        if any(p in col_lower for p in palavras_chave):
+            if 'codigo' not in col_lower and 'código' not in col_lower:
+                return idx
     return 0
 
 def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=False):
@@ -271,7 +276,7 @@ def main():
 
                 # 🎛️ ETAPA 1: PARÂMETROS DINÂMICOS NO TOPO
                 with st.expander("🎛️ 1. Parâmetros Dinâmicos da Análise Comparativa (Eixos X e Y)", expanded=True):
-                    st.info("💡 **Dica de Auditoria:** Certifique-se de que o **Eixo Y** esteja apontando para uma coluna de **Valor Monetário** ou **Quantidade** (e não para o código do produto).")
+                    st.info("💡 **Dica de Auditoria:** Certifique-se de que o **Eixo Y** esteja apontando para uma coluna de **Valor Monetário** ou **Quantidade** (ex: `Valor de Estoque(R$)`).")
                     c_cx, c_cy = st.columns(2)
                     with c_cx:
                         eixo_x_comp = st.selectbox("Eixo X (Identificador SKU / Produto):", col_comum_x, index=0, key="multi_x_din")
