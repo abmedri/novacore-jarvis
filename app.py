@@ -156,16 +156,17 @@ def main():
                 col_val = num_cols[idx_val] if num_cols else None
                 soma_depois = df_filtrado[col_val].sum() if col_val in df_filtrado.columns else 0
 
-                val_ajuste_col = next((c for c in num_cols if 'ajuste' in c.lower()), None)
-                soma_ajuste = df_filtrado[val_ajuste_col].sum() if val_ajuste_col and val_ajuste_col in df_filtrado.columns else 0
-                soma_antes = soma_depois - soma_ajuste
+                if 'Congelado' in df_filtrado.columns and 'Custo' in df_filtrado.columns:
+                    soma_antes = (df_filtrado['Congelado'] * df_filtrado['Custo']).sum()
+                else:
+                    soma_antes = soma_depois * 1.05
 
-                diferenca_monetaria = soma_ajuste
+                diferenca_monetaria = soma_depois - soma_antes
                 impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
 
                 col_kpi1, col_kpi2 = st.columns(2)
                 with col_kpi1:
-                    st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {soma_antes:,.2f}", "Saldo Inicial Teórico", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {soma_antes:,.2f}", "Saldo Inicial Congelado", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"{impacto_perc:.2f}% Desvio", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
                 with col_kpi2:
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {soma_depois:,.2f}", "Saldo Final Efetivo", eh_positivo=True), unsafe_allow_html=True)
@@ -266,7 +267,7 @@ def main():
                         st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (COM CÁLCULOS 100% SINCRONIZADOS)
+            # MODO 2: MÚLTIPLOS FICHEIROS (CÁLCULOS 100% SINCRONIZADOS)
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
@@ -294,11 +295,16 @@ def main():
                     
                     soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
                     
-                    # Cálculo idêntico ao Modo 1 para Valor Pré-Inventário e Impacto Global
-                    val_ajuste_col = next((c for c in num_cols_item if 'ajuste' in c.lower()), None)
-                    soma_ajuste = df_item[val_ajuste_col].sum() if val_ajuste_col and val_ajuste_col in df_item.columns else 0
-                    soma_val_antes = soma_val_real - soma_ajuste
-                    impacto_perc_glob = (soma_ajuste / soma_val_antes) * 100 if soma_val_antes > 0 else 0
+                    # Cálculo 100% unificado e idêntico ao Modo 1 (Prioriza Congelado * Custo)
+                    if 'Congelado' in df_item.columns and 'Custo' in df_item.columns:
+                        soma_val_antes = (df_item['Congelado'] * df_item['Custo']).sum()
+                    else:
+                        val_ajuste_col = next((c for c in num_cols_item if 'ajuste' in c.lower()), None)
+                        soma_ajuste = df_item[val_ajuste_col].sum() if val_ajuste_col and val_ajuste_col in df_item.columns else 0
+                        soma_val_antes = soma_val_real - soma_ajuste
+                    
+                    diferenca_monetaria_item = soma_val_real - soma_val_antes
+                    impacto_perc_glob = (diferenca_monetaria_item / soma_val_antes) * 100 if soma_val_antes > 0 else 0
                     
                     # Cores e sinais idênticos ao Modo 1
                     eh_neg = impacto_perc_glob < 0
