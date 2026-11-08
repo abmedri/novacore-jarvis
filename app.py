@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (MODO 1 COM 5 ETAPAS & MODO 2 COM ANTES/DEPOIS POR ARQUIVO)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (CURVA ABC COMPLETA A/B/C + 5 ETAPAS + ANTES/DEPOIS)
 # ====================================================================================
 
 import os
@@ -120,7 +120,7 @@ def main():
             st.success(f"✅ {len(lista_dfs)} arquivo(s) carregado(s) e auditado(s) com sucesso!")
             
             # ====================================================================
-            # MODO 1: APENAS 1 FICHEIRO (COM AS 5 ETAPAS COMPLETAS)
+            # MODO 1: APENAS 1 FICHEIRO (COM AS 5 ETAPAS E CURVA ABC COMPLETA A/B/C)
             # ====================================================================
             if len(lista_dfs) == 1:
                 df_filtrado = lista_dfs[0]
@@ -152,7 +152,7 @@ def main():
 
                 st.markdown("---")
 
-                # ETAPA 2
+                # ETAPA 2: CURVA ABC COMPLETA COM FILTRO DE CLASSES (A, B, C)
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     if len(num_cols) >= 1:
                         c_x2, c_y2 = st.columns(2)
@@ -169,7 +169,27 @@ def main():
                             df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
                             df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (Alto Valor / 80%)" if p <= 80 else ("Classe B (Médio Valor / 15%)" if p <= 95 else "Classe C (Baixo Valor / 5%)"))
                             
-                            fig_abc = px.bar(df_abc.head(50), x=eixo_x_abc, y=eixo_y_abc, color='Classe_ABC', template="plotly_dark", title=f"Classificação ABC — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}")
+                            # Filtro de seleção de Curva ABC
+                            filtro_classe = st.multiselect(
+                                "Filtrar por Classe ABC:",
+                                ["Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"],
+                                default=["Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"],
+                                key="filtro_abc_multiselect"
+                            )
+                            
+                            if filtro_classe:
+                                df_abc_filtrado = df_abc[df_abc['Classe_ABC'].isin(filtro_classe)]
+                            else:
+                                df_abc_filtrado = df_abc
+
+                            fig_abc = px.bar(
+                                df_abc_filtrado.head(100), 
+                                x=eixo_x_abc, 
+                                y=eixo_y_abc, 
+                                color='Classe_ABC', 
+                                template="plotly_dark", 
+                                title=f"Classificação ABC — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}"
+                            )
                             fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
                             st.plotly_chart(fig_abc, use_container_width=True)
 
@@ -255,7 +275,6 @@ def main():
                     soma_val = df_item[eixo_y_comp].sum() if eixo_y_comp in df_item.columns else 0
                     media_val = df_item[eixo_y_comp].mean() if eixo_y_comp in df_item.columns else 0
                     
-                    # Cada ficheiro exibe o seu próprio bloco com indicador ANTES e DEPOIS do inventário
                     with col_cards[idx]:
                         st.markdown(f"""
                         <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid #00f2fe; border-radius: 12px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);">
@@ -354,3 +373,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
