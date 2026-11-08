@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (MULTI-INVENTÁRIO COM KPIS COMPARATIVOS COMPLETOS)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (MULTI-INVENTÁRIO COM ESTOQUE ANTES E DEPOIS)
 # ====================================================================================
 
 import os
@@ -230,7 +230,7 @@ def main():
                         st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (COM INDICADORES COMPLETO ESTILO MODO 1)
+            # MODO 2: MÚLTIPLOS FICHEIROS (COM ESTOQUE ANTES E DEPOIS SEPARADOS)
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
@@ -254,10 +254,9 @@ def main():
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # 📊 SEÇÃO 1: INDICADORES E PARECER COMPARATIVO LADO A LADO (IGUAL MODO 1)
-                st.markdown("### 📌 1. Indicadores Executivos & Balanço Comparativo")
+                # 📊 SEÇÃO 1: INDICADORES E ESTOQUE ANTES E DEPOIS
+                st.markdown("### 📌 1. Indicadores Executivos & Balanço Patrimonial (Antes vs Depois)")
                 
-                # Vamos calcular variações entre a 1ª e a 2ª base se houver pelo menos 2 bases
                 df_b1 = lista_dfs[0]
                 df_b2 = lista_dfs[1] if len(lista_dfs) >= 2 else lista_dfs[0]
                 
@@ -266,15 +265,15 @@ def main():
                 diff_liquida = val_total_b2 - val_total_b1
                 pct_diff = (diff_liquida / val_total_b1 * 100) if val_total_b1 > 0 else 0
 
-                # KPI Cards em 2 Colunas com visual Bento Card (Estilo Modo 1)
+                # KPI Cards com Estoque Antes e Estoque Depois explícitos
                 col_k1, col_k2 = st.columns(2)
                 with col_k1:
+                    st.markdown(formatar_kpi_html("Estoque Antes (Inventário Anterior)", f"R$ {val_total_b1:,.2f}", f"Base: {nomes_arquivos[0]}", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html(f"Total SKUs ({nomes_arquivos[0]})", f"{len(df_b1):,}".replace(',', '.'), "Base 1 (Inicial)", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html(f"Valor Total ({nomes_arquivos[0]})", f"R$ {val_total_b1:,.2f}", "Montante Base 1", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Acuracidade Volumétrica Média", "78,20%", "21,80% Desvio Global", eh_negativo=True), unsafe_allow_html=True)
                 with col_k2:
+                    st.markdown(formatar_kpi_html("Estoque Depois (Inventário Atual)", f"R$ {val_total_b2:,.2f}", f"Base: {nomes_arquivos[1] if len(nomes_arquivos)>1 else nomes_arquivos[0]}", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html(f"Total SKUs ({nomes_arquivos[1] if len(nomes_arquivos)>1 else nomes_arquivos[0]})", f"{len(df_b2):,}".replace(',', '.'), f"+{len(df_b2)-len(df_b1)} SKUs vs Base 1", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Divergência Monetária Líquida", f"R$ {diff_liquida:,.2f}", f"{pct_diff:+.2f}% de Variação", eh_negativo=(diff_liquida<0), eh_positivo=(diff_liquida>=0)), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Acuracidade Financeira Média", "88,40%", "11,60% Desvio Patrimonial", eh_negativo=True), unsafe_allow_html=True)
 
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -374,3 +373,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
