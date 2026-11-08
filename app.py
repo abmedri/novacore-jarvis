@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (AUDITORIA EXECUTIVA DE INVENTÁRIO - DEFINITIVO)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO ESTÁVEL COM COMPONENTES NATIVOS)
 # ====================================================================================
 
 import os
@@ -242,7 +242,7 @@ def main():
                         st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (CORRIGIDO: HTML RENDERIZADO CORRETAMENTE)
+            # MODO 2: MÚLTIPLOS FICHEIROS (USANDO COMPONENTES NATIVOS DO STREAMLIT)
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
@@ -265,7 +265,7 @@ def main():
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # 📊 SEÇÃO 1: PAINEL DE VALOR DE ESTOQUE ANTES E DEPOIS INDIVIDUAL PARA CADA FICHEIRO
+                # 📊 SEÇÃO 1: PAINEL DE VALOR DE ESTOQUE ANTES E DEPOIS POR FICHEIRO (100% NATIVO)
                 st.markdown("### 📌 1. Indicadores Executivos: Estoque Antes e Depois por Ficheiro")
                 
                 col_cards = st.columns(len(lista_dfs))
@@ -274,30 +274,30 @@ def main():
                     soma_val = df_item[eixo_y_comp].sum() if eixo_y_comp in df_item.columns else 0
                     media_val = df_item[eixo_y_comp].mean() if eixo_y_comp in df_item.columns else 0
                     
-                    # CORREÇÃO CRÍTICA: HTML devidamente formatado e garantindo renderização com unsafe_allow_html=True
-                    html_card = f"""
-                    <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid #00f2fe; border-radius: 12px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);">
-                        <h4 style="color: #00f2fe; margin-top: 0; font-size: 1.05rem; border-bottom: 1px solid #1f293d; padding-bottom: 8px;">📄 {nomes_arquivos[idx]}</h4>
-                        
-                        <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; margin-top: 10px;">
-                            <div style="color: #9ca3af; font-size: 0.78rem; font-weight: 500;">Estoque Antes (Inventário)</div>
-                            <div style="color: #f3f4f6; font-size: 1.15rem; font-weight: 700; font-family: monospace;">R$ {soma_val * 0.95:,.2f}</div>
-                            <div style="color: #3b82f6; font-size: 0.75rem; margin-top: 2px;">Base Teórica Inicial</div>
-                        </div>
-                        
-                        <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; margin-top: 10px;">
-                            <div style="color: #9ca3af; font-size: 0.78rem; font-weight: 500;">Estoque Depois (Inventário)</div>
-                            <div style="color: #10b981; font-size: 1.15rem; font-weight: 700; font-family: monospace;">R$ {soma_val:,.2f}</div>
-                            <div style="color: #10b981; font-size: 0.75rem; margin-top: 2px;">Saldo Auditado Efetivo</div>
-                        </div>
-
-                        <hr style="border-color: #1f293d; margin: 12px 0;">
-                        <p style="margin: 4px 0; font-size: 0.82rem; color: #9ca3af;">Total SKUs: <b style="color: #f3f4f6;">{total_pos:,}</b></p>
-                        <p style="margin: 4px 0; font-size: 0.82rem; color: #9ca3af;">Média por SKU: <b style="color: #f3f4f6;">R$ {media_val:,.2f}</b></p>
-                    </div>
-                    """
+                    # Usando st.container com borda nativa do Streamlit para evitar qualquer vazamento de HTML cru na tela
                     with col_cards[idx]:
-                        st.markdown(html_card, unsafe_allow_html=True)
+                        with st.container(border=True):
+                            st.markdown(f"#### 📄 {nomes_arquivos[idx]}")
+                            st.divider()
+                            
+                            # Métrica de Estoque Antes
+                            st.metric(
+                                label="Estoque Antes (Inventário)",
+                                value=f"R$ {soma_val * 0.95:,.2f}",
+                                delta="Base Teórica Inicial"
+                            )
+                            
+                            # Métrica de Estoque Depois
+                            st.metric(
+                                label="Estoque Depois (Inventário)",
+                                value=f"R$ {soma_val:,.2f}",
+                                delta="Saldo Auditado Efetivo",
+                                delta_color="normal"
+                            )
+                            
+                            st.divider()
+                            st.markdown(f"**Total SKUs:** {total_pos:,}".replace(',', '.'))
+                            st.markdown(f"**Média por SKU:** R$ {media_val:,.2f}")
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -364,7 +364,7 @@ def main():
                         color='Variação Monetária (R$)',
                         color_continuous_scale="RdYlGn_r",
                         template="plotly_dark",
-                        title=f"Top 20 Divergências Monetárias entre {nomes_arquivos[0]}: {nomes_arquivos[1]}"
+                        title=f"Top 20 Divergências Monetárias entre {nomes_arquivos[0]} e {nomes_arquivos[1]}"
                     )
                     fig_var.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                     st.plotly_chart(fig_var, use_container_width=True)
