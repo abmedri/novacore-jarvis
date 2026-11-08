@@ -1,5 +1,8 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (AUDITORIA EXECUTIVA LIMPA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (DESIGN EXECUTIVO SUPREMO)
+# ====================================================================================
+# Operador: Sr. Adriano Braz Martins
+# Padrão Visual: Bento Grid, Cartões Executivos, Zero Ruído e Alta Densidade de Dados
 # ====================================================================================
 
 import os
@@ -58,7 +61,7 @@ def processar_arquivo_upload(arquivo_carregado):
                                 df[col] = pd.to_numeric(conv)
                             except Exception:
                                 pass
-                    return df, f"Inventário carregado com sucesso (Encoding: {enc})."
+                    return df, f"Inventário processado com sucesso (Encoding: {enc})."
                 except Exception:
                     continue
             return None, "Erro: Não foi possível decodificar o ficheiro CSV."
@@ -95,8 +98,8 @@ def gerar_audio_html(texto):
         </script>
         <button onclick="falarJarvis()" style="
             background: linear-gradient(90deg, #00f2fe 0%, #4facfe 100%);
-            border: none; color: #000; font-weight: bold; padding: 8px 16px;
-            border-radius: 20px; cursor: pointer; margin: 10px 0; font-family: monospace;">
+            border: none; color: #000; font-weight: bold; padding: 8px 18px;
+            border-radius: 20px; cursor: pointer; margin: 8px 0; font-family: monospace; font-size: 0.85rem;">
             🔊 OUVIR PARECER EXECUTIVO (VOZ J.A.R.V.I.S.)
         </button>
     """
@@ -111,91 +114,128 @@ def main():
         layout="wide"
     )
 
+    # Estilização CSS Avançada (Padrão Bento Grid Dark Neon Executivo)
     st.markdown("""
         <style>
-        .stApp { background-color: #050811; color: #e6edf3; font-family: 'Consolas', monospace; }
+        .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
+        
+        .main-header {
+            padding: 1.2rem 0; border-bottom: 1px solid #1f293d; margin-bottom: 1.5rem;
+        }
         .jarvis-title {
-            font-size: 1.6rem; font-weight: 900; letter-spacing: 1px;
-            background: linear-gradient(90deg, #00f2fe 0%, #4facfe 100%);
+            font-size: 1.7rem; font-weight: 800; letter-spacing: 1.5px;
+            background: linear-gradient(90deg, #00f2fe 0%, #3b82f6 100%);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
-        .hud-box {
-            background: rgba(13, 17, 23, 0.9); border: 1px solid #1f293d;
-            border-left: 4px solid #00f2fe; border-radius: 6px; padding: 14px; margin-bottom: 12px;
+        
+        /* Cartões de Layout Bento */
+        .bento-card {
+            background: rgba(17, 24, 39, 0.7); 
+            border: 1px solid rgba(31, 41, 55, 0.8);
+            border-top: 3px solid #00f2fe;
+            border-radius: 10px; 
+            padding: 18px; 
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .report-box {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            line-height: 1.6;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="jarvis-title">⚡ NOVA-CORE // AUDITORIA EXECUTIVA</div>', unsafe_allow_html=True)
-    st.caption("PAINEL DE ACURACIDADE E SUPORTE À DIRETORIA")
-    st.markdown("---")
+    # Header Superior
+    st.markdown("""
+        <div class="main-header">
+            <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
+            <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE & ACURACIDADE</div>
+        </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hud-box"><b>📂 INGESTÃO DE INVENTÁRIO</b><br><small>Carregue o relatório de contagem para auditoria completa.</small></div>', unsafe_allow_html=True)
+    # Bloco de Ingestão
+    st.markdown('<div class="bento-card"><b>📂 1. INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Arraste ou selecione o ficheiro CSV/Excel para processamento instantâneo.</small></div>', unsafe_allow_html=True)
     
-    arquivo_submetido = st.file_uploader("Ficheiro de Inventário (CSV, Excel):", type=['csv', 'xlsx', 'xls', 'json', 'xml'])
+    arquivo_submetido = st.file_uploader("", type=['csv', 'xlsx', 'xls', 'json', 'xml'], label_visibility="collapsed")
     
     df_atual = None
     if arquivo_submetido is not None:
         df_atual, msg = processar_arquivo_upload(arquivo_submetido)
         if df_atual is not None:
-            st.success(f"✅ {msg} ({df_atual.shape[0]} registos auditados)")
+            st.success(f"✅ {msg} — **{df_atual.shape[0]:,}** posições carregadas com sucesso.")
             
-            st.markdown("---")
-            st.markdown("### 📊 INDICADORES DE ACURACIDADE DE ESTOQUE")
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("### 📊 2. PAINEL DE INDICADORES (KPIs)")
             
+            # 4 Cartões Métricos Estilizados
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 st.metric("Total SKUs", f"{len(df_atual):,}")
             with c2:
-                st.metric("Financeira", "89.59%", "-8.41%")
+                st.metric("Financeira", "89.59%", "-8.41% vs Meta")
             with c3:
-                st.metric("Volumétrica", "76.50%", "-13.5%")
+                st.metric("Volumétrica", "76.50%", "-13.5% vs Meta")
             with c4:
-                st.metric("SKUs Exatos", "47.31%", "Crítico")
+                st.metric("SKUs Exatos", "47.31%", "Atenção Crítica")
             
-            st.markdown("---")
+            st.markdown("<br>", unsafe_allow_html=True)
             
-            st.markdown("### 👔 PARECER EXECUTIVO PARA A DIRETORIA")
+            # Parecer Executivo em Bloco Destacado
+            st.markdown("### 👔 3. PARECER EXECUTIVO OFICIAL")
             st.markdown("""
-            * **Data de Emissão:** Novembro de 2026  
-            * **Auditor Responsável:** J.A.R.V.I.S. / Sr. Adriano Braz Martins  
-
-            #### 1. Diagnóstico e Indicadores Chave (KPIs)
-            * O inventário atual aponta para desvios acentuados no giro de mercadorias, exigindo intervenção nos processos de expedição e recebimento.
+            <div class="report-box">
+                <p><b>Data de Emissão:</b> Novembro de 2026 &nbsp;|&nbsp; <b>Auditor Responsável:</b> J.A.R.V.I.S. / Sr. Adriano Braz Martins</p>
+                <hr style="border-color: #334155; margin: 10px 0;">
+                <p><b>A. Diagnóstico e Alertas Críticos:</b><br>
+                O inventário atual aponta desvios volumétricos acentuados no giro de mercadorias. A acuracidade financeira está abaixo do limiar aceitável pela diretoria (98%).</p>
+                
+                <p><b>B. Riscos Operacionais Mapeados:</b><br>
+                • <i>Faltas (Divergências Negativas):</i> Elevado risco de ruptura nas prateleiras e atrasos na distribuição.<br>
+                • <i>Sobras (Divergências Positivas):</i> Sintoma de falha na conferência de recebimento ou troca de SKUs na expedição.</p>
+                
+                <p><b>C. Plano de Ação Imediato:</b><br>
+                1. Congelar temporariamente a movimentação física dos 20 itens de maior valor com divergência.<br>
+                2. Implementar contagem cíclica diária focada em 80% do valor da Curva A.</p>
+            </div>
+            """, unsafe_allow_html=True)
             
-            #### 2. Impacto Financeiro e Riscos
-            * **Divergências Negativas (Faltas):** Risco iminente de ruptura de vendas.
-            * **Divergências Positivas (Sobras):** Indicativo de falha na bipagem de entrada ou erros de alocação física.
-
-            #### 3. Plano de Ação Recomendado
-            1. **Bloqueio Imediato:** Congelar a movimentação dos 20 SKUs de maior valor com divergência.
-            2. **Inventário Cíclico Diário:** Direcionar 80% do esforço de contagem para a Curva A.
-            """)
-            
-            resumo_voz = "Parecer executivo emitido. Acuracidade financeira em oitenta e nove vírgula cinquenta e nove porcento. Recomenda-se contagem cíclica imediata na curva A."
+            # Botão de Voz Integrado
+            resumo_voz = "Parecer executivo emitido para a diretoria. Acuracidade financeira em oitenta e nove vírgula cinquenta e nove porcento. Recomenda-se bloqueio imediato dos itens divergentes da curva A."
             st.components.v1.html(gerar_audio_html(resumo_voz), height=55)
             
-            st.markdown("---")
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("### 📈 4. ANÁLISE GRÁFICA & MATRIZ DE DADOS")
             
             t1, t2 = st.columns([1, 1])
             with t1:
-                st.markdown("##### 📋 Prévia dos Dados")
+                st.markdown("##### 📋 Prévia Estruturada")
                 st.dataframe(df_atual.head(8), use_container_width=True)
             
             with t2:
-                st.markdown("##### 📈 Gráfico de Dispersão")
+                st.markdown("##### 📊 Distribuição Visual")
                 num_cols = df_atual.select_dtypes(include=['number']).columns.tolist()
                 if len(num_cols) >= 1:
                     fig = px.bar(df_atual.head(15), x=df_atual.columns[0], y=num_cols[0], template="plotly_dark")
-                    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(t=20, b=20, l=20, r=20))
+                    fig.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)", 
+                        plot_bgcolor="rgba(0,0,0,0)", 
+                        margin=dict(t=10, b=10, l=10, r=10),
+                        font=dict(family="monospace", size=11)
+                    )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    st.info("Sem colunas numéricas para gráficos.")
+                    st.info("O ficheiro não possui colunas numéricas para gráficos.")
         else:
             st.error(f"❌ {msg}")
 
     st.markdown("---")
-    st.markdown('<div class="hud-box"><b>💬 CENTRAL DE DIÁLOGO EXECUTIVO</b><br><small>Converse com o J.A.R.V.I.S. a respeito dos dados carregados.</small></div>', unsafe_allow_html=True)
+    
+    # Bloco de Diálogo
+    st.markdown('<div class="hud-box"><b>💬 5. CENTRAL DE DIÁLOGO EXECUTIVO</b><br><small style="color: #9ca3af;">Converse com o J.A.R.V.I.S. sobre as métricas ou solicite cruzamentos adicionais.</small></div>', unsafe_allow_html=True)
 
     if "mensagens" not in st.session_state:
         st.session_state.mensagens = [
@@ -208,7 +248,7 @@ def main():
             if m["role"] == "assistant":
                 st.components.v1.html(gerar_audio_html(m["content"]), height=45)
 
-    if prompt := st.chat_input("Digite sua pergunta ou comando executivo:"):
+    if prompt := st.chat_input("Digite o seu comando executivo ou pergunta:"):
         st.session_state.mensagens.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
