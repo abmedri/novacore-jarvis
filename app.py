@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (KPIS FORMATADOS COM CORES + / -)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (EIXOS X E Y DINÂMICOS)
 # ====================================================================================
 
 import os
@@ -47,16 +47,14 @@ def processar_arquivo_upload(arquivo_carregado):
         return None, "Erro ao processar ficheiro: " + str(e)
 
 def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=False):
-    # Função para renderizar cada KPI por inteiro, sem cortes e com cores configuradas no delta/números
-    cor_delta = "#9ca3af" # neutro (cinza)
+    cor_delta = "#9ca3af"
     sinal = ""
-    
     if eh_negativo:
-        cor_delta = "#ef4444" # vermelho
+        cor_delta = "#ef4444"
         if not delta_texto.startswith("-"):
             sinal = "-"
     elif eh_positivo:
-        cor_delta = "#10b981" # verde
+        cor_delta = "#10b981"
         if not delta_texto.startswith("+"):
             sinal = "+"
 
@@ -106,7 +104,7 @@ def main():
     st.markdown("""
 <div class="main-header">
     <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
-    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (KPIS DE VALOR INTEIRO & FORMATO +/- COLORIDO)</div>
+    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (EIXOS X E Y DINÂMICOS)</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -144,13 +142,11 @@ def main():
             all_cols = df_filtrado.columns.tolist()
 
             # ----------------------------------------------------
-            # ETAPA 1: VISÃO GERAL & PARECER (KPIS COLORIDOS E COMPLETOS)
+            # ETAPA 1: VISÃO GERAL & PARECER
             # ----------------------------------------------------
             st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # Bloco 1: Acuracidade
-            st.markdown("##### 📊 Indicadores de Acuracidade Geral")
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{len(df_filtrado):,}".replace(',', '.'), "Total Processado", eh_positivo=True), unsafe_allow_html=True)
@@ -202,15 +198,19 @@ def main():
             st.markdown("---")
 
             # ----------------------------------------------------
-            # ETAPA 2: ACURACIDADE & CURVA ABC
+            # ETAPA 2: ACURACIDADE & CURVA ABC (EIXOS X e Y DINÂMICOS)
             # ----------------------------------------------------
             with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                 if len(num_cols) >= 1:
-                    col_abc_val = st.selectbox("Selecione a Coluna de Valor Monetário/Quantidade:", num_cols, index=0, key="abc_val_mod")
+                    c_x2, c_y2 = st.columns(2)
+                    with c_x2:
+                        eixo_x_abc = st.selectbox("Eixo X (Identificador/SKU/Produto):", all_cols, index=0, key="abc_x_din")
+                    with c_y2:
+                        eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário/Quantidade):", num_cols, index=0, key="abc_y_din")
                     
-                    df_abc = df_filtrado.sort_values(by=col_abc_val, ascending=False).copy()
-                    df_abc['Soma_Acumulada'] = df_abc[col_abc_val].cumsum()
-                    soma_total = df_abc[col_abc_val].sum()
+                    df_abc = df_filtrado.sort_values(by=eixo_y_abc, ascending=False).copy()
+                    df_abc['Soma_Acumulada'] = df_abc[eixo_y_abc].cumsum()
+                    soma_total = df_abc[eixo_y_abc].sum()
                     
                     if soma_total > 0:
                         df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
@@ -225,10 +225,17 @@ def main():
                                 
                         df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(classificar_abc)
                         
+                        opcoes_curvas = ["Todas as Curvas", "Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"]
+                        curva_selecionada = st.selectbox("Filtrar Exibição por Curva ABC:", opcoes_curvas, key="filtro_curva_abc")
+                        
+                        df_abc_plot = df_abc.copy()
+                        if curva_selecionada != "Todas as Curvas":
+                            df_abc_plot = df_abc[df_abc['Classe_ABC'] == curva_selecionada]
+                        
                         fig_abc = px.bar(
-                            df_abc.head(40),
-                            x=all_cols[0],
-                            y=col_abc_val,
+                            df_abc_plot.head(50),
+                            x=eixo_x_abc,
+                            y=eixo_y_abc,
                             color='Classe_ABC',
                             color_discrete_map={
                                 "Classe A (Alto Valor / 80%)": "#00f2fe",
@@ -236,7 +243,7 @@ def main():
                                 "Classe C (Baixo Valor / 5%)": "#ef4444"
                             },
                             template="plotly_dark",
-                            title="Classificação ABC dos Principais Produtos"
+                            title=f"Classificação ABC ({curva_selecionada}) — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}"
                         )
                         fig_abc.update_layout(
                             paper_bgcolor="rgba(0,0,0,0)", 
@@ -251,15 +258,20 @@ def main():
                     st.info("O ficheiro não possui colunas numéricas suficientes.")
 
             # ----------------------------------------------------
-            # ETAPA 3: RUPTURA & COBERTURA
+            # ETAPA 3: RUPTURA & COBERTURA (EIXOS X e Y DINÂMICOS)
             # ----------------------------------------------------
             with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
                 if len(num_cols) >= 1:
-                    col_estoque_qtd = st.selectbox("Selecione a coluna de Estoque Físico:", num_cols, index=0, key="cob_qtd_mod")
+                    c_x3, c_y3 = st.columns(2)
+                    with c_x3:
+                        eixo_x_cob = st.selectbox("Eixo X (Métrica de Cobertura/Estoque):", num_cols, index=0, key="cob_x_din")
+                    with c_y3:
+                        eixo_y_cob = st.selectbox("Eixo Y (Frequência / Contagem de SKUs):", ["Contagem de SKUs"] + num_cols, index=0, key="cob_y_din")
+                    
                     vazao_diaria = st.slider("Média estimada de consumo/saída diária por SKU (unidades):", min_value=1, max_value=500, value=25, key="vazao_mod")
                     
                     df_cob = df_filtrado.copy()
-                    df_cob['Dias_Cobertura'] = df_cob[col_estoque_qtd] / vazao_diaria
+                    df_cob['Dias_Cobertura'] = df_cob[eixo_x_cob] / vazao_diaria
                     
                     fig_cob = px.histogram(
                         df_cob,
@@ -267,7 +279,7 @@ def main():
                         nbins=30,
                         color_discrete_sequence=['#00f2fe'],
                         template="plotly_dark",
-                        title="Distribuição de Dias de Cobertura antes de Ruptura Total"
+                        title=f"Distribuição de Cobertura (Baseado na coluna: {eixo_x_cob})"
                     )
                     fig_cob.update_layout(
                         paper_bgcolor="rgba(0,0,0,0)", 
@@ -278,23 +290,26 @@ def main():
                     st.plotly_chart(fig_cob, use_container_width=True)
 
             # ----------------------------------------------------
-            # ETAPA 4: CAUSA RAIZ & PROCESSOS
+            # ETAPA 4: CAUSA RAIZ & PROCESSOS (EIXOS X e Y DINÂMICOS)
             # ----------------------------------------------------
             with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
                 if len(cat_cols) >= 1 and len(num_cols) >= 1:
-                    col_cat_giro = st.selectbox("Selecione a Categoria/Grupo de Produtos:", cat_cols, key="giro_cat_mod")
-                    col_val_giro = st.selectbox("Selecione a Coluna de Valor/Quantidade:", num_cols, key="giro_val_mod")
+                    c_x4, c_y4 = st.columns(2)
+                    with c_x4:
+                        eixo_x_giro = st.selectbox("Eixo X (Categoria / Grupo):", cat_cols, key="giro_x_din")
+                    with c_y4:
+                        eixo_y_giro = st.selectbox("Eixo Y (Valor Somado / Métrica):", num_cols, key="giro_y_din")
                     
-                    df_giro = df_filtrado.groupby(col_cat_giro)[col_val_giro].sum().reset_index().sort_values(by=col_val_giro, ascending=False).head(15)
+                    df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().sort_values(by=eixo_y_giro, ascending=False).head(15)
                     
                     fig_giro = px.bar(
                         df_giro,
-                        x=col_cat_giro,
-                        y=col_val_giro,
-                        color=col_val_giro,
+                        x=eixo_x_giro,
+                        y=eixo_y_giro,
+                        color=eixo_y_giro,
                         color_continuous_scale="Blues",
                         template="plotly_dark",
-                        title=f"Volume de Estoque Acumulado por {col_cat_giro}"
+                        title=f"Análise por {eixo_x_giro} (Eixo Y: {eixo_y_giro})"
                     )
                     fig_giro.update_layout(
                         paper_bgcolor="rgba(0,0,0,0)",
@@ -306,7 +321,7 @@ def main():
                     st.info("São necessárias colunas de categoria e valor para este diagnóstico.")
 
             # ----------------------------------------------------
-            # ETAPA 5: SIMULAÇÃO & TENDÊNCIA
+            # ETAPA 5: SIMULAÇÃO & TENDÊNCIA (EIXOS X e Y DINÂMICOS)
             # ----------------------------------------------------
             with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
                 col_sim1, col_sim2 = st.columns(2)
@@ -334,23 +349,31 @@ def main():
                     "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, 76.50]
                 })
                 
-                fig_hist = px.line(
-                    df_hist, 
-                    x="Inventário", 
-                    y=["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"],
-                    markers=True,
-                    template="plotly_dark",
-                    title="Tendência de Melhora da Acuracidade Geral"
-                )
-                fig_hist.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)", 
-                    plot_bgcolor="rgba(0,0,0,0)"
-                )
-                st.plotly_chart(fig_hist, use_container_width=True)
+                c_x5, c_y5 = st.columns(2)
+                with c_x5:
+                    eixo_x_hist = st.selectbox("Eixo X (Período / Histórico):", df_hist.columns.tolist(), index=0, key="hist_x_din")
+                with c_y5:
+                    eixo_y_hist = st.multiselect("Eixo Y (Métricas de Acuracidade Histórica):", ["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"], default=["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"], key="hist_y_din")
+                
+                if eixo_y_hist:
+                    fig_hist = px.line(
+                        df_hist, 
+                        x=eixo_x_hist, 
+                        y=eixo_y_hist,
+                        markers=True,
+                        template="plotly_dark",
+                        title=f"Evolução Histórica (Eixo X: {eixo_x_hist})"
+                    )
+                    fig_hist.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)", 
+                        plot_bgcolor="rgba(0,0,0,0)"
+                    )
+                    st.plotly_chart(fig_hist, use_container_width=True)
+                else:
+                    st.warning("Selecione pelo menos uma métrica para o Eixo Y.")
 
         else:
             st.error("❌ " + msg)
 
 if __name__ == "__main__":
     main()
-                
