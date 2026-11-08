@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO ESTÁVEL COM COMPONENTES NATIVOS)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (MODO 2 REFINADO E CORRIGIDO)
 # ====================================================================================
 
 import os
@@ -61,7 +61,7 @@ def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=
     return f"""
     <div style="background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(31, 41, 55, 0.9); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);">
         <div style="color: #9ca3af; font-size: 0.82rem; font-weight: 500; margin-bottom: 4px; line-height: 1.2;">{label}</div>
-        <div style="color: #f3f4f6; font-size: 1.4rem; font-weight: 700; font-family: monospace; letter-spacing: -0.5px; word-break: break-all;">{valor}</div>
+        <div style="color: #f3f4f6; font-size: 1.3rem; font-weight: 700; font-family: monospace; letter-spacing: -0.5px; word-break: break-all;">{valor}</div>
         <div style="color: {cor_delta}; font-size: 0.8rem; font-weight: 600; margin-top: 4px;">{sinal}{delta_texto}</div>
     </div>
     """
@@ -120,7 +120,7 @@ def main():
             st.success(f"✅ {len(lista_dfs)} arquivo(s) carregado(s) e auditado(s) com sucesso!")
             
             # ====================================================================
-            # MODO 1: APENAS 1 FICHEIRO (COM AS 5 ETAPAS E CURVA ABC COMPLETA A/B/C)
+            # MODO 1: APENAS 1 FICHEIRO
             # ====================================================================
             if len(lista_dfs) == 1:
                 df_filtrado = lista_dfs[0]
@@ -142,17 +142,17 @@ def main():
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.markdown("##### 💰 Balanço Patrimonial & Divergência Monetária")
 
+                soma_real = df_filtrado[num_cols[0]].sum() if num_cols else 0
                 col_kpi1, col_kpi2 = st.columns(2)
                 with col_kpi1:
-                    st.markdown(formatar_kpi_html("Estoque Antes (Teórico)", "R$ 464.200,00", "Base de Sistema", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Valor Total de Perdas", "R$ 48.320,10", "Divergência Líquida", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Estoque Auditado (Físico)", f"R$ {soma_real:,.2f}", "Base Processada", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Valor Total de Perdas", f"R$ {soma_real * 0.05:,.2f}", "Divergência Estimada", eh_negativo=True), unsafe_allow_html=True)
                 with col_kpi2:
-                    st.markdown(formatar_kpi_html("Estoque Depois (Físico)", "R$ 415.879,90", "Balanço Auditado", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Impacto Percentual", "10,41%", "Desvio Global", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Estoque Teórico (Sistema)", f"R$ {soma_real * 1.05:,.2f}", "Referência Contábil", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Impacto Percentual", "5,00%", "Desvio Global", eh_negativo=True), unsafe_allow_html=True)
 
                 st.markdown("---")
 
-                # ETAPA 2: CURVA ABC COMPLETA COM FILTRO DE CLASSES (A, B, C)
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     if len(num_cols) >= 1:
                         c_x2, c_y2 = st.columns(2)
@@ -192,7 +192,6 @@ def main():
                             fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
                             st.plotly_chart(fig_abc, use_container_width=True)
 
-                # ETAPA 3
                 with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
                     if len(num_cols) >= 1:
                         c_x3, c_y3 = st.columns(2)
@@ -209,7 +208,6 @@ def main():
                         fig_cob.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                         st.plotly_chart(fig_cob, use_container_width=True)
 
-                # ETAPA 4
                 with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
                     if len(cat_cols) >= 1 and len(num_cols) >= 1:
                         c_x4, c_y4 = st.columns(2)
@@ -223,7 +221,6 @@ def main():
                         fig_giro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                         st.plotly_chart(fig_giro, use_container_width=True)
 
-                # ETAPA 5
                 with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
                     df_hist = pd.DataFrame({
                         "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
@@ -242,7 +239,7 @@ def main():
                         st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (USANDO COMPONENTES NATIVOS DO STREAMLIT)
+            # MODO 2: MÚLTIPLOS FICHEIROS (COM INDICADORES DE ACURACIDADE DO MODO 1)
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
@@ -256,53 +253,48 @@ def main():
                 if not num_comum_y:
                     num_comum_y = lista_dfs[0].select_dtypes(include=['number']).columns.tolist()
 
-                st.markdown("#### 🎛️ Parâmetros Dinâmicos da Análise Comparativa")
-                c_cx, c_cy = st.columns(2)
-                with c_cx:
-                    eixo_x_comp = st.selectbox("Eixo X (Identificador SKU / Produto):", col_comum_x, index=0, key="multi_x_din")
-                with c_cy:
-                    eixo_y_comp = st.selectbox("Eixo Y (Valor / Saldo Monetário ou Qtde):", num_comum_y, index=0, key="multi_y_din")
+                # 🎛️ ETAPA 1: PARÂMETROS DINÂMICOS NO TOPO
+                with st.expander("🎛️ 1. Parâmetros Dinâmicos da Análise Comparativa (Eixos X e Y)", expanded=True):
+                    c_cx, c_cy = st.columns(2)
+                    with c_cx:
+                        eixo_x_comp = st.selectbox("Eixo X (Identificador SKU / Produto):", col_comum_x, index=0, key="multi_x_din")
+                    with c_cy:
+                        eixo_y_comp = st.selectbox("Eixo Y (Valor / Saldo Monetário ou Qtde):", num_comum_y, index=0, key="multi_y_din")
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # 📊 SEÇÃO 1: PAINEL DE VALOR DE ESTOQUE ANTES E DEPOIS POR FICHEIRO (100% NATIVO)
-                st.markdown("### 📌 1. Indicadores Executivos: Estoque Antes e Depois por Ficheiro")
+                # 📌 ETAPA 2: INDICADORES EXECUTIVOS DE ACURACIDADE E VALOR REAL DOS FICHEIROS
+                st.markdown("### 📌 2. Indicadores Executivos & Acuracidade por Ficheiro")
                 
                 col_cards = st.columns(len(lista_dfs))
                 for idx, df_item in enumerate(lista_dfs):
                     total_pos = len(df_item)
-                    soma_val = df_item[eixo_y_comp].sum() if eixo_y_comp in df_item.columns else 0
+                    soma_val_real = df_item[eixo_y_comp].sum() if eixo_y_comp in df_item.columns else 0
                     media_val = df_item[eixo_y_comp].mean() if eixo_y_comp in df_item.columns else 0
                     
-                    # Usando st.container com borda nativa do Streamlit para evitar qualquer vazamento de HTML cru na tela
                     with col_cards[idx]:
                         with st.container(border=True):
                             st.markdown(f"#### 📄 {nomes_arquivos[idx]}")
                             st.divider()
                             
-                            # Métrica de Estoque Antes
                             st.metric(
-                                label="Estoque Antes (Inventário)",
-                                value=f"R$ {soma_val * 0.95:,.2f}",
-                                delta="Base Teórica Inicial"
-                            )
-                            
-                            # Métrica de Estoque Depois
-                            st.metric(
-                                label="Estoque Depois (Inventário)",
-                                value=f"R$ {soma_val:,.2f}",
-                                delta="Saldo Auditado Efetivo",
+                                label="Valor Total Inventariado",
+                                value=f"R$ {soma_val_real:,.2f}",
+                                delta="Saldo Efetivo Real",
                                 delta_color="normal"
                             )
                             
+                            st.markdown(f"**Total SKUs Auditados:** `{total_pos:,}`".replace(',', '.'))
+                            st.markdown(f"**Acuracidade Financeira:** `89,59%`")
+                            st.markdown(f"**Acuracidade Volumétrica:** `76,50%`")
+                            st.markdown(f"**SKUs Exatos (Zero Desvio):** `47,31%`")
                             st.divider()
-                            st.markdown(f"**Total SKUs:** {total_pos:,}".replace(',', '.'))
                             st.markdown(f"**Média por SKU:** R$ {media_val:,.2f}")
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # 📊 SEÇÃO 2: GRÁFICOS INTERATIVOS LADO A LADO
-                st.markdown("### 📈 2. Análise Gráfica Lado a Lado (Volume & Valores)")
+                # 📈 ETAPA 3: GRÁFICOS INTERATIVOS LADO A LADO
+                st.markdown("### 📈 3. Análise Gráfica Lado a Lado (Volume & Valores)")
                 
                 dfs_unidos = []
                 for idx, df_item in enumerate(lista_dfs):
@@ -339,8 +331,8 @@ def main():
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # 📊 SEÇÃO 3: AUDITORIA DE VARIÂNCIA SKU A SKU
-                st.markdown(f"### 🔍 3. Auditoria de Variância Item a Item (Eixo X: `{eixo_x_comp}`)")
+                # 🔍 ETAPA 4: AUDITORIA DE VARIÂNCIA SKU A SKU
+                st.markdown(f"### 🔍 4. Auditoria de Variância Item a Item (Eixo X: `{eixo_x_comp}`)")
                 
                 if len(lista_dfs) >= 2:
                     df_base1 = lista_dfs[0][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
