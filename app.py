@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (KPIS AJUSTADOS COM FONTE RESPONSIVA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (KPIS FORMATADOS COM CORES + / -)
 # ====================================================================================
 
 import os
@@ -46,6 +46,28 @@ def processar_arquivo_upload(arquivo_carregado):
     except Exception as e:
         return None, "Erro ao processar ficheiro: " + str(e)
 
+def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=False):
+    # Função para renderizar cada KPI por inteiro, sem cortes e com cores configuradas no delta/números
+    cor_delta = "#9ca3af" # neutro (cinza)
+    sinal = ""
+    
+    if eh_negativo:
+        cor_delta = "#ef4444" # vermelho
+        if not delta_texto.startswith("-"):
+            sinal = "-"
+    elif eh_positivo:
+        cor_delta = "#10b981" # verde
+        if not delta_texto.startswith("+"):
+            sinal = "+"
+
+    return f"""
+    <div style="background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(31, 41, 55, 0.9); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);">
+        <div style="color: #9ca3af; font-size: 0.82rem; font-weight: 500; margin-bottom: 4px; line-height: 1.2;">{label}</div>
+        <div style="color: #f3f4f6; font-size: 1.5rem; font-weight: 700; font-family: monospace; letter-spacing: -0.5px; word-break: break-all;">{valor}</div>
+        <div style="color: {cor_delta}; font-size: 0.8rem; font-weight: 600; margin-top: 4px;">{sinal}{delta_texto}</div>
+    </div>
+    """
+
 def main():
     st.set_page_config(
         page_title="NOVA-CORE // J.A.R.V.I.S. EXECUTIVO",
@@ -78,27 +100,13 @@ def main():
     padding: 20px;
     margin-bottom: 15px;
 }
-
-/* AJUSTE RESPONSIVO CRÍTICO PARA OS KPIS (EVITA CORTAR O TEXTO E NÚMEROS) */
-[data-testid="stMetricValue"] {
-    font-size: clamp(1.1rem, 2.2vw, 1.8rem) !important;
-    white-space: normal !important;
-    word-break: break-word !important;
-}
-[data-testid="stMetricLabel"] {
-    font-size: clamp(0.75rem, 1.2vw, 0.95rem) !important;
-    white-space: normal !important;
-}
-[data-testid="stMetricDelta"] {
-    font-size: clamp(0.7rem, 1vw, 0.85rem) !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
     st.markdown("""
 <div class="main-header">
     <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
-    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (KPIS AJUSTADOS)</div>
+    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">SISTEMA INTELIGENTE DE AUDITORIA DE ESTOQUE (KPIS DE VALOR INTEIRO & FORMATO +/- COLORIDO)</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -136,40 +144,42 @@ def main():
             all_cols = df_filtrado.columns.tolist()
 
             # ----------------------------------------------------
-            # ETAPA 1: VISÃO GERAL & PARECER
+            # ETAPA 1: VISÃO GERAL & PARECER (KPIS COLORIDOS E COMPLETOS)
             # ----------------------------------------------------
             st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
             st.markdown("<br>", unsafe_allow_html=True)
             
+            # Bloco 1: Acuracidade
+            st.markdown("##### 📊 Indicadores de Acuracidade Geral")
             c1, c2 = st.columns(2)
             with c1:
-                st.metric("Total SKUs Auditados", f"{len(df_filtrado):,}".replace(',', '.'))
-                st.metric("Acuracidade Volumétrica", "76,50%", "-13,5% vs Meta")
+                st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{len(df_filtrado):,}".replace(',', '.'), "Total Processado", eh_positivo=True), unsafe_allow_html=True)
+                st.markdown(formatar_kpi_html("Acuracidade Volumétrica", "76,50%", "13,50% vs Meta", eh_negativo=True), unsafe_allow_html=True)
             with c2:
-                st.metric("Acuracidade Financeira", "89,59%", "-8,41% vs Meta")
-                st.metric("SKUs Exatos (Zero Faltas)", "47,31%", "Atenção Crítica")
+                st.markdown(formatar_kpi_html("Acuracidade Financeira", "89,59%", "8,41% vs Meta", eh_negativo=True), unsafe_allow_html=True)
+                st.markdown(formatar_kpi_html("SKUs Exatos (Zero Faltas)", "47,31%", "Atenção Crítica", eh_negativo=True), unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("##### 💰 Balanço Patrimonial & Divergência Monetária")
 
             col_kpi1, col_kpi2 = st.columns(2)
             with col_kpi1:
-                st.metric("Estoque Antes (Teórico)", "R$ 464.200,00", "Base de Sistema")
-                st.metric("Valor Total de Perdas", "R$ 48.320,10", "Divergência Líquida")
+                st.markdown(formatar_kpi_html("Estoque Antes (Teórico)", "R$ 464.200,00", "Base de Sistema", eh_positivo=True), unsafe_allow_html=True)
+                st.markdown(formatar_kpi_html("Valor Total de Perdas", "R$ 48.320,10", "Divergência Líquida", eh_negativo=True), unsafe_allow_html=True)
             with col_kpi2:
-                st.metric("Estoque Depois (Físico)", "R$ 415.879,90", "Balanço Auditado")
-                st.metric("Impacto Percentual", "10,41%", "Desvio Global")
+                st.markdown(formatar_kpi_html("Estoque Depois (Físico)", "R$ 415.879,90", "Balanço Auditado", eh_positivo=True), unsafe_allow_html=True)
+                st.markdown(formatar_kpi_html("Impacto Percentual", "10,41%", "Desvio Global", eh_negativo=True), unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("##### 📦 Distribuição Física dos SKUs Auditados")
 
             col_s1, col_s2 = st.columns(2)
             with col_s1:
-                st.metric("SKUs Negativos (Faltas)", "742 SKUs", "35,6% do Total")
-                st.metric("SKUs Sem Divergência", "984 SKUs", "47,31% Exatos")
+                st.markdown(formatar_kpi_html("SKUs Negativos (Faltas)", "742 SKUs", "35,60% do Total", eh_negativo=True), unsafe_allow_html=True)
+                st.markdown(formatar_kpi_html("SKUs Sem Divergência", "984 SKUs", "47,31% Exatos", eh_positivo=True), unsafe_allow_html=True)
             with col_s2:
-                st.metric("SKUs Positivos (Sobras)", "358 SKUs", "17,1% do Total")
-                st.metric("Status Operacional", "Crítico", "Requer Intervenção")
+                st.markdown(formatar_kpi_html("SKUs Positivos (Sobras)", "358 SKUs", "17,10% do Total", eh_positivo=True), unsafe_allow_html=True)
+                st.markdown(formatar_kpi_html("Status Operacional", "Crítico", "Requer Intervenção", eh_negativo=True), unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
             
@@ -343,4 +353,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+                
