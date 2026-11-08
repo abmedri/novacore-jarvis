@@ -108,7 +108,7 @@ def main():
     col_h1, col_h2 = st.columns([3, 1])
     with col_h1:
         st.markdown('<div class="jarvis-title">⚡ NOVA-CORE // J.A.R.V.I.S.</div>', unsafe_allow_html=True)
-        st.caption("KMB DISTRIBUIDORA — SISTEMA EXECUTIVO AUTÔNOMO")
+        st.caption("SISTEMA EXECUTIVO AUTÔNOMO")
     with col_h2:
         st.markdown("<div style='text-align: right; color: #00f2fe;'><b>● ONLINE</b><br><small>SR. ADRIANO</small></div>", unsafe_allow_html=True)
 
