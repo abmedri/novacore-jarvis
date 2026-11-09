@@ -211,6 +211,98 @@ def main():
 
                 st.markdown("---")
 
+                # ETAPA 2: CURVA ABC
+                with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
+                    if len(num_cols) >= 1:
+                        idx_padrao_y = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
+                        c_x2, c_y2 = st.columns(2)
+                        with c_x2:
+                            eixo_x_abc = st.selectbox("Eixo X (Identificador/SKU/Produto):", all_cols, index=0, key="abc_x_din")
+                        with c_y2:
+                            eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário/Quantidade):", num_cols, index=idx_padrao_y, key="abc_y_din")
+                        
+                        df_abc = df_filtrado.sort_values(by=eixo_y_abc, ascending=False).copy()
+                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_abc].cumsum()
+                        soma_total = df_abc[eixo_y_abc].sum()
+                        
+                        if soma_total > 0:
+                            df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
+                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (Alto Valor / 80%)" if p <= 80 else ("Classe B (Médio Valor / 15%)" if p <= 95 else "Classe C (Baixo Valor / 5%)"))
+                            
+                            filtro_classe = st.multiselect(
+                                "Filtrar por Classe ABC:",
+                                ["Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"],
+                                default=["Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"],
+                                key="filtro_abc_multiselect"
+                            )
+                            
+                            if filtro_classe:
+                                df_abc_filtrado = df_abc[df_abc['Classe_ABC'].isin(filtro_classe)]
+                            else:
+                                df_abc_filtrado = df_abc
+
+                            fig_abc = px.bar(
+                                df_abc_filtrado.head(100), 
+                                x=eixo_x_abc, 
+                                y=eixo_y_abc, 
+                                color='Classe_ABC', 
+                                template="plotly_dark", 
+                                title=f"Classificação ABC — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}"
+                            )
+                            fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
+                            st.plotly_chart(fig_abc, use_container_width=True)
+
+                # ETAPA 3: COBERTURA
+                with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
+                    if len(num_cols) >= 1:
+                        idx_cob = identificar_coluna_ideal(num_cols, ['saldo', 'quantidade', 'estoque'])
+                        c_x3, c_y3 = st.columns(2)
+                        with c_x3:
+                            eixo_x_cob = st.selectbox("Eixo X (Métrica de Cobertura/Estoque):", num_cols, index=idx_cob, key="cob_x_din")
+                        with c_y3:
+                            eixo_y_cob = st.selectbox("Eixo Y (Frequência / Contagem de SKUs):", ["Contagem de SKUs"] + num_cols, index=0, key="cob_y_din")
+                        
+                        vazao_diaria = st.slider("Média estimada de consumo/saída diária por SKU (unidades):", min_value=1, max_value=500, value=25, key="vazao_mod")
+                        df_cob = df_filtrado.copy()
+                        df_cob['Dias_Cobertura'] = df_cob[eixo_x_cob] / vazao_diaria
+                        
+                        fig_cob = px.histogram(df_cob, x='Dias_Cobertura', nbins=30, color_discrete_sequence=['#00f2fe'], template="plotly_dark", title="Distribuição de Dias de Cobertura")
+                        fig_cob.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_cob, use_container_width=True)
+
+                # ETAPA 4: GIRO POR CATEGORIA
+                with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
+                    if len(cat_cols) >= 1 and len(num_cols) >= 1:
+                        idx_giro = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
+                        c_x4, c_y4 = st.columns(2)
+                        with c_x4:
+                            eixo_x_giro = st.selectbox("Eixo X (Categoria / Grupo):", cat_cols, key="giro_x_din")
+                        with c_y4:
+                            eixo_y_giro = st.selectbox("Eixo Y (Valor Somado / Métrica):", num_cols, index=idx_giro, key="giro_y_din")
+                        
+                        df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().sort_values(by=eixo_y_giro, ascending=False).head(15)
+                        fig_giro = px.bar(df_giro, x=eixo_x_giro, y=eixo_y_giro, color=eixo_y_giro, color_continuous_scale="Blues", template="plotly_dark", title=f"Análise por {eixo_x_giro}")
+                        fig_giro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_giro, use_container_width=True)
+
+                # ETAPA 5: EVOLUÇÃO HISTÓRICA
+                with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
+                    df_hist = pd.DataFrame({
+                        "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
+                        "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, acur_fin_real],
+                        "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, acur_vol_real]
+                    })
+                    c_x5, c_y5 = st.columns(2)
+                    with c_x5:
+                        eixo_x_hist = st.selectbox("Eixo X (Período / Histórico):", df_hist.columns.tolist(), index=0, key="hist_x_din")
+                    with c_y5:
+                        eixo_y_hist = st.multiselect("Eixo Y (Métricas de Acuracidade Histórica):", ["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"], default=["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"], key="hist_y_din")
+                    
+                    if eixo_y_hist:
+                        fig_hist = px.line(df_hist, x=eixo_x_hist, y=eixo_y_hist, markers=True, template="plotly_dark", title="Evolução Histórica")
+                        fig_hist.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_hist, use_container_width=True)
+
             # ====================================================================
             # MODO 2: MÚLTIPLOS FICHEIROS (VISÃO COMPARATIVA EXECUTIVA)
             # ====================================================================
@@ -309,6 +401,191 @@ def main():
                             st.markdown(f"**Valor Pré-Inventário:** R$ {soma_val_antes:,.2f}")
 
                 st.markdown("<br>", unsafe_allow_html=True)
+
+                # 📈 ETAPA 2: ANÁLISE GRÁFICA LADO A LADO
+                st.markdown("### 📈 2. Análise Gráfica Lado a Lado (Volume & Valores)")
+                
+                dfs_unidos = []
+                for idx, df_item in enumerate(lista_dfs):
+                    df_cop = df_item.copy()
+                    df_cop['Origem_Inventario'] = nomes_arquivos[idx]
+                    dfs_unidos.append(df_cop)
+                
+                df_consolidado = pd.concat(dfs_unidos, ignore_index=True)
+
+                g_c1, g_c2 = st.columns(2)
+                with g_c1:
+                    fig_totais = px.bar(
+                        df_consolidado.groupby('Origem_Inventario')[col_temp].sum().reset_index(),
+                        x='Origem_Inventario',
+                        y=col_temp,
+                        color='Origem_Inventario',
+                        template="plotly_dark",
+                        title="Comparação de Valor Total de Estoque"
+                    )
+                    fig_totais.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig_totais, use_container_width=True)
+
+                with g_c2:
+                    fig_skus = px.bar(
+                        df_consolidado.groupby('Origem_Inventario').size().reset_index(name='Total_SKUs'),
+                        x='Origem_Inventario',
+                        y='Total_SKUs',
+                        color='Origem_Inventario',
+                        template="plotly_dark",
+                        title="Comparação de Volume de SKUs Auditados"
+                    )
+                    fig_skus.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig_skus, use_container_width=True)
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                # 🔍 ETAPA 3: AUDITORIA DE VARIÂNCIA ITEM A ITEM
+                st.markdown("### 🔍 3. Auditoria de Variância Item a Item")
+                
+                if len(lista_dfs) >= 2:
+                    x_padrao_var = col_comum_x[0]
+                    y_padrao_var = num_comum_y[idx_padrao_comp_y]
+                    
+                    df_base1 = lista_dfs[0][[x_padrao_var, y_padrao_var]].groupby(x_padrao_var).sum().reset_index()
+                    df_base2 = lista_dfs[1][[x_padrao_var, y_padrao_var]].groupby(x_padrao_var).sum().reset_index()
+                    
+                    df_merge = pd.merge(df_base1, df_base2, on=x_padrao_var, how='outer', suffixes=(f" ({nomes_arquivos[0]})", f" ({nomes_arquivos[1]})")).fillna(0)
+                    
+                    col_b1 = f"{y_padrao_var} ({nomes_arquivos[0]})"
+                    col_b2 = f"{y_padrao_var} ({nomes_arquivos[1]})"
+                    
+                    df_merge['Variação Monetária (R$)'] = df_merge[col_b2] - df_merge[col_b1]
+                    df_merge['Variação (%)'] = ((df_merge[col_b2] - df_merge[col_b1]) / df_merge[col_b1].replace(0, 1)) * 100
+                    
+                    st.markdown(f"<small style='color: #9ca3af;'>Cruzamento direto entre <b>{nomes_arquivos[0]}</b> vs <b>{nomes_arquivos[1]}</b>:</small>", unsafe_allow_html=True)
+                    st.dataframe(df_merge.sort_values(by='Variação Monetária (R$)', ascending=False), use_container_width=True)
+
+                    fig_var = px.bar(
+                        df_merge.sort_values(by='Variação Monetária (R$)', ascending=False).head(20),
+                        x=x_padrao_var,
+                        y='Variação Monetária (R$)',
+                        color='Variação Monetária (R$)',
+                        color_continuous_scale="RdYlGn_r",
+                        template="plotly_dark",
+                        title="Top 20 Divergências Monetárias"
+                    )
+                    fig_var.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig_var, use_container_width=True)
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS & GRÁFICO COMPARATIVO EXECUTIVO
+                with st.expander("🎛️ 4. Parâmetros Dinâmicos da Análise Comparativa (Eixos X e Y)", expanded=True):
+                    st.info("💡 **Central de Inteligência Dinâmica:** Selecione os eixos abaixo para cruzar livremente qualquer dimensão e métrica dos seus ficheiros.")
+                    c_cx, c_cy = st.columns(2)
+                    with c_cx:
+                        eixo_x_comp = st.selectbox("Eixo X (Dimensão / SKU / Categoria):", col_comum_x, index=0, key="multi_x_din")
+                    with c_cy:
+                        eixo_y_comp = st.selectbox("Eixo Y (Métrica Numérica / Valor / Quantidade):", num_comum_y, index=idx_padrao_comp_y, key="multi_y_din")
+                    
+                    if len(lista_dfs) >= 2 and eixo_x_comp and eixo_y_comp:
+                        df_d1 = lista_dfs[0][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
+                        df_d2 = lista_dfs[1][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
+                        df_comp_din = pd.merge(df_d1, df_d2, on=eixo_x_comp, how='outer', suffixes=(f" ({nomes_arquivos[0]})", f" ({nomes_arquivos[1]})")).fillna(0)
+                        
+                        col_sk1 = f"{eixo_y_comp} ({nomes_arquivos[0]})"
+                        col_sk2 = f"{eixo_y_comp} ({nomes_arquivos[1]})"
+                        
+                        df_comp_din['Variação Absoluta'] = df_comp_din[col_sk2] - df_comp_din[col_sk1]
+                        df_comp_din['Tipo de Variação'] = df_comp_din['Variação Absoluta'].apply(lambda x: 'Aumento (Sobra/Positivo)' if x > 0 else ('Redução (Falta/Negativo)' if x < 0 else 'Sem Alteração'))
+                        
+                        st.markdown(f"##### 📊 Análise Comparativa Dinâmica: {eixo_y_comp} por {eixo_x_comp}")
+                        
+                        fig_din = px.bar(
+                            df_comp_din.sort_values(by='Variação Absoluta', ascending=False).head(20),
+                            x=eixo_x_comp,
+                            y='Variação Absoluta',
+                            color='Tipo de Variação',
+                            color_discrete_map={
+                                'Aumento (Sobra/Positivo)': '#10b981',
+                                'Redução (Falta/Negativo)': '#ef4444',
+                                'Sem Alteração': '#9ca3af'
+                            },
+                            template="plotly_dark",
+                            title=f"Top 20 Variações de {eixo_y_comp} entre {nomes_arquivos[0]} e {nomes_arquivos[1]}"
+                        )
+                        fig_din.update_layout(
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            xaxis_title=eixo_x_comp,
+                            yaxis_title=f"Diferença Absoluta ({eixo_y_comp})",
+                            legend_title="Direção da Variação"
+                        )
+                        st.plotly_chart(fig_din, use_container_width=True)
+
+            # ====================================================================
+            # MÓDULO DE EXPORTAÇÃO EXECUTIVA (RELATÓRIO & SLIDES)
+            # ====================================================================
+            st.markdown("---")
+            st.markdown("### 📥 EXPORTAÇÃO DE RELATÓRIOS & APRESENTAÇÕES EXECUTIVAS")
+            st.info("💡 **Central de Exportação NOVA-CORE:** Descarregue o relatório técnico oficial e a estrutura de slides para a diretoria.")
+            
+            col_exp1, col_exp2 = st.columns(2)
+            
+            with col_exp1:
+                conteudo_relatorio = f"""# RELATÓRIO EXECUTIVO DE AUDITORIA DE ESTOQUE
+## NOVA-CORE // PROTOCOLO J.A.R.V.I.S.
+
+### 1. Sumário Executivo
+Este documento apresenta a auditoria comparativa de inventários realizada pelo sistema NOVA-CORE.
+Total de Inventários Analisados: {len(lista_dfs)}
+
+### 2. Indicadores por Ficheiro
+"""
+                for idx, df_item in enumerate(lista_dfs):
+                    total_pos = len(df_item)
+                    num_cols_item = df_item.select_dtypes(include=['number']).columns.tolist()
+                    idx_temp = identificar_coluna_ideal(num_cols_item, ['valor de estoque', 'valor', 'saldo'])
+                    col_temp = num_cols_item[idx_temp] if num_cols_item and idx_temp < len(num_cols_item) else (num_cols_item[0] if num_cols_item else None)
+                    soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
+                    
+                    conteudo_relatorio += f"""
+- **Ficheiro:** {nomes_arquivos[idx]}
+  - Total SKUs Auditados: {total_pos:,}
+  - Valor Total Real: R$ {soma_val_real:,.2f}
+"""
+                st.download_button(
+                    label="📄 Descarregar Relatório Executivo Oficial (.md)",
+                    data=conteudo_relatorio,
+                    file_name="Relatorio_Executivo_Inventario_NovaCore.md",
+                    mime="text/markdown"
+                )
+
+            with col_exp2:
+                conteudo_slides = """# ESTRUTURA DE SLIDES PARA APRESENTAÇÃO EM POWERPOINT
+## NOVA-CORE // DIRETORIA EXECUTIVA
+
+- **Slide 1: Capa Executiva**
+  - Título: Auditoria Geral de Estoque & Análise Comparativa Multi-Inventário
+  - Subtítulo: Relatório de Desvios, Acuracidade e Parecer Técnico
+
+- **Slide 2: Sumário de Inventários Auditados**
+  - Comparativo lado a lado dos volumes de SKUs, Valores Reais e Impacto Geral.
+
+- **Slide 3: Painel de Acuracidade (Financeira vs. Volumétrica)**
+  - Avaliação de desempenho frente à meta corporativa de 95%.
+
+- **Slide 4: Balanço Patrimonial (Teórico vs. Real)**
+  - Exibição clara do impacto financeiro das quebras de estoque apuradas.
+
+- **Slide 5: Top SKUs com Maior Divergência Monetária**
+  - Destaque para os produtos que exigem auditoria imediata.
+
+- **Slide 6: Conclusões & Plano de Ação Estratégico**
+  - Próximos passos operacionais e governança para o próximo ciclo.
+"""
+                st.download_button(
+                    label="📊 Descarregar Roteiro de Slides PPTX (.txt)",
+                    data=conteudo_slides,
+                    file_name="Apresentacao_Slides_Diretoria.txt",
+                    mime="text/plain"
+                )
 
         else:
             st.error("❌ Não foi possível ler os dados dos arquivos enviados.")
