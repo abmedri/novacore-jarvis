@@ -441,14 +441,14 @@ def main():
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS & GRÁFICO COMPARATIVO PERSONALIZADO
+                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS & GRÁFICO COMPARATIVO EXECUTIVO
                 with st.expander("🎛️ 4. Parâmetros Dinâmicos da Análise Comparativa (Eixos X e Y)", expanded=True):
-                    st.info("💡 **Dica de Auditoria:** Altere os eixos abaixo para recalcular instantaneamente o cruzamento e o gráfico comparativo entre os inventários.")
+                    st.info("💡 **Central de Inteligência Dinâmica:** Selecione os eixos abaixo para cruzar livremente qualquer dimensão e métrica dos seus ficheiros.")
                     c_cx, c_cy = st.columns(2)
                     with c_cx:
-                        eixo_x_comp = st.selectbox("Eixo X (Identificador SKU / Produto):", col_comum_x, index=0, key="multi_x_din")
+                        eixo_x_comp = st.selectbox("Eixo X (Dimensão / SKU / Categoria):", col_comum_x, index=0, key="multi_x_din")
                     with c_cy:
-                        eixo_y_comp = st.selectbox("Eixo Y (Valor / Saldo Monetário ou Qtde):", num_comum_y, index=idx_padrao_comp_y, key="multi_y_din")
+                        eixo_y_comp = st.selectbox("Eixo Y (Métrica Numérica / Valor / Quantidade):", num_comum_y, index=idx_padrao_comp_y, key="multi_y_din")
                     
                     if len(lista_dfs) >= 2 and eixo_x_comp and eixo_y_comp:
                         df_d1 = lista_dfs[0][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
@@ -458,19 +458,31 @@ def main():
                         col_sk1 = f"{eixo_y_comp} ({nomes_arquivos[0]})"
                         col_sk2 = f"{eixo_y_comp} ({nomes_arquivos[1]})"
                         
-                        df_comp_din['Diferença Dinâmica'] = df_comp_din[col_sk2] - df_comp_din[col_sk1]
+                        df_comp_din['Variação Absoluta'] = df_comp_din[col_sk2] - df_comp_din[col_sk1]
+                        df_comp_din['Tipo de Variação'] = df_comp_din['Variação Absoluta'].apply(lambda x: 'Aumento (Sobra/Positivo)' if x > 0 else ('Redução (Falta/Negativo)' if x < 0 else 'Sem Alteração'))
                         
-                        st.markdown(f"##### 📊 Visualização Dinâmica: {eixo_y_comp} por {eixo_x_comp}")
+                        st.markdown(f"##### 📊 Análise Comparativa Dinâmica: {eixo_y_comp} por {eixo_x_comp}")
+                        
                         fig_din = px.bar(
-                            df_comp_din.sort_values(by='Diferença Dinâmica', ascending=False).head(25),
+                            df_comp_din.sort_values(by='Variação Absoluta', ascending=False).head(20),
                             x=eixo_x_comp,
-                            y='Diferença Dinâmica',
-                            color='Diferença Dinâmica',
-                            color_continuous_scale="RdYlGn_r",
+                            y='Variação Absoluta',
+                            color='Tipo de Variação',
+                            color_discrete_map={
+                                'Aumento (Sobra/Positivo)': '#10b981',
+                                'Redução (Falta/Negativo)': '#ef4444',
+                                'Sem Alteração': '#9ca3af'
+                            },
                             template="plotly_dark",
-                            title=f"Top Variações Dinâmicas para {eixo_y_comp}"
+                            title=f"Top 20 Variações de {eixo_y_comp} entre {nomes_arquivos[0]} e {nomes_arquivos[1]}"
                         )
-                        fig_din.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                        fig_din.update_layout(
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            xaxis_title=eixo_x_comp,
+                            yaxis_title=f"Diferença Absoluta ({eixo_y_comp})",
+                            legend_title="Direção da Variação"
+                        )
                         st.plotly_chart(fig_din, use_container_width=True)
 
             # ====================================================================
