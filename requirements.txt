@@ -1,4 +1,8 @@
 streamlit
 pandas
 plotly
+matplotlib
 numpy
+python-docx
+python-pptx
+openpyxl
