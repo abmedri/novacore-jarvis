@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA C-LEVEL & MATEMATICAMENTE BLINDADA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO ESTÁVEL & RESTAURADA)
 # ====================================================================================
 
 import os
@@ -23,7 +23,6 @@ from docx.oxml.ns import nsdecls
 from pptx import Presentation
 from pptx.util import Inches as PptxInches, Pt as PptxPt
 from pptx.dml.color import RGBColor as PptxRGBColor
-from pptx.enum.shapes import MSO_SHAPE
 
 def processar_arquivo_upload(arquivo_carregado):
     nome = arquivo_carregado.name.lower()
@@ -66,17 +65,13 @@ def processar_arquivo_upload(arquivo_carregado):
         return None, "Erro ao processar ficheiro: " + str(e)
 
 def identificar_coluna_ideal(colunas_disponiveis, palavras_alvo):
-    try:
-        if not colunas_disponive:
-            return 0
-        for palavra in palavras_alvo:
-            for idx, col in enumerate(colunas_disponive):
-                col_lower = str(col).lower()
-                if palavra in col_lower and 'codigo' not in col_lower and 'código' not in col_lower and 'id' not in col_lower:
-                    return idx
+    if not colunas_disponive:
         return 0
-    except Exception:
-        return 0
+    for palavra in palavras_alvo:
+        for idx, col in enumerate(colunas_disponive):
+            if palavra in str(col).lower() and 'codigo' not in str(col).lower() and 'código' not in str(col).lower():
+                return idx
+    return 0
 
 def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=False):
     cor_delta = "#9ca3af"
@@ -123,28 +118,24 @@ def gerar_docx_executivo_c_level(nomes_arquivos, lista_dfs):
     doc.add_paragraph().paragraph_format.space_after = Pt(10)
     h1 = doc.add_heading("1. Sumário Executivo & Exposição Patrimonial", level=1)
     h1.runs[0].font.color.rgb = RGBColor(15, 23, 42)
-    
     doc.add_paragraph("Este documento consolida a auditoria de inventário dos recintos operacionais com foco em governança WMS e controle de divergências físicas.")
 
     table_kpi = doc.add_table(rows=1, cols=4)
     table_kpi.alignment = WD_TABLE_ALIGNMENT.CENTER
     hdr = table_kpi.rows[0].cells
-    headers = ["Indicador Estratégico", "Valor Auditado", "Variação / Impacto", "Status / Parecer"]
-    for i, h in enumerate(headers):
+    for i, h in enumerate(["Indicador Estratégico", "Valor Auditado", "Variação / Impacto", "Status / Parecer"]):
         hdr[i].text = h
         shading = parse_xml(r'<w:shd {} w:fill="0F172A"/>'.format(nsdecls('w')))
         hdr[i]._tc.get_or_add_tcPr().append(shading)
         hdr[i].paragraphs[0].runs[0].font.bold = True
         hdr[i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
 
-    kpis_data = [
+    for row in [
         ["Estoque Total Auditado (Pós)", "R$ 4.262.645,30", "4.041 SKUs", "Concluído"],
         ["Divergência Financeira Líquida", "-R$ 70.389,31", "-1,62% sobre o Pré", "Ajuste em DRE"],
         ["Exposição Bruta Absoluta", "R$ 146.000,00", "Variação Bruta Real", "Risco Operacional"],
         ["Volume Físico Divergente", "43.818 unidades", "19,98% do Volume Pré", "Alerta Vermelho"]
-    ]
-
-    for row in kpis_data:
+    ]:
         cells = table_kpi.add_row().cells
         for i, val in enumerate(row):
             cells[i].text = val
@@ -167,13 +158,12 @@ def gerar_docx_executivo_c_level(nomes_arquivos, lista_dfs):
         hdr_p[i].paragraphs[0].runs[0].font.bold = True
         hdr_p[i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
 
-    acoes = [
+    for row in [
         ["30 Dias", "Inventário Cíclico Quinzenal nos Top 50 SKUs", "Gerente de Armazém", "Estabilizar Acuracidade Fin > 98%"],
         ["30 Dias", "Bloqueio de Movimentação Manual no WMS sem Bipagem", "TI / Operações", "Eliminar Troca de SKUs"],
         ["60 Dias", "Revisão de Cadastro de Caixa Máster", "Suprimentos", "Zerar Erros de Entrada"],
         ["90 Dias", "Dashboard Semanal de Divergências Volumétricas", "Controladoria", "Acuracidade Volumétrica > 90%"]
-    ]
-    for row in acoes:
+    ]:
         cells = t_plano.add_row().cells
         for i, val in enumerate(row):
             cells[i].text = val
@@ -187,11 +177,9 @@ def gerar_pptx_bytes_c_level(nomes_arquivos, lista_dfs):
     prs = Presentation()
     prs.slide_width = PptxInches(13.333)
     prs.slide_height = PptxInches(7.5)
-    blank_layout = prs.slide_layouts[6]
-    slide1 = prs.slides.add_slide(blank_layout)
-    bg1 = slide1.background
-    bg1.fill.solid()
-    bg1.fill.fore_color.rgb = PptxRGBColor(11, 15, 25)
+    slide1 = prs.slides.add_slide(prs.slide_layouts[6])
+    slide1.background.fill.solid()
+    slide1.background.fill.fore_color.rgb = PptxRGBColor(11, 15, 25)
 
     tb = slide1.shapes.add_textbox(PptxInches(1), PptxInches(2), PptxInches(11.3), PptxInches(3.5))
     tf = tb.text_frame
@@ -214,11 +202,7 @@ def gerar_pptx_bytes_c_level(nomes_arquivos, lista_dfs):
     return buffer
 
 def main():
-    st.set_page_config(
-        page_title="NOVA-CORE // J.A.R.V.I.S. EXECUTIVO",
-        page_icon="⚡",
-        layout="wide"
-    )
+    st.set_page_config(page_title="NOVA-CORE // J.A.R.V.I.S. EXECUTIVO", page_icon="⚡", layout="wide")
 
     st.markdown("""
 <style>
@@ -230,13 +214,8 @@ def main():
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .bento-card {
-    background: rgba(17, 24, 39, 0.7); 
-    border: 1px solid rgba(31, 41, 55, 0.8);
-    border-top: 3px solid #00f2fe;
-    border-radius: 10px; 
-    padding: 18px; 
-    margin-bottom: 15px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    background: rgba(17, 24, 39, 0.7); border: 1px solid rgba(31, 41, 55, 0.8);
+    border-top: 3px solid #00f2fe; border-radius: 10px; padding: 18px; margin-bottom: 15px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -256,7 +235,6 @@ def main():
     if arquivos_submetidos:
         lista_dfs = []
         nomes_arquivos = []
-        
         for arq in arquivos_submetidos:
             df_temp, msg = processar_arquivo_upload(arq)
             if df_temp is not None:
@@ -266,67 +244,60 @@ def main():
         if lista_dfs:
             st.success(f"✅ {len(lista_dfs)} arquivo(s) carregado(s) e auditado(s) com sucesso!")
             
-            # ====================================================================
-            # MODO 1: APENAS 1 FICHEIRO (VISÃO DETALHADA 5 ETAPAS)
-            # ====================================================================
             if len(lista_dfs) == 1:
                 df_filtrado = lista_dfs[0]
-                all_cols = df_filtrado.columns.tolist()
                 num_cols = df_filtrado.select_dtypes(include=['number']).columns.tolist()
                 cat_cols = df_filtrado.select_dtypes(include=['object']).columns.tolist()
+                all_cols = df_filtrado.columns.tolist()
 
                 if not num_cols:
                     num_cols = all_cols
                 if not cat_cols:
                     cat_cols = all_cols
 
-                # PAINEL DE CONTROLE MANUAL DE COLUNAS (Blindagem contra mapeamento incorreto)
-                with st.expander("🛠️ MAPEAMENTO MANUAL DE COLUNAS (Ajuste de Precisão)", expanded=False):
-                    st.info("Selecione as colunas corretas do seu ficheiro para garantir que o cálculo monetário e físico esteja 100% exato.")
-                    c_m1, c_m2, c_m3 = st.columns(3)
-                    with c_m1:
-                        idx_val_def = identificar_coluna_ideal(num_cols, ['valor', 'total', 'preco', 'custo', 'saldo'])
-                        col_val_sel = st.selectbox("Coluna de Valor / Custo Total:", num_cols, index=idx_val_def)
-                    with c_m2:
-                        idx_qtd_def = identificar_coluna_ideal(num_cols, ['quantidade', 'fisico', 'estoque', 'atual'])
-                        col_qtd_sel = st.selectbox("Coluna de Quantidade / Saldo:", num_cols, index=idx_qtd_def)
-                    with c_m3:
-                        idx_aj_def = identificar_coluna_ideal(num_cols, ['ajuste', 'diferenca', 'dif'])
-                        col_aj_sel = st.selectbox("Coluna de Ajuste / Desvio:", num_cols, index=idx_aj_def if idx_aj_def < len(num_cols) else 0)
-
                 total_pos = len(df_filtrado)
-                soma_depois = df_filtrado[col_val_sel].sum() if col_val_sel in df_filtrado.columns else 0
-                total_itens_pos = df_filtrado[col_qtd_sel].sum() if col_qtd_sel in df_filtrado.columns else total_pos
+                idx_val = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
+                col_val = num_cols[idx_val] if num_cols else all_cols[0]
+                soma_depois = df_filtrado[col_val].sum() if col_val and col_val in df_filtrado.columns else 0
+
+                idx_qtd = identificar_coluna_ideal(num_cols, ['quantidade', 'saldo', 'estoque', 'fisico', 'teorico'])
+                col_qtd_pos = num_cols[idx_qtd] if num_cols else col_val
+                total_itens_pos = df_filtrado[col_qtd_pos].sum() if col_qtd_pos and col_qtd_pos in df_filtrado.columns else total_pos
                 
-                soma_ajuste_qtd = df_filtrado[col_aj_sel].sum() if col_aj_sel in df_filtrado.columns else 0
+                col_ajuste = next((c for c in num_cols if 'ajuste' in str(c).lower() and 'valor' not in str(c).lower()), 'Ajuste' if 'Ajuste' in df_filtrado.columns else (num_cols[0] if num_cols else all_cols[0]))
+                soma_ajuste_qtd = df_filtrado[col_ajuste].sum() if col_ajuste and col_ajuste in df_filtrado.columns else 0
                 total_itens_antes = total_itens_pos - soma_ajuste_qtd
 
-                df_falta = df_filtrado[df_filtrado[col_aj_sel] < 0] if col_aj_sel in df_filtrado.columns else pd.DataFrame()
-                df_sobra = df_filtrado[df_filtrado[col_aj_sel] > 0] if col_aj_sel in df_filtrado.columns else pd.DataFrame()
+                df_falta = df_filtrado[df_filtrado[col_ajuste] < 0] if col_ajuste in df_filtrado.columns else pd.DataFrame()
+                df_sobra = df_filtrado[df_filtrado[col_ajuste] > 0] if col_ajuste in df_filtrado.columns else pd.DataFrame()
                 
                 qtd_falta = len(df_falta)
                 qtd_sobra = len(df_sobra)
-                vol_falta_un = abs(df_falta[col_aj_sel].sum()) if not df_falta.empty and col_aj_sel in df_falta.columns else 0
-                vol_sobra_un = df_sobra[col_aj_sel].sum() if not df_sobra.empty and col_aj_sel in df_sobra.columns else 0
+                vol_falta_un = abs(df_falta[col_ajuste].sum()) if col_ajuste and not df_falta.empty and col_ajuste in df_falta.columns else 0
+                vol_sobra_un = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobra.empty and col_ajuste in df_sobra.columns else 0
 
                 vol_total_div = vol_falta_un + vol_sobra_un
                 perc_vol_div = (vol_total_div / total_itens_antes * 100) if total_itens_antes > 0 else 0
 
-                qtd_exatos = (df_filtrado[col_aj_sel] == 0).sum() if col_aj_sel in df_filtrado.columns else int(total_pos * 0.5)
+                qtd_exatos = (df_filtrado[col_ajuste] == 0).sum() if col_ajuste in df_filtrado.columns else int(total_pos * 0.5)
                 total_divergencias = qtd_falta + qtd_sobra
                 perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0
                 
                 perc_falta_itens = (qtd_falta / total_pos * 100) if total_pos > 0 else 0
                 perc_sobra_itens = (qtd_sobra / total_pos * 100) if total_pos > 0 else 0
 
-                # Cálculo Contábil Rigoroso: Estoque Antes = Estoque Depois - Valor do Ajuste
-                soma_ajuste_val = df_filtrado[col_aj_sel].sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1)
-                soma_antes = soma_depois - soma_ajuste_val
+                if 'Congelado' in df_filtrado.columns and 'Custo' in df_filtrado.columns:
+                    soma_antes = (df_filtrado['Congelado'] * df_filtrado['Custo']).sum()
+                else:
+                    soma_ajuste_val = df_filtrado['Valor de Ajuste(R$)'].sum() if 'Valor de Ajuste(R$)' in df_filtrado.columns else 0
+                    soma_antes = soma_depois - soma_ajuste_val
+
                 diferenca_monetaria = soma_depois - soma_antes
                 impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
 
-                val_falta_fin = abs(df_falta[col_aj_sel].sum()) * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1) if not df_falta.empty and col_aj_sel in df_falta.columns else 0
-                val_sobra_fin = df_sobra[col_aj_sel].sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1) if not df_sobra.empty and col_aj_sel in df_sobra.columns else 0
+                col_val_aju = 'Valor de Ajuste(R$)' if 'Valor de Ajuste(R$)' in df_filtrado.columns else None
+                val_falta_fin = df_falta[col_val_aju].sum() if col_val_aju and not df_falta.empty and col_val_aju in df_falta.columns else 0
+                val_sobra_fin = df_sobra[col_val_aju].sum() if col_val_aju and not df_sobra.empty and col_val_aju in df_sobra.columns else 0
                 soma_absoluta_val = abs(val_falta_fin) + abs(val_sobra_fin)
 
                 acur_vol_real = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0
@@ -361,11 +332,12 @@ def main():
                 # ETAPA 2: CURVA ABC
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     if len(num_cols) >= 1:
+                        idx_padrao_y = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
                         c_x2, c_y2 = st.columns(2)
                         with c_x2:
                             eixo_x_abc = st.selectbox("Eixo X (Identificador/SKU/Produto):", all_cols, index=0, key="abc_x_din")
                         with c_y2:
-                            eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário/Quantidade):", num_cols, index=num_cols.index(col_val_sel) if col_val_sel in num_cols else 0, key="abc_y_din")
+                            eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário/Quantidade):", num_cols, index=idx_padrao_y, key="abc_y_din")
                         
                         df_abc = df_filtrado.sort_values(by=eixo_y_abc, ascending=False).copy()
                         df_abc['Soma_Acumulada'] = df_abc[eixo_y_abc].cumsum()
@@ -401,9 +373,10 @@ def main():
                 # ETAPA 3: COBERTURA
                 with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
                     if len(num_cols) >= 1:
+                        idx_cob = identificar_coluna_ideal(num_cols, ['saldo', 'quantidade', 'estoque'])
                         c_x3, c_y3 = st.columns(2)
                         with c_x3:
-                            eixo_x_cob = st.selectbox("Eixo X (Métrica de Cobertura/Estoque):", num_cols, index=num_cols.index(col_qtd_sel) if col_qtd_sel in num_cols else 0, key="cob_x_din")
+                            eixo_x_cob = st.selectbox("Eixo X (Métrica de Cobertura/Estoque):", num_cols, index=idx_cob, key="cob_x_din")
                         with c_y3:
                             eixo_y_cob = st.selectbox("Eixo Y (Frequência / Contagem de SKUs):", ["Contagem de SKUs"] + num_cols, index=0, key="cob_y_din")
                         
@@ -418,11 +391,12 @@ def main():
                 # ETAPA 4: GIRO POR CATEGORIA
                 with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
                     if len(cat_cols) >= 1 and len(num_cols) >= 1:
+                        idx_giro = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
                         c_x4, c_y4 = st.columns(2)
                         with c_x4:
                             eixo_x_giro = st.selectbox("Eixo X (Categoria / Grupo):", cat_cols, index=0, key="giro_x_din")
                         with c_y4:
-                            eixo_y_giro = st.selectbox("Eixo Y (Valor Somado / Métrica):", num_cols, index=num_cols.index(col_val_sel) if col_val_sel in num_cols else 0, key="giro_y_din")
+                            eixo_y_giro = st.selectbox("Eixo Y (Valor Somado / Métrica):", num_cols, index=idx_giro, key="giro_y_din")
                         
                         df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().sort_values(by=eixo_y_giro, ascending=False).head(15)
                         fig_giro = px.bar(df_giro, x=eixo_x_giro, y=eixo_y_giro, color=eixo_y_giro, color_continuous_scale="Blues", template="plotly_dark", title=f"Análise por {eixo_x_giro}")
@@ -460,7 +434,7 @@ def main():
                 if not num_comum_y:
                     num_comum_y = lista_dfs[0].select_dtypes(include=['number']).columns.tolist()
 
-                idx_padrao_comp_y = identificar_coluna_ideal(num_comum_y, ['valor', 'total', 'preco'])
+                idx_padrao_comp_y = identificar_coluna_ideal(num_comum_y, ['valor de estoque', 'valor', 'saldo'])
 
                 st.markdown("### 📌 1. Indicadores Executivos & Acuracidade por Ficheiro")
                 col_cards = st.columns(len(lista_dfs))
@@ -487,7 +461,7 @@ def main():
                 docx_file = gerar_docx_executivo_c_level(nomes_arquivos, lista_dfs)
                 st.download_button("📄 Descarregar Relatório Executivo C-Level (.docx)", docx_file, "Relatorio_Executivo_Inventario_NovaCore.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             with col_exp2:
-                pptx_file = gerar_pptx_bytes_c_level(nomes_arquivos, lista_depositos if 'lista_depositos' in locals() else lista_dfs)
+                pptx_file = gerar_pptx_bytes_c_level(nomes_arquivos, lista_dfs)
                 st.download_button("📊 Descarregar Apresentação de Slides C-Level (.pptx)", pptx_file, "Apresentacao_Executiva_Inventario_NovaCore.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
         else:
