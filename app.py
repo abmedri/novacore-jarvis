@@ -66,13 +66,16 @@ def processar_arquivo_upload(arquivo_carregado):
         return None, "Erro ao processar ficheiro: " + str(e)
 
 def identificar_coluna_ideal(colunas_disponiveis, palavras_alvo):
-    if not colunas_disponive:
+    try:
+        if not colunas_disponive:
+            return 0
+        for palavra in palavras_alvo:
+            for idx, col in enumerate(colunas_disponive):
+                if palavra in str(col).lower() and 'codigo' not in str(col).lower() and 'código' not in str(col).lower():
+                    return idx
         return 0
-    for palavra in palavras_alvo:
-        for idx, col in enumerate(colunas_disponive):
-            if palavra in str(col).lower() and 'codigo' not in str(col).lower() and 'código' not in str(col).lower():
-                return idx
-    return 0
+    except Exception:
+        return 0
 
 def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=False):
     cor_delta = "#9ca3af"
@@ -200,7 +203,6 @@ def gerar_pptx_bytes_c_level(nomes_arquivos, lista_dfs):
     prs.slide_height = PptxInches(7.5)
     blank_layout = prs.slide_layouts[6]
 
-    # Slide 1: Capa Executiva
     slide1 = prs.slides.add_slide(blank_layout)
     bg1 = slide1.background
     bg1.fill.solid()
