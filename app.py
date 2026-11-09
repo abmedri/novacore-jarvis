@@ -379,21 +379,23 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
     for r in resumos:
         doc.add_heading(f"📄 Unidade / Ficheiro: {r['nome']}", level=2)
         p_det = doc.add_paragraph()
-        p_det.add_run(f"• Total de Produtos Auditados: ").bold = True
-        p_det.add_run(f"{r['total_skus']:,} SKUs (Pré: {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un)
-")
-        p_det.add_run(f"• Quebra Física (Faltas/Negativos): ").bold = True
-        p_det.add_run(f"{r['skus_falta']:,} SKUs | Volume: -{r['vol_falta']:,.0f} un | Valor Perda: R$ {r['val_falta']:,.2f}
-")
-        p_det.add_run(f"• Sobras Físicas (Positivos): ").bold = True
-        p_det.add_run(f"{r['skus_sobra']:,} SKUs | Volume: +{r['vol_sobra']:,.0f} un | Valor Excesso: R$ {r['val_sobra']:,.2f}
-")
-        p_det.add_run(f"• Volume Total Físico Divergente: ").bold = True
-        p_det.add_run(f"{r['vol_div_total']:,.0f} un (Soma de Sobras e Faltas) | Impacto Absoluto: R$ {r['val_div_absoluto']:,.2f}
-")
-        p_det.add_run(f"• Concentração Pareto (Classe A): ").bold = True
-        p_det.add_run(f"{r['skus_a']:,} SKUs representam R$ {r['val_a']:,.2f} em estoque.
-")
+        p_det.add_run("• Total de Produtos Auditados: ").bold = True
+        
+        # --- LINHA 383 CORRIGIDA (SEM ERRO DE SINTAXE) ---
+        skus_totais_txt = f"{r['total_skus']:,}"
+        qtd_antes_txt = f"{r['qtd_antes']:,.0f}"
+        qtd_pos_txt = f"{r['qtd_pos']:,.0f}"
+        p_det.add_run(f"{skus_totais_txt} SKUs (Pré: {qtd_antes_txt} un | Pós: {qtd_pos_txt} un)\n")
+        # ------------------------------------------------
+
+        p_det.add_run("• Quebra Física (Faltas/Negativos): ").bold = True
+        p_det.add_run(f"{r['skus_falta']:,} SKUs | Volume: -{r['vol_falta']:,.0f} un | Valor Perda: R$ {r['val_falta']:,.2f}\n")
+        p_det.add_run("• Sobras Físicas (Positivos): ").bold = True
+        p_det.add_run(f"{r['skus_sobra']:,} SKUs | Volume: +{r['vol_sobra']:,.0f} un | Valor Excesso: R$ {r['val_sobra']:,.2f}\n")
+        p_det.add_run("• Volume Total Físico Divergente: ").bold = True
+        p_det.add_run(f"{r['vol_div_total']:,.0f} un (Soma de Sobras e Faltas) | Impacto Absoluto: R$ {r['val_div_absoluto']:,.2f}\n")
+        p_det.add_run("• Concentração Pareto (Classe A): ").bold = True
+        p_det.add_run(f"{r['skus_a']:,} SKUs representam R$ {r['val_a']:,.2f} em estoque.\n")
         
     # Seção 3: Plano de Ação Estratégico C-Level
     h3 = doc.add_heading("3. Plano de Governança & Próximos Passos recomendados", level=1)
@@ -401,11 +403,9 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
     
     plano_p = doc.add_paragraph()
     plano_p.add_run("1. Contagem Cíclica Diária: ").bold = True
-    plano_p.add_run("Implantar rotina diária de contagem focada nos produtos de Classe A (Pareto 80/20).
-")
+    plano_p.add_run("Implantar rotina diária de contagem focada nos produtos de Classe A (Pareto 80/20).\n")
     plano_p.add_run("2. Investigação de Causa Raiz: ").bold = True
-    plano_p.add_run("Bloquear acerto direto de sistema para divergências acima de R$ 1.000,00 sem parecer de auditoria.
-")
+    plano_p.add_run("Bloquear acerto direto de sistema para divergências acima de R$ 1.000,00 sem parecer de auditoria.\n")
     plano_p.add_run("3. Reconciliação FISCAL vs FÍSICO: ").bold = True
     plano_p.add_run("Ajustar saldo contábil em DRE para refletir a variação patrimonial apurada nesta auditoria.")
     
@@ -1032,4 +1032,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
