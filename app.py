@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO ESTÁVEL & RESTAURADA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA 100% ESTÁVEL)
 # ====================================================================================
 
 import os
@@ -65,13 +65,16 @@ def processar_arquivo_upload(arquivo_carregado):
         return None, "Erro ao processar ficheiro: " + str(e)
 
 def identificar_coluna_ideal(colunas_disponiveis, palavras_alvo):
-    if not colunas_disponive:
+    try:
+        if not colunas_disponive:
+            return 0
+        for palavra in palavras_alvo:
+            for idx, col in enumerate(colunas_disponive):
+                if palavra in str(col).lower() and 'codigo' not in str(col).lower() and 'código' not in str(col).lower():
+                    return idx
         return 0
-    for palavra in palavras_alvo:
-        for idx, col in enumerate(colunas_disponive):
-            if palavra in str(col).lower() and 'codigo' not in str(col).lower() and 'código' not in str(col).lower():
-                return idx
-    return 0
+    except Exception:
+        return 0
 
 def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=False):
     cor_delta = "#9ca3af"
