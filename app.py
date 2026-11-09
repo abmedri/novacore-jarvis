@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO 100% AUTOMÁTICA & CORRIGIDA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO 100% CORRIGIDA & MODULAR)
 # ====================================================================================
 
 import os
@@ -10,17 +10,6 @@ import xml.etree.ElementTree as ET
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
-
-# Dependências para Documentos e Apresentações C-Level
-import docx
-from docx.shared import Inches, Pt, RGBColor
-from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.oxml import parse_xml
-from docx.oxml.ns import nsdecls
-
-from pptx import Presentation
-from pptx.util import Inches as PptxInches, Pt as PptxPt
-from pptx.dml.color import RGBColor as PptxRGBColor
 
 def processar_arquivo_upload(arquivo_carregado):
     nome = arquivo_carregado.name.lower()
@@ -39,13 +28,6 @@ def processar_arquivo_upload(arquivo_carregado):
             return None, "Erro: Não foi possível decodificar o ficheiro CSV."
         elif nome.endswith(('.xls', '.xlsx')):
             return pd.read_excel(arquivo_carregado), "Excel processado com sucesso."
-        elif nome.endswith('.json'):
-            return pd.read_json(arquivo_carregado), "JSON processado com sucesso."
-        elif nome.endswith('.xml'):
-            tree = ET.parse(arquivo_carregado)
-            root = tree.getroot()
-            dados = [{elem.tag: elem.text for elem in filho} for filho in root]
-            return pd.DataFrame(dados), "XML processado com sucesso."
         else:
             return None, "Formato não suportado."
     except Exception as e:
@@ -64,28 +46,17 @@ def limpar_serie_numerica(serie):
 
 def auto_detectar_coluna_valor(colunas):
     colunas_str = [str(c) for c in colunas]
-    termos_fortes = ['valor de estoque', 'estoque atual', 'valor total', 'custo total', 'saldo atual', 'total', 'valor']
-    for termo in termos_fortes:
+    for termo in ['valor de estoque', 'estoque atual', 'valor total', 'custo total', 'total', 'valor']:
         for c in colunas_str:
-            c_low = c.lower()
-            if termo in c_low and 'ajuste' not in c_low and 'diferenca' not in c_low and 'codigo' not in c_low and 'código' not in c_low and 'id' not in c_low:
+            if termo in c.lower() and 'ajuste' not in c.lower() and 'codigo' not in c.lower() and 'código' not in c.lower():
                 return c
-    for c in colunas_str:
-        c_low = c.lower()
-        if 'ajuste' not in c_low and 'diferenca' not in c_low and 'codigo' not in c_low and 'código' not in c_low and 'id' not in c_low and 'quantidade' not in c_low:
-            return c
     return colunas_str[0]
 
 def auto_detectar_coluna(colunas, palavras_chave):
     colunas_str = [str(c) for c in colunas]
     for palavra in palavras_chave:
         for c in colunas_str:
-            c_low = c.lower()
-            if palavra in c_low and 'codigo' not in c_low and 'código' not in c_low and 'id' not in c_low:
-                return c
-    for palavra in palavras_chave:
-        for c in colunas_str:
-            if palavra in c.lower():
+            if palavra in c.lower() and 'codigo' not in c.lower() and 'código' not in c.lower():
                 return c
     return colunas_str[0]
 
@@ -109,107 +80,36 @@ def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=
     </div>
     """
 
-def gerar_docx_executivo_c_level(nomes_arquivos, lista_dfs):
-    doc = docx.Document()
-    for section in doc.sections:
-        section.top_margin = Inches(0.7)
-        section.bottom_margin = Inches(0.7)
-        section.left_margin = Inches(0.8)
-        section.right_margin = Inches(0.8)
-
-    p_title = doc.add_paragraph()
-    r = p_title.add_run("⚡ NOVA-CORE // AUDITORIA EXECUTIVA DE INVENTÁRIO")
-    r.font.name = 'Arial'
-    r.font.size = Pt(20)
-    r.font.bold = True
-    r.font.color.rgb = RGBColor(15, 23, 42)
-
-    p_sub = doc.add_paragraph()
-    r_sub = p_sub.add_run("RELATÓRIO DE GOVERNANÇA PATRIMONIAL, RISCO DE CAIXA E PLANO DE AÇÃO C-LEVEL")
-    r_sub.font.name = 'Arial'
-    r_sub.font.size = Pt(10)
-    r_sub.font.bold = True
-    r_sub.font.color.rgb = RGBColor(2, 132, 199)
-
-    doc.add_paragraph().paragraph_format.space_after = Pt(10)
-    h1 = doc.add_heading("1. Sumário Executivo & Exposição Patrimonial", level=1)
-    h1.runs[0].font.color.rgb = RGBColor(15, 23, 42)
-    doc.add_paragraph("Este documento consolida a auditoria de inventário dos recintos operacionais com foco em governança WMS e controle de divergências físicas.")
-
-    table_kpi = doc.add_table(rows=1, cols=4)
-    table_kpi.alignment = WD_TABLE_ALIGNMENT.CENTER
-    hdr = table_kpi.rows[0].cells
-    for i, h in enumerate(["Indicador Estratégico", "Valor Auditado", "Variação / Impacto", "Status / Parecer"]):
-        hdr[i].text = h
-        shading = parse_xml(r'<w:shd {} w:fill="0F172A"/>'.format(nsdecls('w')))
-        hdr[i]._tc.get_or_add_tcPr().append(shading)
-        hdr[i].paragraphs[0].runs[0].font.bold = True
-        hdr[i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
-
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
-
-def gerar_pptx_bytes_c_level(nomes_arquivos, lista_dfs):
-    prs = Presentation()
-    prs.slide_width = PptxInches(13.333)
-    prs.slide_height = PptxInches(7.5)
-    slide1 = prs.slides.add_slide(prs.slide_layouts[6])
-    slide1.background.fill.solid()
-    slide1.background.fill.fore_color.rgb = PptxRGBColor(11, 15, 25)
-
-    tb = slide1.shapes.add_textbox(PptxInches(1), PptxInches(2), PptxInches(11.3), PptxInches(3.5))
-    tf = tb.text_frame
-    p0 = tf.paragraphs[0]
-    p0.text = "⚡ NOVA-CORE // DIRETORIA EXECUTIVA & C-LEVEL"
-    p0.font.size = Pt(14)
-    p0.font.bold = True
-    p0.font.color.rgb = PptxRGBColor(0, 242, 254)
-
-    p1 = tf.add_paragraph()
-    p1.text = "Relatório Executivo de Auditoria & Governança Patrimonial"
-    p1.font.size = Pt(30)
-    p1.font.bold = True
-    p1.font.color.rgb = PptxRGBColor(243, 244, 246)
-    p1.space_before = Pt(15)
-
-    buffer = io.BytesIO()
-    prs.save(buffer)
-    buffer.seek(0)
-    return buffer
-
 def main():
     st.set_page_config(page_title="NOVA-CORE // J.A.R.V.I.S. EXECUTIVO", page_icon="⚡", layout="wide")
 
     st.markdown("""
-<style>
-.stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
-.main-header { padding: 20px 0; border-bottom: 1px solid #1f293d; margin-bottom: 20px; }
-.jarvis-title {
-    font-size: 1.7rem; font-weight: 800; letter-spacing: 1.5px;
-    background: linear-gradient(90deg, #00f2fe 0%, #3b82f6 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}
-.bento-card {
-    background: rgba(17, 24, 39, 0.7); border: 1px solid rgba(31, 41, 55, 0.8);
-    border-top: 3px solid #00f2fe; border-radius: 10px; padding: 18px; margin-bottom: 15px;
-}
-</style>
-""", unsafe_allow_html=True)
+    <style>
+    .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
+    .jarvis-title {
+        font-size: 1.7rem; font-weight: 800; letter-spacing: 1.5px;
+        background: linear-gradient(90deg, #00f2fe 0%, #3b82f6 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .bento-card {
+        background: rgba(17, 24, 39, 0.7); border: 1px solid rgba(31, 41, 55, 0.8);
+        border-top: 3px solid #00f2fe; border-radius: 10px; padding: 18px; margin-bottom: 15px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     st.markdown("""
-<div class="main-header">
-    <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
-    <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">AUDITORIA DE ESTOQUE & ANÁLISE COMPARATIVA MULTI-INVENTÁRIO</div>
-</div>
-""", unsafe_allow_html=True)
+    <div style="padding: 20px 0; border-bottom: 1px solid #1f293d; margin-bottom: 20px;">
+        <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
+        <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">AUDITORIA DE ESTOQUE & ANÁLISE COMPARATIVA MULTI-INVENTÁRIO</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.sidebar.markdown("### 🎛️ CONTROLES & FILTROS")
-    st.markdown('<div class="bento-card"><b>📂 INGESTÃO DE DADOS DE INVENTÁRIO</b><br><small style="color: #9ca3af;">Carregue 1 ou múltiplos arquivos para análise.</small></div>', unsafe_allow_html=True)
+    st.sidebar.markdown("### 🎛️ CONTROLES & NAVEGAÇÃO")
+    arquivos_submetidos = st.sidebar.file_uploader("📂 Ingestão de Ficheiros", type=['csv', 'xlsx', 'xls'], accept_multiple_files=True)
     
-    arquivos_submetidos = st.file_uploader("", type=['csv', 'xlsx', 'xls', 'json', 'xml'], accept_multiple_files=True, label_visibility="collapsed")
-    
+    modo = st.sidebar.radio("Selecione o Modo:", ["Modo 1: Indicadores Executivos & Balanço", "Modo 2: Curva ABC & Concentração Financeira"])
+
     if arquivos_submetidos:
         lista_dfs = []
         nomes_arquivos = []
@@ -220,119 +120,94 @@ def main():
                 nomes_arquivos.append(arq.name)
         
         if lista_dfs:
-            st.success(f"✅ {len(lista_dfs)} arquivo(s) carregado(s) e auditado(s) com sucesso!")
+            df_filtrado = lista_dfs[0]
+            todas_colunas = df_filtrado.columns.tolist()
+
+            col_val_sel = auto_detectar_coluna_valor(todas_colunas)
+            col_qtd_sel = auto_detectar_coluna(todas_colunas, ['quantidade', 'fisico', 'estoque', 'atual', 'qtd'])
+            col_aj_sel = auto_detectar_coluna(todas_colunas, ['ajuste', 'diferenca', 'dif', 'desvio'])
+            col_custo_sel = auto_detectar_coluna(todas_colunas, ['custo', 'preco', 'preço', 'unitario'])
+
+            total_pos = len(df_filtrado)
+            serie_val = limpar_serie_numerica(df_filtrado[col_val_sel]) if col_val_sel in df_filtrado.columns else pd.Series(0.0, index=df_filtrado.index)
+            serie_qtd = limpar_serie_numerica(df_filtrado[col_qtd_sel]) if col_qtd_sel in df_filtrado.columns else pd.Series(0.0, index=df_filtrado.index)
+            serie_ajuste = limpar_serie_numerica(df_filtrado[col_aj_sel]) if col_aj_sel in df_filtrado.columns else pd.Series(0.0, index=df_filtrado.index)
+
+            soma_depois = serie_val.sum()
+            total_itens_pos = serie_qtd.sum()
+            soma_ajuste_qtd = serie_ajuste.sum()
+            total_itens_antes = total_itens_pos - soma_ajuste_qtd
+
+            df_falta = df_filtrado[serie_ajuste < 0]
+            df_sobra = df_filtrado[serie_ajuste > 0]
             
-            if len(lista_dfs) == 1:
-                df_filtrado = lista_dfs[0]
-                todas_colunas = df_filtrado.columns.tolist()
+            qtd_falta = len(df_falta)
+            qtd_sobra = len(df_sobra)
+            vol_falta_un = abs(limpar_serie_numerica(df_falta[col_aj_sel])).sum() if not df_falta.empty else 0.0
+            vol_sobra_un = limpar_serie_numerica(df_sobra[col_aj_sel]).sum() if not df_sobra.empty else 0.0
 
-                col_val_sel = auto_detectar_coluna_valor(todas_colunas)
-                col_qtd_sel = auto_detectar_coluna(todas_colunas, ['quantidade', 'fisico', 'estoque', 'atual', 'qtd'])
-                col_aj_sel = auto_detectar_coluna(todas_colunas, ['ajuste', 'diferenca', 'dif', 'desvio'])
-                col_custo_sel = auto_detectar_coluna(todas_colunas, ['custo', 'preco', 'preço', 'unitario'])
+            if col_custo_sel in df_filtrado.columns and col_aj_sel in df_filtrado.columns:
+                val_falta_fin = abs((limpar_serie_numerica(df_falta[col_aj_sel]) * limpar_serie_numerica(df_falta[col_custo_sel]))).sum() if not df_falta.empty else 0.0
+                val_sobra_fin = (limpar_serie_numerica(df_sobra[col_aj_sel]) * limpar_serie_numerica(df_sobra[col_custo_sel])).sum() if not df_sobra.empty else 0.0
+                diferenca_monetaria = val_sobra_fin - val_falta_fin
+            else:
+                val_falta_fin = abs(limpar_serie_numerica(df_falta[col_aj_sel])).sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1.0) if not df_falta.empty else 0.0
+                val_sobra_fin = limpar_serie_numerica(df_sobra[col_aj_sel]).sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1.0) if not df_sobra.empty else 0.0
+                diferenca_monetaria = val_sobra_fin - val_falta_fin
 
-                total_pos = len(df_filtrado)
-                
-                serie_val = limpar_serie_numerica(df_filtrado[col_val_sel]) if col_val_sel in df_filtrado.columns else pd.Series(0.0, index=df_filtrado.index)
-                serie_qtd = limpar_serie_numerica(df_filtrado[col_qtd_sel]) if col_qtd_sel in df_filtrado.columns else pd.Series(0.0, index=df_filtrado.index)
-                serie_ajuste = limpar_serie_numerica(df_filtrado[col_aj_sel]) if col_aj_sel in df_filtrado.columns else pd.Series(0.0, index=df_filtrado.index)
-                serie_custo = limpar_serie_numerica(df_filtrado[col_custo_sel]) if col_custo_sel in df_filtrado.columns else pd.Series(0.0, index=df_filtrado.index)
+            soma_absoluta_val = val_falta_fin + val_sobra_fin
+            soma_antes = soma_depois - diferenca_monetaria
+            impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0.0
+            acur_vol_real = ((total_pos - (qtd_falta + qtd_sobra)) / total_pos * 100) if total_pos > 0 else 0.0
+            acur_fin_real = max(0.0, min(100.0, 100.0 - abs(impacto_perc) * 2.5))
 
-                soma_depois = serie_val.sum()
-                total_itens_pos = serie_qtd.sum()
-                soma_ajuste_qtd = serie_ajuste.sum()
-                total_itens_antes = total_itens_pos - soma_ajuste_qtd
-
-                df_falta = df_filtrado[serie_ajuste < 0]
-                df_sobra = df_filtrado[serie_ajuste > 0]
-                
-                qtd_falta = len(df_falta)
-                qtd_sobra = len(df_sobra)
-                vol_falta_un = abs(limpar_serie_numerica(df_falta[col_aj_sel])).sum() if not df_falta.empty else 0.0
-                vol_sobra_un = limpar_serie_numerica(df_sobra[col_aj_sel]).sum() if not df_sobra.empty else 0.0
-
-                vol_total_div = vol_falta_un + vol_sobra_un
-                perc_vol_div = (vol_total_div / total_itens_antes * 100) if total_itens_antes > 0 else 0.0
-
-                qtd_exatos = (serie_ajuste == 0).sum()
-                total_divergencias = qtd_falta + qtd_sobra
-                perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0.0
-                
-                perc_falta_itens = (qtd_falta / total_pos * 100) if total_pos > 0 else 0.0
-                perc_sobra_itens = (qtd_sobra / total_pos * 100) if total_pos > 0 else 0.0
-
-                # Cálculo financeiro preciso ponderado pelo custo
-                if col_custo_sel in df_filtrado.columns and col_aj_sel in df_filtrado.columns:
-                    val_falta_fin = abs((limpar_serie_numerica(df_falta[col_aj_sel]) * limpar_serie_numerica(df_falta[col_custo_sel]))).sum() if not df_falta.empty else 0.0
-                    val_sobra_fin = (limpar_serie_numerica(df_sobra[col_aj_sel]) * limpar_serie_numerica(df_sobra[col_custo_sel])).sum() if not df_sobra.empty else 0.0
-                    diferenca_monetaria = val_sobra_fin - val_falta_fin
-                else:
-                    val_falta_fin = abs(limpar_serie_numerica(df_falta[col_aj_sel])).sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1.0) if not df_falta.empty else 0.0
-                    val_sobra_fin = limpar_serie_numerica(df_sobra[col_aj_sel]).sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1.0) if not df_sobra.empty else 0.0
-                    diferenca_monetaria = val_sobra_fin - val_falta_fin
-
-                soma_absoluta_val = val_falta_fin + val_sobra_fin
-                soma_antes = soma_depois - diferenca_monetaria
-                impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0.0
-
-                acur_vol_real = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0.0
-                acur_fin_real = max(0.0, min(100.0, 100.0 - abs(impacto_perc) * 2.5))
-
-                st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
-                st.markdown("<br>", unsafe_allow_html=True)
-                
+            if modo == "Modo 1: Indicadores Executivos & Balanço":
+                st.markdown("### 📌 MODO 1: Indicadores Executivos & Parecer Técnico")
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{total_pos:,}".replace(',', '.'), f"Pré: {total_itens_antes:,.0f} un | Pós: {total_itens_pos:,.0f} un".replace('.', ','), eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{qtd_falta:,} SKUs ({perc_falta_itens:.2f}%)", f"Vol: -{vol_falta_un:,.0f} un | R$ {val_falta_fin:,.2f}".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{vol_total_div:,.0f} unidades ({perc_vol_div:.2f}%)".replace('.', ','), f"R$ {soma_absoluta_val:,.2f}".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{qtd_falta:,} SKUs", f"Vol: -{vol_falta_un:,.0f} un | R$ {val_falta_fin:,.2f}".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
                 with c2:
-                    st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{qtd_sobra:,} SKUs ({perc_sobra_itens:.2f}%)", f"Vol: +{vol_sobra_un:,.0f} un | R$ +{val_sobra_fin:,.2f}".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{total_divergencias:,} SKUs ({perc_divergencia:.2f}%)".replace('.', ','), "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {acur_vol_real:.2f}% | Fin: {acur_fin_real:.2f}%".replace('.', ','), "Meta Corporativa 95%", eh_negativo=(acur_vol_real < 95), eh_positivo=(acur_vol_real >= 95)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{qtd_sobra:,} SKUs", f"Vol: +{vol_sobra_un:,.0f} un | R$ +{val_sobra_fin:,.2f}".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {acur_vol_real:.2f}% | Fin: {acur_fin_real:.2f}%".replace('.', ','), "Meta Corporativa 95%", eh_positivo=(acur_vol_real >= 95)), unsafe_allow_html=True)
 
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("##### 💰 Balanço Patrimonial & Divergência Monetária (Antes vs Depois)")
-
-                col_kpi1, col_kpi2 = st.columns(2)
-                with col_kpi1:
+                st.markdown("##### 💰 Balanço Patrimonial & Divergência Monetária")
+                bc1, bc2 = st.columns(2)
+                with bc1:
                     st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {soma_antes:,.2f}", f"Qtd Pré: {total_itens_antes:,.0f} un".replace('.', ','), eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"{impacto_perc:.2f}% Desvio", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
-                with col_kpi2:
+                with bc2:
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {soma_depois:,.2f}", f"Qtd Pós: {total_itens_pos:,.0f} un".replace('.', ','), eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Impacto Geral", f"{impacto_perc:.2f}%", "Variação Apurada", eh_negativo=(impacto_perc < 0), eh_positivo=(impacto_perc >= 0)), unsafe_allow_html=True)
 
-                st.markdown("---")
-
-                # ETAPA 2: CURVA ABC
-                with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
-                    c_x2, c_y2 = st.columns(2)
-                    with c_x2:
-                        eixo_x_abc = st.selectbox("Eixo X (Identificador/SKU/Produto):", todas_colunas, index=0, key="abc_x_din")
-                    with c_y2:
-                        eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário/Quantidade):", todas_colunas, index=todas_colunas.index(col_val_sel) if col_val_sel in todas_colunas else 0, key="abc_y_din")
+            elif modo == "Modo 2: Curva ABC & Concentração Financeira":
+                st.markdown("### 📊 MODO 2: Concentração Financeira & Curva ABC (Pareto 80/20)")
+                c_x2, c_y2 = st.columns(2)
+                with c_x2:
+                    eixo_x_abc = st.selectbox("Eixo X (Identificador / SKU / Produto):", todas_colunas, index=0)
+                with c_y2:
+                    eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário / Quantidade):", todas_colunas, index=todas_colunas.index(col_val_sel) if col_val_sel in todas_colunas else 0)
+                
+                df_abc = df_filtrado.copy()
+                df_abc['Val_Num_ABC'] = limpar_serie_numerica(df_abc[eixo_y_abc]) if eixo_y_abc in df_abc.columns else pd.Series(0.0, index=df_abc.index)
+                df_abc = df_abc.sort_values(by='Val_Num_ABC', ascending=False).copy()
+                df_abc['Soma_Acumulada'] = df_abc['Val_Num_ABC'].cumsum()
+                soma_total = df_abc['Val_Num_ABC'].sum()
+                
+                if soma_total > 0:
+                    df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
+                    df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (Alto Valor / 80%)" if p <= 80 else ("Classe B (Médio Valor / 15%)" if p <= 95 else "Classe C (Baixo Valor / 5%)"))
                     
-                    df_abc = df_filtrado.copy()
-                    df_abc['Val_Num_ABC'] = limpar_serie_numerica(df_abc[eixo_y_abc]) if eixo_y_abc in df_abc.columns else pd.Series(0.0, index=df_abc.index)
-                    df_abc = df_abc.sort_values(by='Val_Num_ABC', ascending=False).copy()
-                    df_abc['Soma_Acumulada'] = df_abc['Val_Num_ABC'].cumsum()
-                    soma_total = df_abc['Val_Num_ABC'].sum()
+                    fig_abc = px.bar(
+                        df_abc.head(100), 
+                        x=eixo_x_abc, 
+                        y='Val_Num_ABC', 
+                        color='Classe_ABC', 
+                        template="plotly_dark", 
+                        title=f"Classificação ABC — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}"
+                    )
+                    fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
+                    st.plotly_chart(fig_abc, use_container_width=True)
                     
-                    if soma_total > 0:
-                        df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
-                        df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (Alto Valor / 80%)" if p <= 80 else ("Classe B (Médio Valor / 15%)" if p <= 95 else "Classe C (Baixo Valor / 5%)"))
-                        
-                        fig_abc = px.bar(
-                            df_abc.head(100), 
-                            x=eixo_x_abc, 
-                            y='Val_Num_ABC', 
-                            color='Classe_ABC', 
-                            template="plotly_dark", 
-                            title=f"Classificação ABC — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}"
-                        )
-                        fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
-                        st.plotly_chart(fig_abc, use_container_width=True)
+                st.dataframe(df_abc[[eixo_x_abc, eixo_y_abc, '%_Acumulado', 'Classe_ABC']], use_container_width=True)
 
 if __name__ == "__main__":
     main()
-
