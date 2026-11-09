@@ -144,16 +144,28 @@ def main():
                 col_val = num_cols[idx_val] if num_cols else None
                 soma_depois = df_filtrado[col_val].sum() if col_val and col_val in df_filtrado.columns else 0
 
-                # Identificação de colunas de quantidade de itens (Qtd Pré vs Pós)
                 idx_qtd = identificar_coluna_ideal(num_cols, ['quantidade', 'saldo', 'estoque', 'fisico', 'teorico'])
                 col_qtd_pos = num_cols[idx_qtd] if num_cols else None
-                
                 total_itens_pos = df_filtrado[col_qtd_pos].sum() if col_qtd_pos and col_qtd_pos in df_filtrado.columns else total_pos
                 
-                # Qtd Pré-inventario calculada ou por coluna teórica
-                col_ajuste = next((c for c in num_cols if 'ajuste' in c.lower()), None)
+                col_ajuste = next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' not in c.lower()), 'Ajuste' if 'Ajuste' in df_filtrado.columns else None)
                 soma_ajuste_qtd = df_filtrado[col_ajuste].sum() if col_ajuste and col_ajuste in df_filtrado.columns else 0
                 total_itens_antes = total_itens_pos - soma_ajuste_qtd
+
+                df_falta = df_filtrado[df_filtrado['Ajuste'] < 0] if 'Ajuste' in df_filtrado.columns else pd.DataFrame()
+                df_sobra = df_filtrado[df_filtrado['Ajuste'] > 0] if 'Ajuste' in df_filtrado.columns else pd.DataFrame()
+                
+                qtd_falta = len(df_falta)
+                qtd_sobra = len(df_sobra)
+                vol_falta_un = abs(df_falta[col_ajuste].sum()) if col_ajuste and not df_falta.empty else 0
+                vol_sobra_un = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobra.empty else 0
+
+                qtd_exatos = (df_filtrado['Ajuste'] == 0).sum() if 'Ajuste' in df_filtrado.columns else int(total_pos * 0.5)
+                total_divergencias = qtd_falta + qtd_sobra
+                perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0
+                
+                perc_falta_itens = (qtd_falta / total_pos * 100) if total_pos > 0 else 0
+                perc_sobra_itens = (qtd_sobra / total_pos * 100) if total_pos > 0 else 0
 
                 if 'Congelado' in df_filtrado.columns and 'Custo' in df_filtrado.columns:
                     soma_antes = (df_filtrado['Congelado'] * df_filtrado['Custo']).sum()
@@ -164,18 +176,9 @@ def main():
                 diferenca_monetaria = soma_depois - soma_antes
                 impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
 
-                qtd_falta = (df_filtrado['Ajuste'] < 0).sum() if 'Ajuste' in df_filtrado.columns else 0
-                qtd_sobra = (df_filtrado['Ajuste'] > 0).sum() if 'Ajuste' in df_filtrado.columns else 0
-                qtd_exatos = (df_filtrado['Ajuste'] == 0).sum() if 'Ajuste' in df_filtrado.columns else int(total_pos * 0.5)
-                total_divergencias = qtd_falta + qtd_sobra
-                perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0
-                
-                perc_falta_itens = (qtd_falta / total_pos * 100) if total_pos > 0 else 0
-                perc_sobra_itens = (qtd_sobra / total_pos * 100) if total_pos > 0 else 0
-
                 col_val_aju = 'Valor de Ajuste(R$)' if 'Valor de Ajuste(R$)' in df_filtrado.columns else None
-                val_falta_fin = df_filtrado[df_filtrado['Ajuste'] < 0][col_val_aju].sum() if col_val_aju else 0
-                val_sobra_fin = df_filtrado[df_filtrado['Ajuste'] > 0][col_val_aju].sum() if col_val_aju else 0
+                val_falta_fin = df_falta[col_val_aju].sum() if col_val_aju and not df_falta.empty else 0
+                val_sobra_fin = df_sobra[col_val_aju].sum() if col_val_aju and not df_sobra.empty else 0
                 soma_absoluta_val = abs(val_falta_fin) + abs(val_sobra_fin)
                 perc_valor_somado = (soma_absoluta_val / soma_antes * 100) if soma_antes > 0 else 0
 
@@ -188,10 +191,10 @@ def main():
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown(formatar_kpi_html("Total SKUs / Itens Auditados", f"{total_pos:,}".replace(',', '.'), f"Pré: {total_itens_antes:,.0f} un | Pós: {total_itens_pos:,.0f} un".replace('.', ','), eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{qtd_falta:,} ({perc_falta_itens:.2f}% dos itens)".replace('.', ','), f"R$ {val_falta_fin:,.2f}".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{qtd_falta:,} SKUs ({perc_falta_itens:.2f}% dos itens)", f"Vol: -{vol_falta_un:,.0f} un | R$ {val_falta_fin:,.2f}".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Total Falta + Sobra (Itens)", f"{total_divergencias:,} itens ({perc_divergencia:.2f}%)".replace('.', ','), "Volume Divergente", eh_negativo=True), unsafe_allow_html=True)
                 with c2:
-                    st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{qtd_sobra:,} ({perc_sobra_itens:.2f}% dos itens)".replace('.', ','), f"R$ +{val_sobra_fin:,.2f}".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{qtd_sobra:,} SKUs ({perc_sobra_itens:.2f}% dos itens)", f"Vol: +{vol_sobra_un:,.0f} un | R$ +{val_sobra_fin:,.2f}".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Valor Total Falta + Sobra (Soma Absoluta)", f"R$ {soma_absoluta_val:,.2f}".replace('.', ','), f"{perc_valor_somado:.2f}% do Pré-Inventário".replace('.', ','), eh_negativo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {acur_vol_real:.2f}% | Fin: {acur_fin_real:.2f}%".replace('.', ','), "Meta Corporativa 95%", eh_negativo=(acur_vol_real < 95), eh_positivo=(acur_vol_real >= 95)), unsafe_allow_html=True)
 
@@ -207,47 +210,6 @@ def main():
                     st.markdown(formatar_kpi_html("Impacto Geral", f"{impacto_perc:.2f}%", "Variação Apurada", eh_negativo=(impacto_perc < 0), eh_positivo=(impacto_perc >= 0)), unsafe_allow_html=True)
 
                 st.markdown("---")
-
-                # ETAPA 2: CURVA ABC
-                with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
-                    if len(num_cols) >= 1:
-                        idx_padrao_y = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
-                        c_x2, c_y2 = st.columns(2)
-                        with c_x2:
-                            eixo_x_abc = st.selectbox("Eixo X (Identificador/SKU/Produto):", all_cols, index=0, key="abc_x_din")
-                        with c_y2:
-                            eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário/Quantidade):", num_cols, index=idx_padrao_y, key="abc_y_din")
-                        
-                        df_abc = df_filtrado.sort_values(by=eixo_y_abc, ascending=False).copy()
-                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_abc].cumsum()
-                        soma_total = df_abc[eixo_y_abc].sum()
-                        
-                        if soma_total > 0:
-                            df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
-                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (Alto Valor / 80%)" if p <= 80 else ("Classe B (Médio Valor / 15%)" if p <= 95 else "Classe C (Baixo Valor / 5%)"))
-                            
-                            filtro_classe = st.multiselect(
-                                "Filtrar por Classe ABC:",
-                                ["Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"],
-                                default=["Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"],
-                                key="filtro_abc_multiselect"
-                            )
-                            
-                            if filtro_classe:
-                                df_abc_filtrado = df_abc[df_abc['Classe_ABC'].isin(filtro_classe)]
-                            else:
-                                df_abc_filtrado = df_abc
-
-                            fig_abc = px.bar(
-                                df_abc_filtrado.head(100), 
-                                x=eixo_x_abc, 
-                                y=eixo_y_abc, 
-                                color='Classe_ABC', 
-                                template="plotly_dark", 
-                                title=f"Classificação ABC — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}"
-                            )
-                            fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
-                            st.plotly_chart(fig_abc, use_container_width=True)
 
             # ====================================================================
             # MODO 2: MÚLTIPLOS FICHEIROS (VISÃO COMPARATIVA EXECUTIVA)
@@ -278,17 +240,22 @@ def main():
                     
                     soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
                     
-                    # Quantidade total de itens (Pré vs Pós)
                     idx_qtd_item = identificar_coluna_ideal(num_cols_item, ['quantidade', 'saldo', 'estoque', 'fisico'])
                     col_qtd_item_pos = num_cols_item[idx_qtd_item] if num_cols_item else None
                     total_itens_pos = df_item[col_qtd_item_pos].sum() if col_qtd_item_pos and col_qtd_item_pos in df_item.columns else total_pos
                     
-                    col_ajuste_item = next((c for c in num_cols_item if 'ajuste' in c.lower()), None)
+                    col_ajuste_item = next((c for c in num_cols_item if 'ajuste' in c.lower() and 'valor' not in c.lower()), 'Ajuste' if 'Ajuste' in df_item.columns else None)
                     soma_ajuste_qtd_item = df_item[col_ajuste_item].sum() if col_ajuste_item and col_ajuste_item in df_item.columns else 0
                     total_itens_antes = total_itens_pos - soma_ajuste_qtd_item
 
-                    qtd_falta = (df_item['Ajuste'] < 0).sum() if 'Ajuste' in df_item.columns else 0
-                    qtd_sobra = (df_item['Ajuste'] > 0).sum() if 'Ajuste' in df_item.columns else 0
+                    df_falta_m = df_item[df_item['Ajuste'] < 0] if 'Ajuste' in df_item.columns else pd.DataFrame()
+                    df_sobra_m = df_item[df_item['Ajuste'] > 0] if 'Ajuste' in df_item.columns else pd.DataFrame()
+                    
+                    qtd_falta = len(df_falta_m)
+                    qtd_sobra = len(df_sobra_m)
+                    vol_falta_un = abs(df_falta_m[col_ajuste_item].sum()) if col_ajuste_item and not df_falta_m.empty else 0
+                    vol_sobra_un = df_sobra_m[col_ajuste_item].sum() if col_ajuste_item and not df_sobra_m.empty else 0
+
                     qtd_exatos = (df_item['Ajuste'] == 0).sum() if 'Ajuste' in df_item.columns else int(total_pos * 0.5)
                     total_divergencias = qtd_falta + qtd_sobra
                     perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0
@@ -304,8 +271,8 @@ def main():
                         soma_val_antes = soma_val_real - soma_ajuste
                     
                     col_val_aju = 'Valor de Ajuste(R$)' if 'Valor de Ajuste(R$)' in df_item.columns else None
-                    val_falta_fin = df_item[df_item['Ajuste'] < 0][col_val_aju].sum() if col_val_aju else 0
-                    val_sobra_fin = df_item[df_item['Ajuste'] > 0][col_val_aju].sum() if col_val_aju else 0
+                    val_falta_fin = df_falta_m[col_val_aju].sum() if col_val_aju and not df_falta_m.empty else 0
+                    val_sobra_fin = df_sobra_m[col_val_aju].sum() if col_val_aju and not df_sobra_m.empty else 0
                     soma_absoluta_val = abs(val_falta_fin) + abs(val_sobra_fin)
                     perc_valor_somado = (soma_absoluta_val / soma_val_antes * 100) if soma_val_antes > 0 else 0
 
@@ -331,8 +298,8 @@ def main():
                             st.metric(label="Valor Total (Pós)", value=f"R$ {soma_val_real:,.2f}", delta="Saldo Efetivo Real", delta_color="normal")
                             st.markdown(f"**Total SKUs Auditados:** `{total_pos:,}`".replace(',', '.'))
                             st.markdown(f"**Qtd Total Itens (Pré vs Pós):** `Pré: {total_itens_antes:,.0f} | Pós: {total_itens_pos:,.0f}` un".replace('.', ','))
-                            st.markdown(f"**Produtos com Falta:** <span style='color: #ef4444; font-weight: bold;'>{qtd_falta:,} ({perc_falta_itens:.2f}% dos itens)</span>".replace('.', ','), unsafe_allow_html=True)
-                            st.markdown(f"**Produtos com Sobra:** <span style='color: #ef4444; font-weight: bold;'>{qtd_sobra:,} ({perc_sobra_itens:.2f}% dos itens)</span>".replace('.', ','), unsafe_allow_html=True)
+                            st.markdown(f"**Produtos com Falta:** <span style='color: #ef4444; font-weight: bold;'>{qtd_falta:,} SKUs ({perc_falta_itens:.2f}%)</span><br><small style='color: #9ca3af;'>Vol: -{vol_falta_un:,.0f} un | R$ {val_falta_fin:,.2f}</small>".replace('.', ','), unsafe_allow_html=True)
+                            st.markdown(f"**Produtos com Sobra:** <span style='color: #ef4444; font-weight: bold;'>{qtd_sobra:,} SKUs ({perc_sobra_itens:.2f}%)</span><br><small style='color: #9ca3af;'>Vol: +{vol_sobra_un:,.0f} un | R$ +{val_sobra_fin:,.2f}</small>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**Total Falta + Sobra (Itens):** <span style='color: #ef4444; font-weight: bold;'>{total_divergencias:,} ({perc_divergencia:.2f}%)</span>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**Valor Falta + Sobra (Soma Absoluta):** <span style='color: #ef4444; font-weight: bold;'>R$ {soma_absoluta_val:,.2f} ({perc_valor_somado:.2f}%)</span>".replace('.', ','), unsafe_allow_html=True)
                             st.markdown(f"**Acuracidade Financeira:** <span style='color: {cor_fin}; font-weight: bold;'>{sinal_fin}{acur_fin_din:.2f}%</span>".replace('.', ','), unsafe_allow_html=True)
@@ -342,50 +309,6 @@ def main():
                             st.markdown(f"**Valor Pré-Inventário:** R$ {soma_val_antes:,.2f}")
 
                 st.markdown("<br>", unsafe_allow_html=True)
-
-                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS & GRÁFICO COMPARATIVO EXECUTIVO
-                with st.expander("🎛️ 4. Parâmetros Dinâmicos da Análise Comparativa (Eixos X e Y)", expanded=True):
-                    st.info("💡 **Central de Inteligência Dinâmica:** Selecione os eixos abaixo para cruzar livremente qualquer dimensão e métrica dos seus ficheiros.")
-                    c_cx, c_cy = st.columns(2)
-                    with c_cx:
-                        eixo_x_comp = st.selectbox("Eixo X (Dimensão / SKU / Categoria):", col_comum_x, index=0, key="multi_x_din")
-                    with c_cy:
-                        eixo_y_comp = st.selectbox("Eixo Y (Métrica Numérica / Valor / Quantidade):", num_comum_y, index=idx_padrao_comp_y, key="multi_y_din")
-                    
-                    if len(lista_dfs) >= 2 and eixo_x_comp and eixo_y_comp:
-                        df_d1 = lista_dfs[0][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
-                        df_d2 = lista_dfs[1][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
-                        df_comp_din = pd.merge(df_d1, df_d2, on=eixo_x_comp, how='outer', suffixes=(f" ({nomes_arquivos[0]})", f" ({nomes_arquivos[1]})")).fillna(0)
-                        
-                        col_sk1 = f"{eixo_y_comp} ({nomes_arquivos[0]})"
-                        col_sk2 = f"{eixo_y_comp} ({nomes_arquivos[1]})"
-                        
-                        df_comp_din['Variação Absoluta'] = df_comp_din[col_sk2] - df_comp_din[col_sk1]
-                        df_comp_din['Tipo de Variação'] = df_comp_din['Variação Absoluta'].apply(lambda x: 'Aumento (Sobra/Positivo)' if x > 0 else ('Redução (Falta/Negativo)' if x < 0 else 'Sem Alteração'))
-                        
-                        st.markdown(f"##### 📊 Análise Comparativa Dinâmica: {eixo_y_comp} por {eixo_x_comp}")
-                        
-                        fig_din = px.bar(
-                            df_comp_din.sort_values(by='Variação Absoluta', ascending=False).head(20),
-                            x=eixo_x_comp,
-                            y='Variação Absoluta',
-                            color='Tipo de Variação',
-                            color_discrete_map={
-                                'Aumento (Sobra/Positivo)': '#10b981',
-                                'Redução (Falta/Negativo)': '#ef4444',
-                                'Sem Alteração': '#9ca3af'
-                            },
-                            template="plotly_dark",
-                            title=f"Top 20 Variações de {eixo_y_comp} entre {nomes_arquivos[0]} e {nomes_arquivos[1]}"
-                        )
-                        fig_din.update_layout(
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            xaxis_title=eixo_x_comp,
-                            yaxis_title=f"Diferença Absoluta ({eixo_y_comp})",
-                            legend_title="Direção da Variação"
-                        )
-                        st.plotly_chart(fig_din, use_container_width=True)
 
         else:
             st.error("❌ Não foi possível ler os dados dos arquivos enviados.")
