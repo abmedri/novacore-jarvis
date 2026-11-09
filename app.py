@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA 100% BLINDADA CONTRA ERROS DE COLUNA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO 100% AUTOMÁTICA & EXECUTIVA)
 # ====================================================================================
 
 import os
@@ -9,13 +9,11 @@ import streamlit as st
 import xml.etree.ElementTree as ET
 import plotly.express as px
 import plotly.graph_objects as go
-import matplotlib.pyplot as plt
 import numpy as np
 
 # Dependências para Documentos e Apresentações C-Level
 import docx
 from docx.shared import Inches, Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
@@ -55,28 +53,28 @@ def processar_arquivo_upload(arquivo_carregado):
 
 def limpar_serie_numerica(serie):
     if serie is None:
-        return pd.Series(0, index=range(10))
+        return pd.Series(0.0, index=range(10))
     if pd.api.types.is_numeric_dtype(serie):
-        return pd.to_numeric(serie, errors='coerce').fillna(0)
+        return pd.to_numeric(serie, errors='coerce').fillna(0.0)
     try:
         limpo = serie.astype(str).str.replace('R$', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False).str.strip()
-        return pd.to_numeric(limpo, errors='coerce').fillna(0)
+        return pd.to_numeric(limpo, errors='coerce').fillna(0.0)
     except Exception:
-        return pd.to_numeric(serie, errors='coerce').fillna(0)
+        return pd.to_numeric(serie, errors='coerce').fillna(0.0)
 
-def identificar_coluna_exata(colunas, termos):
+def auto_detectar_coluna(colunas, palavras_chave):
     colunas_str = [str(c) for c in colunas]
-    # 1. Busca exata ou contida estrita ignorando código
-    for termo in termos:
+    # 1. Procura por correspondência estrita ignorando códigos de produto
+    for palavra in palavras_chave:
         for c in colunas_str:
             c_low = c.lower()
-            if termo in c_low and 'codigo' not in c_low and 'código' not in c_low and 'id' not in c_low:
+            if palavra in c_low and 'codigo' not in c_low and 'código' not in c_low and 'id' not in c_low:
                 return c
-    # 2. Fallback geral
-    for c in colunas_str:
-        c_low = c.lower()
-        if 'codigo' not in c_low and 'código' not in c_low:
-            return c
+    # 2. Segunda varredura geral
+    for palavra in palavras_chave:
+        for c in colunas_str:
+            if palavra in c.lower():
+                return c
     return colunas_str[0]
 
 def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=False):
@@ -254,25 +252,14 @@ def main():
                 df_filtrado = lista_dfs[0]
                 todas_colunas = df_filtrado.columns.tolist()
 
-                # PAINEL DE CONTROLE MANUAL OBRIGATÓRIO (Elimina qualquer erro de adivinhação)
-                with st.expander("🛠️ MAPEAMENTO MANUAL DE COLUNAS (Essencial para Precisão)", expanded=True):
-                    st.info("💡 **Ajuste de Segurança:** Selecione exatamente quais colunas do seu ficheiro contêm os valores, quantidades e ajustes.")
-                    c_m1, c_m2, c_m3 = st.columns(3)
-                    
-                    sugestao_val = identificar_coluna_exata(todas_colunas, ['valor', 'total', 'preco', 'custo', 'saldo'])
-                    sugestao_qtd = identificar_coluna_exata(todas_colunas, ['quantidade', 'fisico', 'estoque', 'atual'])
-                    sugestao_aj = identificar_coluna_exata(todas_colunas, ['ajuste', 'diferenca', 'dif'])
-
-                    with c_m1:
-                        col_val_sel = st.selectbox("Coluna de Valor / Preço Total:", todas_colunas, index=todas_colunas.index(sugestao_val) if sugestao_val in todas_colunas else 0)
-                    with c_m2:
-                        col_qtd_sel = st.selectbox("Coluna de Quantidade / Saldo:", todas_colunas, index=todas_colunas.index(sugestao_qtd) if sugestao_qtd in todas_colunas else 0)
-                    with c_m3:
-                        col_aj_sel = st.selectbox("Coluna de Ajuste / Desvio:", todas_colunas, index=todas_colunas.index(sugestao_aj) if sugestao_aj in todas_colunas else 0)
+                # Detecção 100% Automática das Colunas Críticas
+                col_val_sel = auto_detectar_coluna(todas_colunas, ['valor', 'total', 'preco', 'custo', 'saldo', 'vlr'])
+                col_qtd_sel = auto_detectar_coluna(todas_colunas, ['quantidade', 'fisico', 'estoque', 'atual', 'qtd'])
+                col_aj_sel = auto_detectar_coluna(todas_colunas, ['ajuste', 'diferenca', 'dif', 'desvio'])
 
                 total_pos = len(df_filtrado)
                 
-                # Conversão blindada das colunas selecionadas
+                # Conversão e limpeza numérica automática e segura
                 serie_val = limpar_serie_numerica(df_filtrado[col_val_sel])
                 serie_qtd = limpar_serie_numerica(df_filtrado[col_qtd_sel])
                 serie_ajuste = limpar_serie_numerica(df_filtrado[col_aj_sel])
@@ -282,36 +269,34 @@ def main():
                 soma_ajuste_qtd = serie_ajuste.sum()
                 total_itens_antes = total_itens_pos - soma_ajuste_qtd
 
-                # Filtros de falta e sobra usando a série numérica limpa
                 df_falta = df_filtrado[serie_ajuste < 0]
                 df_sobra = df_filtrado[serie_ajuste > 0]
                 
                 qtd_falta = len(df_falta)
                 qtd_sobra = len(df_sobra)
-                vol_falta_un = abs(limpar_serie_numerica(df_falta[col_aj_sel])).sum() if not df_falta.empty else 0
-                vol_sobra_un = limpar_serie_numerica(df_sobra[col_aj_sel]).sum() if not df_sobra.empty else 0
+                vol_falta_un = abs(limpar_serie_numerica(df_falta[col_aj_sel])).sum() if not df_falta.empty else 0.0
+                vol_sobra_un = limpar_serie_numerica(df_sobra[col_aj_sel]).sum() if not df_sobra.empty else 0.0
 
                 vol_total_div = vol_falta_un + vol_sobra_un
-                perc_vol_div = (vol_total_div / total_itens_antes * 100) if total_itens_antes > 0 else 0
+                perc_vol_div = (vol_total_div / total_itens_antes * 100) if total_itens_antes > 0 else 0.0
 
                 qtd_exatos = (serie_ajuste == 0).sum()
                 total_divergencias = qtd_falta + qtd_sobra
-                perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0
+                perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0.0
                 
-                perc_falta_itens = (qtd_falta / total_pos * 100) if total_pos > 0 else 0
-                perc_sobra_itens = (qtd_sobra / total_pos * 100) if total_pos > 0 else 0
+                perc_falta_itens = (qtd_falta / total_pos * 100) if total_pos > 0 else 0.0
+                perc_sobra_itens = (qtd_sobra / total_pos * 100) if total_pos > 0 else 0.0
 
-                # Cálculo contábil rigoroso e seguro
-                soma_ajuste_val = serie_ajuste.sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1)
+                soma_ajuste_val = serie_ajuste.sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1.0)
                 soma_antes = soma_depois - soma_ajuste_val
                 diferenca_monetaria = soma_depois - soma_antes
-                impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
+                impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0.0
 
-                val_falta_fin = abs(limpar_serie_numerica(df_falta[col_aj_sel])).sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1) if not df_falta.empty else 0
-                val_sobra_fin = limpar_serie_numerica(df_sobra[col_aj_sel]).sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1) if not df_sobra.empty else 0
+                val_falta_fin = abs(limpar_serie_numerica(df_falta[col_aj_sel])).sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1.0) if not df_falta.empty else 0.0
+                val_sobra_fin = limpar_serie_numerica(df_sobra[col_aj_sel]).sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1.0) if not df_sobra.empty else 0.0
                 soma_absoluta_val = abs(val_falta_fin) + abs(val_sobra_fin)
 
-                acur_vol_real = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0
+                acur_vol_real = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0.0
                 acur_fin_real = max(0.0, min(100.0, 100.0 - abs(impacto_perc) * 2.5))
 
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
@@ -424,15 +409,11 @@ def main():
             # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
-                col_comum_x = list(set.intersection(*[set(df.columns) for df in lista_dfs]))
-                if not col_comum_x:
-                    col_comum_x = lista_dfs[0].columns.tolist()
-
                 st.markdown("### 📌 1. Indicadores Executivos & Acuracidade por Ficheiro")
                 col_cards = st.columns(len(lista_dfs))
                 for idx, df_item in enumerate(lista_dfs):
                     total_pos = len(df_item)
-                    col_temp = identificar_coluna_exata(df_item.columns, ['valor', 'total', 'preco'])
+                    col_temp = auto_detectar_coluna(df_item.columns, ['valor', 'total', 'preco'])
                     soma_val_real = limpar_serie_numerica(df_item[col_temp]).sum()
                     
                     with col_cards[idx]:
