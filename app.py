@@ -120,7 +120,6 @@ def gerar_excel_bytes(df):
     data_font = Font(name="Segoe UI", size=10)
     thin_border = Border(left=Side(style='thin', color='CBD5E1'), right=Side(style='thin', color='CBD5E1'), top=Side(style='thin', color='CBD5E1'), bottom=Side(style='thin', color='CBD5E1'))
 
-    # Sheet 1
     ws1['A1'] = "NOVA-CORE // PAINEL DE CONTROLO EXECUTIVO"
     ws1['A1'].font = title_font
     ws1['A2'] = "Sumário Geral de Indicadores, Balanço Patrimonial e Governança WMS"
@@ -427,7 +426,6 @@ def gerar_pptx_bytes(df):
     prs.slide_height = PptxInches(7.5)
     slide_layout = prs.slide_layouts[6]
 
-    # Slide 1: Capa
     slide1 = prs.slides.add_slide(slide_layout)
     slide1.background.fill.solid()
     slide1.background.fill.fore_color.rgb = PptxRGBColor(11, 15, 25)
@@ -447,7 +445,6 @@ def gerar_pptx_bytes(df):
     p1.font.color.rgb = PptxRGBColor(243, 244, 246)
     p1.space_before = Pt(15)
 
-    # Slide 2: Indicadores Principais
     slide2 = prs.slides.add_slide(slide_layout)
     slide2.background.fill.solid()
     slide2.background.fill.fore_color.rgb = PptxRGBColor(11, 15, 25)
@@ -480,7 +477,6 @@ def gerar_pptx_bytes(df):
         p_m.font.color.rgb = PptxRGBColor(243, 244, 246)
         p_m.space_before = Pt(12)
 
-    # Slide 3: Curva ABC Top Itens
     slide3 = prs.slides.add_slide(slide_layout)
     slide3.background.fill.solid()
     slide3.background.fill.fore_color.rgb = PptxRGBColor(11, 15, 25)
@@ -764,3 +760,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
