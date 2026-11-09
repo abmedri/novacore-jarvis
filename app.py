@@ -9,6 +9,21 @@ import streamlit as st
 import xml.etree.ElementTree as ET
 import plotly.express as px
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Dependências para Documentos e Apresentações
+import docx
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.oxml import parse_xml
+from docx.oxml.ns import nsdecls
+
+from pptx import Presentation
+from pptx.util import Inches as PptxInches, Pt as PptxPt
+from pptx.dml.color import RGBColor as PptxRGBColor
+from pptx.enum.shapes import MSO_SHAPE
 
 def processar_arquivo_upload(arquivo_carregado):
     nome = arquivo_carregado.name.lower()
@@ -76,6 +91,144 @@ def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=
         <div style="color: {cor_delta}; font-size: 0.8rem; font-weight: 600; margin-top: 4px;">{sinal}{delta_texto}</div>
     </div>
     """
+
+def gerar_grafico_matplotlib(tipo, x_vals, y1_vals, y2_vals=None, labels=None):
+    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(6, 3.2), dpi=300)
+    
+    fig.patch.set_facecolor('#0b0f19')
+    ax.set_facecolor('#111827')
+    
+    x = np.arange(len(x_vals))
+    width = 0.35
+    
+    if tipo == 'valores':
+        rects1 = ax.bar(x - width/2, [v/1e6 for v in y1_vals], width, label='Pré-Inventário (R$ Mi)', color='#3b82f6')
+        rects2 = ax.bar(x + width/2, [v/1e6 for v in y2_vals], width, label='Pós-Inventário (R$ Mi)', color='#00f2fe')
+        ax.set_ylabel('Valor (R$ Milhões)')
+        ax.set_title('Comparativo de Valor Patrimonial', pad=12, fontweight='bold', color='#00f2fe')
+    elif tipo == 'volumes':
+        rects1 = ax.bar(x - width/2, y1_vals, width, label='Volume Falta (un)', color='#ef4444')
+        rects2 = ax.bar(x + width/2, y2_vals, width, label='Volume Sobra (un)', color='#10b981')
+        ax.set_ylabel('Unidades Físicas')
+        ax.set_title('Divergência de Volume (Falta vs Sobra)', pad=12, fontweight='bold', color='#00f2fe')
+    elif tipo == 'acuracidade':
+        rects1 = ax.bar(x - width/2, y1_vals, width, label='Acuracidade Fin. (%)', color='#10b981')
+        rects2 = ax.bar(x + width/2, y2_vals, width, label='Acuracidade Vol. (%)', color='#f59e0b')
+        ax.axhline(95, color='#ef4444', linestyle='--', label='Meta Corporativa (95%)')
+        ax.set_ylabel('Percentual (%)')
+        ax.set_ylim(0, 115)
+        ax.set_title('Acuracidade Financeira vs Volumétrica', pad=12, fontweight='bold', color='#00f2fe')
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels if labels else x_vals)
+    ax.legend(facecolor='#111827', edgecolor='none', fontsize=8)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    plt.tight_layout()
+    img_stream = io.BytesIO()
+    plt.savefig(img_stream, format='png', bbox_inches='tight')
+    plt.close(fig)
+    img_stream.seek(0)
+    return img_stream
+
+def gerar_docx_bytes(nomes_arquivos, lista_dfs):
+    doc = docx.Document()
+    for section in doc.sections:
+        section.top_margin = Inches(0.8)
+        section.bottom_margin = Inches(0.8)
+        section.left_margin = Inches(0.8)
+        section.right_margin = Inches(0.8)
+
+    title_p = doc.add_paragraph()
+    r = title_p.add_run("⚡ NOVA-CORE // RELATÓRIO EXECUTIVO DE AUDITORIA")
+    r.font.name = 'Arial'
+    r.font.size = Pt(18)
+    r.font.bold = True
+    r.font.color.rgb = RGBColor(0, 102, 204)
+
+    sub_p = doc.add_paragraph()
+    r2 = sub_p.add_run(f"Relatório Consolidado de Inventários — {len(lista_dfs)} Ficheiro(s) Analisado(s)")
+    r2.font.name = 'Arial'
+    r2.font.size = Pt(11)
+    r2.font.italic = True
+    r2.font.color.rgb = RGBColor(128, 128, 128)
+
+    doc.add_heading("1. Sumário de Indicadores", level=1)
+    
+    table = doc.add_table(rows=1, cols=3)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    hdr = table.rows[0].cells
+    hdr[0].text = "Ficheiro / Inventário"
+    hdr[1].text = "SKUs / Vol Físico"
+    hdr[2].text = "Valor Pós (Auditado)"
+    
+    for cell in hdr:
+        shading = parse_xml(r'<w:shd {} w:fill="0F172A"/>'.format(nsdecls('w')))
+        cell._tc.get_or_add_tcPr().append(shading)
+        for p in cell.paragraphs:
+            for run in p.runs:
+                run.font.bold = True
+                run.font.color.rgb = RGBColor(255, 255, 255)
+
+    for idx, df_item in enumerate(lista_dfs):
+        row = table.add_row().cells
+        total_pos = len(df_item)
+        num_cols = df_item.select_dtypes(include=['number']).columns.tolist()
+        idx_temp = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
+        col_temp = num_cols[idx_temp] if num_cols and idx_temp < len(num_cols) else num_cols[0]
+        soma_val = df_item[col_temp].sum() if col_temp in df_item.columns else 0
+        
+        row[0].text = nomes_arquivos[idx]
+        row[1].text = f"{total_pos:,} SKUs"
+        row[2].text = f"R$ {soma_val:,.2f}"
+
+    doc.add_heading("2. Parecer Técnico", level=1)
+    doc.add_paragraph("A auditoria executiva realizada pelo NOVA-CORE avaliou a integridade patrimonial e física do estoque. Recomenda-se contagem cíclica para os itens divergentes de curva A e rigor no processo de bipagem de recebimento.")
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+def gerar_pptx_bytes(nomes_arquivos, lista_dfs):
+    prs = Presentation()
+    prs.slide_width = PptxInches(13.333)
+    prs.slide_height = PptxInches(7.5)
+    blank_layout = prs.slide_layouts[6]
+
+    # Slide 1: Capa
+    slide1 = prs.slides.add_slide(blank_layout)
+    bg1 = slide1.background
+    bg1.fill.solid()
+    bg1.fill.fore_color.rgb = PptxRGBColor(11, 15, 25)
+
+    tb = slide1.shapes.add_textbox(PptxInches(1), PptxInches(2), PptxInches(11.3), PptxInches(3.5))
+    tf = tb.text_frame
+    p0 = tf.paragraphs[0]
+    p0.text = "⚡ NOVA-CORE // DIRETORIA EXECUTIVA"
+    p0.font.size = Pt(14)
+    p0.font.bold = True
+    p0.font.color.rgb = PptxRGBColor(0, 242, 254)
+
+    p1 = tf.add_paragraph()
+    p1.text = "Relatório Executivo de Auditoria & Inventário"
+    p1.font.size = Pt(32)
+    p1.font.bold = True
+    p1.font.color.rgb = PptxRGBColor(243, 244, 246)
+    p1.space_before = Pt(15)
+
+    p2 = tf.add_paragraph()
+    p2.text = f"Análise Consolidada de {len(lista_dfs)} Ficheiro(s) de Inventário"
+    p2.font.size = Pt(16)
+    p2.font.color.rgb = PptxRGBColor(156, 163, 175)
+    p2.space_before = Pt(15)
+
+    buffer = io.BytesIO()
+    prs.save(buffer)
+    buffer.seek(0)
+    return buffer
 
 def main():
     st.set_page_config(
@@ -160,7 +313,6 @@ def main():
                 vol_falta_un = abs(df_falta[col_ajuste].sum()) if col_ajuste and not df_falta.empty else 0
                 vol_sobra_un = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobra.empty else 0
 
-                # Indicador de Volume Físico Total de Divergências (Sobra + Falta em Unidades)
                 vol_total_div = vol_falta_un + vol_sobra_un
                 perc_vol_div = (vol_total_div / total_itens_antes * 100) if total_itens_antes > 0 else 0
 
@@ -184,7 +336,6 @@ def main():
                 val_falta_fin = df_falta[col_val_aju].sum() if col_val_aju and not df_falta.empty else 0
                 val_sobra_fin = df_sobra[col_val_aju].sum() if col_val_aju and not df_sobra.empty else 0
                 soma_absoluta_val = abs(val_falta_fin) + abs(val_sobra_fin)
-                perc_valor_somado = (soma_absoluta_val / soma_antes * 100) if soma_antes > 0 else 0
 
                 acur_vol_real = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0
                 acur_fin_real = max(0.0, min(100.0, 100.0 - abs(impacto_perc) * 2.5))
@@ -324,7 +475,7 @@ def main():
 
                 idx_padrao_comp_y = identificar_coluna_ideal(num_comum_y, ['valor de estoque', 'valor', 'saldo'])
 
-                # 📌 ETAPA 1: INDICADORES EXECUTIVOS & ACURACIDADE POR FICHEIRO (100% DINÂMICO)
+                # 📌 ETAPA 1: INDICADORES EXECUTIVOS & ACURACIDADE POR FICHEIRO
                 st.markdown("### 📌 1. Indicadores Executivos & Acuracidade por Ficheiro")
                 
                 col_cards = st.columns(len(lista_dfs))
@@ -373,7 +524,6 @@ def main():
                     val_falta_fin = df_falta_m[col_val_aju].sum() if col_val_aju and not df_falta_m.empty else 0
                     val_sobra_fin = df_sobra_m[col_val_aju].sum() if col_val_aju and not df_sobra_m.empty else 0
                     soma_absoluta_val = abs(val_falta_fin) + abs(val_sobra_fin)
-                    perc_valor_somado = (soma_absoluta_val / soma_val_antes * 100) if soma_val_antes > 0 else 0
 
                     diferenca_monetaria_item = soma_val_real - soma_val_antes
                     impacto_perc_glob = (diferenca_monetaria_item / soma_val_antes) * 100 if soma_val_antes > 0 else 0
@@ -468,21 +618,9 @@ def main():
                     st.markdown(f"<small style='color: #9ca3af;'>Cruzamento direto entre <b>{nomes_arquivos[0]}</b> vs <b>{nomes_arquivos[1]}</b>:</small>", unsafe_allow_html=True)
                     st.dataframe(df_merge.sort_values(by='Variação Monetária (R$)', ascending=False), use_container_width=True)
 
-                    fig_var = px.bar(
-                        df_merge.sort_values(by='Variação Monetária (R$)', ascending=False).head(20),
-                        x=x_padrao_var,
-                        y='Variação Monetária (R$)',
-                        color='Variação Monetária (R$)',
-                        color_continuous_scale="RdYlGn_r",
-                        template="plotly_dark",
-                        title="Top 20 Divergências Monetárias"
-                    )
-                    fig_var.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-                    st.plotly_chart(fig_var, use_container_width=True)
-
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS & GRÁFICO COMPARATIVO EXECUTIVO
+                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS
                 with st.expander("🎛️ 4. Parâmetros Dinâmicos da Análise Comparativa (Eixos X e Y)", expanded=True):
                     st.info("💡 **Central de Inteligência Dinâmica:** Selecione os eixos abaixo para cruzar livremente qualquer dimensão e métrica dos seus ficheiros.")
                     c_cx, c_cy = st.columns(2)
@@ -490,108 +628,32 @@ def main():
                         eixo_x_comp = st.selectbox("Eixo X (Dimensão / SKU / Categoria):", col_comum_x, index=0, key="multi_x_din")
                     with c_cy:
                         eixo_y_comp = st.selectbox("Eixo Y (Métrica Numérica / Valor / Quantidade):", num_comum_y, index=idx_padrao_comp_y, key="multi_y_din")
-                    
-                    if len(lista_dfs) >= 2 and eixo_x_comp and eixo_y_comp:
-                        df_d1 = lista_dfs[0][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
-                        df_d2 = lista_dfs[1][[eixo_x_comp, eixo_y_comp]].groupby(eixo_x_comp).sum().reset_index()
-                        df_comp_din = pd.merge(df_d1, df_d2, on=eixo_x_comp, how='outer', suffixes=(f" ({nomes_arquivos[0]})", f" ({nomes_arquivos[1]})")).fillna(0)
-                        
-                        col_sk1 = f"{eixo_y_comp} ({nomes_arquivos[0]})"
-                        col_sk2 = f"{eixo_y_comp} ({nomes_arquivos[1]})"
-                        
-                        df_comp_din['Variação Absoluta'] = df_comp_din[col_sk2] - df_comp_din[col_sk1]
-                        df_comp_din['Tipo de Variação'] = df_comp_din['Variação Absoluta'].apply(lambda x: 'Aumento (Sobra/Positivo)' if x > 0 else ('Redução (Falta/Negativo)' if x < 0 else 'Sem Alteração'))
-                        
-                        st.markdown(f"##### 📊 Análise Comparativa Dinâmica: {eixo_y_comp} por {eixo_x_comp}")
-                        
-                        fig_din = px.bar(
-                            df_comp_din.sort_values(by='Variação Absoluta', ascending=False).head(20),
-                            x=eixo_x_comp,
-                            y='Variação Absoluta',
-                            color='Tipo de Variação',
-                            color_discrete_map={
-                                'Aumento (Sobra/Positivo)': '#10b981',
-                                'Redução (Falta/Negativo)': '#ef4444',
-                                'Sem Alteração': '#9ca3af'
-                            },
-                            template="plotly_dark",
-                            title=f"Top 20 Variações de {eixo_y_comp} entre {nomes_arquivos[0]} e {nomes_arquivos[1]}"
-                        )
-                        fig_din.update_layout(
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            xaxis_title=eixo_x_comp,
-                            yaxis_title=f"Diferença Absoluta ({eixo_y_comp})",
-                            legend_title="Direção da Variação"
-                        )
-                        st.plotly_chart(fig_din, use_container_width=True)
 
             # ====================================================================
-            # MÓDULO DE EXPORTAÇÃO EXECUTIVA (RELATÓRIO & SLIDES)
+            # MÓDULO DE EXPORTAÇÃO EXECUTIVA (DOCX & PPTX NATIVOS)
             # ====================================================================
             st.markdown("---")
-            st.markdown("### 📥 EXPORTAÇÃO DE RELATÓRIOS & APRESENTAÇÕES EXECUTIVAS")
-            st.info("💡 **Central de Exportação NOVA-CORE:** Descarregue o relatório técnico oficial e a estrutura de slides para a diretoria.")
+            st.markdown("### 📥 EXPORTAÇÃO DE RELATÓRIOS & APRESENTAÇÕES EXECUTIVAS (.DOCX & .PPTX)")
+            st.info("💡 **Central de Exportação Profissional NOVA-CORE:** Descarregue os documentos formatados com tabelas e identidade visual executiva.")
             
             col_exp1, col_exp2 = st.columns(2)
             
             with col_exp1:
-                conteudo_relatorio = f"""# RELATÓRIO EXECUTIVO DE AUDITORIA DE ESTOQUE
-## NOVA-CORE // PROTOCOLO J.A.R.V.I.S.
-
-### 1. Sumário Executivo
-Este documento apresenta a auditoria comparativa de inventários realizada pelo sistema NOVA-CORE.
-Total de Inventários Analisados: {len(lista_dfs)}
-
-### 2. Indicadores por Ficheiro
-"""
-                for idx, df_item in enumerate(lista_dfs):
-                    total_pos = len(df_item)
-                    num_cols_item = df_item.select_dtypes(include=['number']).columns.tolist()
-                    idx_temp = identificar_coluna_ideal(num_cols_item, ['valor de estoque', 'valor', 'saldo'])
-                    col_temp = num_cols_item[idx_temp] if num_cols_item and idx_temp < len(num_cols_item) else (num_cols_item[0] if num_cols_item else None)
-                    soma_val_real = df_item[col_temp].sum() if col_temp and col_temp in df_item.columns else 0
-                    
-                    conteudo_relatorio += f"""
-- **Ficheiro:** {nomes_arquivos[idx]}
-  - Total SKUs Auditados: {total_pos:,}
-  - Valor Total Real: R$ {soma_val_real:,.2f}
-"""
+                docx_file = gerar_docx_bytes(nomes_arquivos, lista_dfs)
                 st.download_button(
-                    label="📄 Descarregar Relatório Executivo Oficial (.md)",
-                    data=conteudo_relatorio,
-                    file_name="Relatorio_Executivo_Inventario_NovaCore.md",
-                    mime="text/markdown"
+                    label="📄 Descarregar Relatório Executivo (.docx)",
+                    data=docx_file,
+                    file_name="Relatorio_Executivo_Inventario_NovaCore.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
 
             with col_exp2:
-                conteudo_slides = """# ESTRUTURA DE SLIDES PARA APRESENTAÇÃO EM POWERPOINT
-## NOVA-CORE // DIRETORIA EXECUTIVA
-
-- **Slide 1: Capa Executiva**
-  - Título: Auditoria Geral de Estoque & Análise Comparativa Multi-Inventário
-  - Subtítulo: Relatório de Desvios, Acuracidade e Parecer Técnico
-
-- **Slide 2: Sumário de Inventários Auditados**
-  - Comparativo lado a lado dos volumes de SKUs, Valores Reais e Impacto Geral.
-
-- **Slide 3: Painel de Acuracidade (Financeira vs. Volumétrica)**
-  - Avaliação de desempenho frente à meta corporativa de 95%.
-
-- **Slide 4: Balanço Patrimonial (Teórico vs. Real)**
-  - Exibição clara do impacto financeiro das quebras de estoque apuradas.
-
-- **Slide 5: Top SKUs com Maior Divergência Monetária**
-  - Destaque para os produtos que exigem auditoria imediata.
-
-- **Slide 6: Conclusões & Plano de Ação Estratégico**
-  - Próximos passos operacionais e governança para o próximo ciclo.
-"""
+                pptx_file = gerar_pptx_bytes(nomes_arquivos, lista_dfs)
                 st.download_button(
-                    label="📊 Descarregar Roteiro de Slides PPTX (.txt)",
-                    data=conteudo_slides,
-                    file_name="Apresentacao_Slides_Diretoria.txt",
-                    mime="text/plain"
+                    label="📊 Descarregar Apresentação de Slides (.pptx)",
+                    data=pptx_file,
+                    file_name="Apresentacao_Executiva_Inventario_NovaCore.pptx",
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
                 )
 
         else:
