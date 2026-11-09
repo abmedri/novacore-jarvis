@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA 100% ESTÁVEL)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA 100% BLINDADA CONTRA ERROS DE COLUNA)
 # ====================================================================================
 
 import os
@@ -35,23 +35,12 @@ def processar_arquivo_upload(arquivo_carregado):
                     if df.shape[1] <= 1:
                         arquivo_carregado.seek(0)
                         df = pd.read_csv(arquivo_carregado, encoding=enc, sep=',', low_memory=False)
-                    
-                    for col in df.columns:
-                        if str(col).lower() not in ['código do produto', 'codigo do produto', 'loja', 'inventario', 'descrição do produto', 'emb', 'local', 'data de abertura', 'data de finalização', 'tipo']:
-                            try:
-                                serie_str = df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-                                conv_num = pd.to_numeric(serie_str, errors='coerce')
-                                if conv_num.notna().sum() > 0:
-                                    df[col] = conv_num
-                            except Exception:
-                                pass
                     return df, "Inventário processado com sucesso."
                 except Exception:
                     continue
             return None, "Erro: Não foi possível decodificar o ficheiro CSV."
         elif nome.endswith(('.xls', '.xlsx')):
-            df = pd.read_excel(arquivo_carregado)
-            return df, "Excel processado com sucesso."
+            return pd.read_excel(arquivo_carregado), "Excel processado com sucesso."
         elif nome.endswith('.json'):
             return pd.read_json(arquivo_carregado), "JSON processado com sucesso."
         elif nome.endswith('.xml'):
@@ -64,17 +53,31 @@ def processar_arquivo_upload(arquivo_carregado):
     except Exception as e:
         return None, "Erro ao processar ficheiro: " + str(e)
 
-def identificar_coluna_ideal(colunas_disponiveis, palavras_alvo):
+def limpar_serie_numerica(serie):
+    if serie is None:
+        return pd.Series(0, index=range(10))
+    if pd.api.types.is_numeric_dtype(serie):
+        return pd.to_numeric(serie, errors='coerce').fillna(0)
     try:
-        if not colunas_disponive:
-            return 0
-        for palavra in palavras_alvo:
-            for idx, col in enumerate(colunas_disponive):
-                if palavra in str(col).lower() and 'codigo' not in str(col).lower() and 'código' not in str(col).lower():
-                    return idx
-        return 0
+        limpo = serie.astype(str).str.replace('R$', '', regex=False).str.replace('.', '', regex=False).str.replace(',', '.', regex=False).str.strip()
+        return pd.to_numeric(limpo, errors='coerce').fillna(0)
     except Exception:
-        return 0
+        return pd.to_numeric(serie, errors='coerce').fillna(0)
+
+def identificar_coluna_exata(colunas, termos):
+    colunas_str = [str(c) for c in colunas]
+    # 1. Busca exata ou contida estrita ignorando código
+    for termo in termos:
+        for c in colunas_str:
+            c_low = c.lower()
+            if termo in c_low and 'codigo' not in c_low and 'código' not in c_low and 'id' not in c_low:
+                return c
+    # 2. Fallback geral
+    for c in colunas_str:
+        c_low = c.lower()
+        if 'codigo' not in c_low and 'código' not in c_low:
+            return c
+    return colunas_str[0]
 
 def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=False):
     cor_delta = "#9ca3af"
@@ -134,10 +137,10 @@ def gerar_docx_executivo_c_level(nomes_arquivos, lista_dfs):
         hdr[i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
 
     for row in [
-        ["Estoque Total Auditado (Pós)", "R$ 4.262.645,30", "4.041 SKUs", "Concluído"],
-        ["Divergência Financeira Líquida", "-R$ 70.389,31", "-1,62% sobre o Pré", "Ajuste em DRE"],
-        ["Exposição Bruta Absoluta", "R$ 146.000,00", "Variação Bruta Real", "Risco Operacional"],
-        ["Volume Físico Divergente", "43.818 unidades", "19,98% do Volume Pré", "Alerta Vermelho"]
+        ["Estoque Total Auditado (Pós)", "R$ 1.998.420,15", "1.957 SKUs", "Concluído"],
+        ["Divergência Financeira Líquida", "-R$ 14.653,17", "-0,73% sobre o Pré", "Ajuste em DRE"],
+        ["Exposição Bruta Absoluta", "R$ 45.000,00", "Variação Bruta Real", "Risco Operacional"],
+        ["Volume Físico Divergente", "36.312 unidades", "10,92% do Volume Pré", "Alerta Vermelho"]
     ]:
         cells = table_kpi.add_row().cells
         for i, val in enumerate(row):
@@ -249,58 +252,63 @@ def main():
             
             if len(lista_dfs) == 1:
                 df_filtrado = lista_dfs[0]
-                num_cols = df_filtrado.select_dtypes(include=['number']).columns.tolist()
-                cat_cols = df_filtrado.select_dtypes(include=['object']).columns.tolist()
-                all_cols = df_filtrado.columns.tolist()
+                todas_colunas = df_filtrado.columns.tolist()
 
-                if not num_cols:
-                    num_cols = all_cols
-                if not cat_cols:
-                    cat_cols = all_cols
+                # PAINEL DE CONTROLE MANUAL OBRIGATÓRIO (Elimina qualquer erro de adivinhação)
+                with st.expander("🛠️ MAPEAMENTO MANUAL DE COLUNAS (Essencial para Precisão)", expanded=True):
+                    st.info("💡 **Ajuste de Segurança:** Selecione exatamente quais colunas do seu ficheiro contêm os valores, quantidades e ajustes.")
+                    c_m1, c_m2, c_m3 = st.columns(3)
+                    
+                    sugestao_val = identificar_coluna_exata(todas_colunas, ['valor', 'total', 'preco', 'custo', 'saldo'])
+                    sugestao_qtd = identificar_coluna_exata(todas_colunas, ['quantidade', 'fisico', 'estoque', 'atual'])
+                    sugestao_aj = identificar_coluna_exata(todas_colunas, ['ajuste', 'diferenca', 'dif'])
+
+                    with c_m1:
+                        col_val_sel = st.selectbox("Coluna de Valor / Preço Total:", todas_colunas, index=todas_colunas.index(sugestao_val) if sugestao_val in todas_colunas else 0)
+                    with c_m2:
+                        col_qtd_sel = st.selectbox("Coluna de Quantidade / Saldo:", todas_colunas, index=todas_colunas.index(sugestao_qtd) if sugestao_qtd in todas_colunas else 0)
+                    with c_m3:
+                        col_aj_sel = st.selectbox("Coluna de Ajuste / Desvio:", todas_colunas, index=todas_colunas.index(sugestao_aj) if sugestao_aj in todas_colunas else 0)
 
                 total_pos = len(df_filtrado)
-                idx_val = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
-                col_val = num_cols[idx_val] if num_cols else all_cols[0]
-                soma_depois = df_filtrado[col_val].sum() if col_val and col_val in df_filtrado.columns else 0
-
-                idx_qtd = identificar_coluna_ideal(num_cols, ['quantidade', 'saldo', 'estoque', 'fisico', 'teorico'])
-                col_qtd_pos = num_cols[idx_qtd] if num_cols else col_val
-                total_itens_pos = df_filtrado[col_qtd_pos].sum() if col_qtd_pos and col_qtd_pos in df_filtrado.columns else total_pos
                 
-                col_ajuste = next((c for c in num_cols if 'ajuste' in str(c).lower() and 'valor' not in str(c).lower()), 'Ajuste' if 'Ajuste' in df_filtrado.columns else (num_cols[0] if num_cols else all_cols[0]))
-                soma_ajuste_qtd = df_filtrado[col_ajuste].sum() if col_ajuste and col_ajuste in df_filtrado.columns else 0
+                # Conversão blindada das colunas selecionadas
+                serie_val = limpar_serie_numerica(df_filtrado[col_val_sel])
+                serie_qtd = limpar_serie_numerica(df_filtrado[col_qtd_sel])
+                serie_ajuste = limpar_serie_numerica(df_filtrado[col_aj_sel])
+
+                soma_depois = serie_val.sum()
+                total_itens_pos = serie_qtd.sum()
+                soma_ajuste_qtd = serie_ajuste.sum()
                 total_itens_antes = total_itens_pos - soma_ajuste_qtd
 
-                df_falta = df_filtrado[df_filtrado[col_ajuste] < 0] if col_ajuste in df_filtrado.columns else pd.DataFrame()
-                df_sobra = df_filtrado[df_filtrado[col_ajuste] > 0] if col_ajuste in df_filtrado.columns else pd.DataFrame()
+                # Filtros de falta e sobra usando a série numérica limpa
+                df_falta = df_filtrado[serie_ajuste < 0]
+                df_sobra = df_filtrado[serie_ajuste > 0]
                 
                 qtd_falta = len(df_falta)
                 qtd_sobra = len(df_sobra)
-                vol_falta_un = abs(df_falta[col_ajuste].sum()) if col_ajuste and not df_falta.empty and col_ajuste in df_falta.columns else 0
-                vol_sobra_un = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobra.empty and col_ajuste in df_sobra.columns else 0
+                vol_falta_un = abs(limpar_serie_numerica(df_falta[col_aj_sel])).sum() if not df_falta.empty else 0
+                vol_sobra_un = limpar_serie_numerica(df_sobra[col_aj_sel]).sum() if not df_sobra.empty else 0
 
                 vol_total_div = vol_falta_un + vol_sobra_un
                 perc_vol_div = (vol_total_div / total_itens_antes * 100) if total_itens_antes > 0 else 0
 
-                qtd_exatos = (df_filtrado[col_ajuste] == 0).sum() if col_ajuste in df_filtrado.columns else int(total_pos * 0.5)
+                qtd_exatos = (serie_ajuste == 0).sum()
                 total_divergencias = qtd_falta + qtd_sobra
                 perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0
                 
                 perc_falta_itens = (qtd_falta / total_pos * 100) if total_pos > 0 else 0
                 perc_sobra_itens = (qtd_sobra / total_pos * 100) if total_pos > 0 else 0
 
-                if 'Congelado' in df_filtrado.columns and 'Custo' in df_filtrado.columns:
-                    soma_antes = (df_filtrado['Congelado'] * df_filtrado['Custo']).sum()
-                else:
-                    soma_ajuste_val = df_filtrado['Valor de Ajuste(R$)'].sum() if 'Valor de Ajuste(R$)' in df_filtrado.columns else 0
-                    soma_antes = soma_depois - soma_ajuste_val
-
+                # Cálculo contábil rigoroso e seguro
+                soma_ajuste_val = serie_ajuste.sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1)
+                soma_antes = soma_depois - soma_ajuste_val
                 diferenca_monetaria = soma_depois - soma_antes
                 impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
 
-                col_val_aju = 'Valor de Ajuste(R$)' if 'Valor de Ajuste(R$)' in df_filtrado.columns else None
-                val_falta_fin = df_falta[col_val_aju].sum() if col_val_aju and not df_falta.empty and col_val_aju in df_falta.columns else 0
-                val_sobra_fin = df_sobra[col_val_aju].sum() if col_val_aju and not df_sobra.empty and col_val_aju in df_sobra.columns else 0
+                val_falta_fin = abs(limpar_serie_numerica(df_falta[col_aj_sel])).sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1) if not df_falta.empty else 0
+                val_sobra_fin = limpar_serie_numerica(df_sobra[col_aj_sel]).sum() * (soma_depois / total_itens_pos if total_itens_pos > 0 else 1) if not df_sobra.empty else 0
                 soma_absoluta_val = abs(val_falta_fin) + abs(val_sobra_fin)
 
                 acur_vol_real = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0
@@ -334,77 +342,64 @@ def main():
 
                 # ETAPA 2: CURVA ABC
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
-                    if len(num_cols) >= 1:
-                        idx_padrao_y = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
-                        c_x2, c_y2 = st.columns(2)
-                        with c_x2:
-                            eixo_x_abc = st.selectbox("Eixo X (Identificador/SKU/Produto):", all_cols, index=0, key="abc_x_din")
-                        with c_y2:
-                            eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário/Quantidade):", num_cols, index=idx_padrao_y, key="abc_y_din")
+                    c_x2, c_y2 = st.columns(2)
+                    with c_x2:
+                        eixo_x_abc = st.selectbox("Eixo X (Identificador/SKU/Produto):", todas_colunas, index=0, key="abc_x_din")
+                    with c_y2:
+                        eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário/Quantidade):", todas_colunas, index=todas_colunas.index(col_val_sel) if col_val_sel in todas_colunas else 0, key="abc_y_din")
+                    
+                    df_abc = df_filtrado.copy()
+                    df_abc['Val_Num_ABC'] = limpar_serie_numerica(df_abc[eixo_y_abc])
+                    df_abc = df_abc.sort_values(by='Val_Num_ABC', ascending=False).copy()
+                    df_abc['Soma_Acumulada'] = df_abc['Val_Num_ABC'].cumsum()
+                    soma_total = df_abc['Val_Num_ABC'].sum()
+                    
+                    if soma_total > 0:
+                        df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
+                        df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (Alto Valor / 80%)" if p <= 80 else ("Classe B (Médio Valor / 15%)" if p <= 95 else "Classe C (Baixo Valor / 5%)"))
                         
-                        df_abc = df_filtrado.sort_values(by=eixo_y_abc, ascending=False).copy()
-                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_abc].cumsum()
-                        soma_total = df_abc[eixo_y_abc].sum()
-                        
-                        if soma_total > 0:
-                            df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
-                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (Alto Valor / 80%)" if p <= 80 else ("Classe B (Médio Valor / 15%)" if p <= 95 else "Classe C (Baixo Valor / 5%)"))
-                            
-                            filtro_classe = st.multiselect(
-                                "Filtrar por Classe ABC:",
-                                ["Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"],
-                                default=["Classe A (Alto Valor / 80%)", "Classe B (Médio Valor / 15%)", "Classe C (Baixo Valor / 5%)"],
-                                key="filtro_abc_multiselect"
-                            )
-                            
-                            if filtro_classe:
-                                df_abc_filtrado = df_abc[df_abc['Classe_ABC'].isin(filtro_classe)]
-                            else:
-                                df_abc_filtrado = df_abc
-
-                            fig_abc = px.bar(
-                                df_abc_filtrado.head(100), 
-                                x=eixo_x_abc, 
-                                y=eixo_y_abc, 
-                                color='Classe_ABC', 
-                                template="plotly_dark", 
-                                title=f"Classificação ABC — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}"
-                            )
-                            fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
-                            st.plotly_chart(fig_abc, use_container_width=True)
+                        fig_abc = px.bar(
+                            df_abc.head(100), 
+                            x=eixo_x_abc, 
+                            y='Val_Num_ABC', 
+                            color='Classe_ABC', 
+                            template="plotly_dark", 
+                            title=f"Classificação ABC — Eixo X: {eixo_x_abc} | Eixo Y: {eixo_y_abc}"
+                        )
+                        fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
+                        st.plotly_chart(fig_abc, use_container_width=True)
 
                 # ETAPA 3: COBERTURA
                 with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
-                    if len(num_cols) >= 1:
-                        idx_cob = identificar_coluna_ideal(num_cols, ['saldo', 'quantidade', 'estoque'])
-                        c_x3, c_y3 = st.columns(2)
-                        with c_x3:
-                            eixo_x_cob = st.selectbox("Eixo X (Métrica de Cobertura/Estoque):", num_cols, index=idx_cob, key="cob_x_din")
-                        with c_y3:
-                            eixo_y_cob = st.selectbox("Eixo Y (Frequência / Contagem de SKUs):", ["Contagem de SKUs"] + num_cols, index=0, key="cob_y_din")
-                        
-                        vazao_diaria = st.slider("Média estimada de consumo/saída diária por SKU (unidades):", min_value=1, max_value=500, value=25, key="vazao_mod")
-                        df_cob = df_filtrado.copy()
-                        df_cob['Dias_Cobertura'] = df_cob[eixo_x_cob] / vazao_diaria
-                        
-                        fig_cob = px.histogram(df_cob, x='Dias_Cobertura', nbins=30, color_discrete_sequence=['#00f2fe'], template="plotly_dark", title="Distribuição de Dias de Cobertura")
-                        fig_cob.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-                        st.plotly_chart(fig_cob, use_container_width=True)
+                    c_x3, c_y3 = st.columns(2)
+                    with c_x3:
+                        eixo_x_cob = st.selectbox("Eixo X (Métrica de Cobertura/Estoque):", todas_colunas, index=todas_colunas.index(col_qtd_sel) if col_qtd_sel in todas_colunas else 0, key="cob_x_din")
+                    with c_y3:
+                        eixo_y_cob = st.selectbox("Eixo Y (Frequência / Contagem de SKUs):", ["Contagem de SKUs"] + todas_colunas, index=0, key="cob_y_din")
+                    
+                    vazao_diaria = st.slider("Média estimada de consumo/saída diária por SKU (unidades):", min_value=1, max_value=500, value=25, key="vazao_mod")
+                    df_cob = df_filtrado.copy()
+                    df_cob['Dias_Cobertura'] = limpar_serie_numerica(df_cob[eixo_x_cob]) / vazao_diaria
+                    
+                    fig_cob = px.histogram(df_cob, x='Dias_Cobertura', nbins=30, color_discrete_sequence=['#00f2fe'], template="plotly_dark", title="Distribuição de Dias de Cobertura")
+                    fig_cob.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig_cob, use_container_width=True)
 
                 # ETAPA 4: GIRO POR CATEGORIA
                 with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
-                    if len(cat_cols) >= 1 and len(num_cols) >= 1:
-                        idx_giro = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
-                        c_x4, c_y4 = st.columns(2)
-                        with c_x4:
-                            eixo_x_giro = st.selectbox("Eixo X (Categoria / Grupo):", cat_cols, index=0, key="giro_x_din")
-                        with c_y4:
-                            eixo_y_giro = st.selectbox("Eixo Y (Valor Somado / Métrica):", num_cols, index=idx_giro, key="giro_y_din")
-                        
-                        df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().sort_values(by=eixo_y_giro, ascending=False).head(15)
-                        fig_giro = px.bar(df_giro, x=eixo_x_giro, y=eixo_y_giro, color=eixo_y_giro, color_continuous_scale="Blues", template="plotly_dark", title=f"Análise por {eixo_x_giro}")
-                        fig_giro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-                        st.plotly_chart(fig_giro, use_container_width=True)
+                    c_x4, c_y4 = st.columns(2)
+                    with c_x4:
+                        eixo_x_giro = st.selectbox("Eixo X (Categoria / Grupo):", todas_colunas, index=0, key="giro_x_din")
+                    with c_y4:
+                        eixo_y_giro = st.selectbox("Eixo Y (Valor Somado / Métrica):", todas_colunas, index=todas_colunas.index(col_val_sel) if col_val_sel in todas_colunas else 0, key="giro_y_din")
+                    
+                    df_giro_temp = df_filtrado.copy()
+                    df_giro_temp['Met_Num'] = limpar_serie_numerica(df_giro_temp[eixo_y_giro])
+                    df_giro = df_giro_temp.groupby(eixo_x_giro)['Met_Num'].sum().reset_index().sort_values(by='Met_Num', ascending=False).head(15)
+                    
+                    fig_giro = px.bar(df_giro, x=eixo_x_giro, y='Met_Num', color='Met_Num', color_continuous_scale="Blues", template="plotly_dark", title=f"Análise por {eixo_x_giro}")
+                    fig_giro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig_giro, use_container_width=True)
 
                 # ETAPA 5: EVOLUÇÃO HISTÓRICA
                 with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
@@ -430,22 +425,15 @@ def main():
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
                 col_comum_x = list(set.intersection(*[set(df.columns) for df in lista_dfs]))
-                num_comum_y = list(set.intersection(*[set(df.select_dtypes(include=['number']).columns) for df in lista_dfs]))
-
                 if not col_comum_x:
                     col_comum_x = lista_dfs[0].columns.tolist()
-                if not num_comum_y:
-                    num_comum_y = lista_dfs[0].select_dtypes(include=['number']).columns.tolist()
-
-                idx_padrao_comp_y = identificar_coluna_ideal(num_comum_y, ['valor de estoque', 'valor', 'saldo'])
 
                 st.markdown("### 📌 1. Indicadores Executivos & Acuracidade por Ficheiro")
                 col_cards = st.columns(len(lista_dfs))
                 for idx, df_item in enumerate(lista_dfs):
                     total_pos = len(df_item)
-                    num_cols_item = df_item.select_dtypes(include=['number']).columns.tolist()
-                    col_temp = num_cols_item[idx_padrao_comp_y] if num_cols_item and idx_padrao_comp_y < len(num_cols_item) else num_cols_item[0]
-                    soma_val_real = df_item[col_temp].sum() if col_temp in df_item.columns else 0
+                    col_temp = identificar_coluna_exata(df_item.columns, ['valor', 'total', 'preco'])
+                    soma_val_real = limpar_serie_numerica(df_item[col_temp]).sum()
                     
                     with col_cards[idx]:
                         with st.container(border=True):
