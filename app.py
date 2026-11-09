@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. DE INVENTÁRIO (VERSÃO EXECUTIVA UNIVERSAL & BLINDADA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA UNIVERSAL & BLINDADA)
 # ====================================================================================
 import os
 import io
