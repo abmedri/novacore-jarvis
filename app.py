@@ -1,14 +1,12 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO 100% CORRIGIDA & MODULAR)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO 100% ROBUSTA & CORRIGIDA)
 # ====================================================================================
 
 import os
 import io
 import pandas as pd
 import streamlit as st
-import xml.etree.ElementTree as ET
 import plotly.express as px
-import plotly.graph_objects as go
 import numpy as np
 
 def processar_arquivo_upload(arquivo_carregado):
@@ -112,12 +110,10 @@ def main():
 
     if arquivos_submetidos:
         lista_dfs = []
-        nomes_arquivos = []
         for arq in arquivos_submetidos:
             df_temp, msg = processar_arquivo_upload(arq)
             if df_temp is not None:
                 lista_dfs.append(df_temp)
-                nomes_arquivos.append(arq.name)
         
         if lista_dfs:
             df_filtrado = lista_dfs[0]
@@ -161,6 +157,7 @@ def main():
             acur_vol_real = ((total_pos - (qtd_falta + qtd_sobra)) / total_pos * 100) if total_pos > 0 else 0.0
             acur_fin_real = max(0.0, min(100.0, 100.0 - abs(impacto_perc) * 2.5))
 
+            # RENDERIZAÇÃO DOS MODOS
             if modo == "Modo 1: Indicadores Executivos & Balanço":
                 st.markdown("### 📌 MODO 1: Indicadores Executivos & Parecer Técnico")
                 c1, c2 = st.columns(2)
@@ -182,9 +179,9 @@ def main():
                 st.markdown("### 📊 MODO 2: Concentração Financeira & Curva ABC (Pareto 80/20)")
                 c_x2, c_y2 = st.columns(2)
                 with c_x2:
-                    eixo_x_abc = st.selectbox("Eixo X (Identificador / SKU / Produto):", todas_colunas, index=0)
+                    eixo_x_abc = st.selectbox("Eixo X (Identificador / SKU / Produto):", todas_colunas, index=0, key="abc_x")
                 with c_y2:
-                    eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário / Quantidade):", todas_colunas, index=todas_colunas.index(col_val_sel) if col_val_sel in todas_colunas else 0)
+                    eixo_y_abc = st.selectbox("Eixo Y (Valor Monetário / Quantidade):", todas_colunas, index=todas_colunas.index(col_val_sel) if col_val_sel in todas_colunas else 0, key="abc_y")
                 
                 df_abc = df_filtrado.copy()
                 df_abc['Val_Num_ABC'] = limpar_serie_numerica(df_abc[eixo_y_abc]) if eixo_y_abc in df_abc.columns else pd.Series(0.0, index=df_abc.index)
@@ -208,6 +205,8 @@ def main():
                     st.plotly_chart(fig_abc, use_container_width=True)
                     
                 st.dataframe(df_abc[[eixo_x_abc, eixo_y_abc, '%_Acumulado', 'Classe_ABC']], use_container_width=True)
+    else:
+        st.info("👈 Por favor, faça o upload de pelo menos um ficheiro de inventário (.csv ou .xlsx) no painel lateral para iniciar os modos de análise.")
 
 if __name__ == "__main__":
     main()
