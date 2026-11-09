@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO 100% AUTOMÁTICA & EXECUTIVA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO 100% AUTOMÁTICA & CORRIGIDA)
 # ====================================================================================
 
 import os
@@ -62,15 +62,29 @@ def limpar_serie_numerica(serie):
     except Exception:
         return pd.to_numeric(serie, errors='coerce').fillna(0.0)
 
+def auto_detectar_coluna_valor(colunas):
+    colunas_str = [str(c) for c in colunas]
+    # Prioridade 1: Termos específicos de valor total / estoque atual (excluindo ajustes)
+    termos_fortes = ['valor de estoque', 'estoque atual', 'valor total', 'custo total', 'saldo atual', 'total', 'valor']
+    for termo in termos_fortes:
+        for c in colunas_str:
+            c_low = c.lower()
+            if termo in c_low and 'ajuste' not in c_low and 'diferenca' not in c_low and 'codigo' not in c_low and 'código' not in c_low and 'id' not in c_low:
+                return c
+    # Prioridade 2: Qualquer coluna numérica que não seja código ou ajuste
+    for c in colunas_str:
+        c_low = c.lower()
+        if 'ajuste' not in c_low and 'diferenca' not in c_low and 'codigo' not in c_low and 'código' not in c_low and 'id' not in c_low and 'quantidade' not in c_low:
+            return c
+    return colunas_str[0]
+
 def auto_detectar_coluna(colunas, palavras_chave):
     colunas_str = [str(c) for c in colunas]
-    # 1. Procura por correspondência estrita ignorando códigos de produto
     for palavra in palavras_chave:
         for c in colunas_str:
             c_low = c.lower()
             if palavra in c_low and 'codigo' not in c_low and 'código' not in c_low and 'id' not in c_low:
                 return c
-    # 2. Segunda varredura geral
     for palavra in palavras_chave:
         for c in colunas_str:
             if palavra in c.lower():
@@ -141,34 +155,6 @@ def gerar_docx_executivo_c_level(nomes_arquivos, lista_dfs):
         ["Volume Físico Divergente", "36.312 unidades", "10,92% do Volume Pré", "Alerta Vermelho"]
     ]:
         cells = table_kpi.add_row().cells
-        for i, val in enumerate(row):
-            cells[i].text = val
-
-    doc.add_paragraph().paragraph_format.space_after = Pt(10)
-    h2 = doc.add_heading("2. Diagnóstico de Causa-Raiz (Root-Cause Taxonomy)", level=1)
-    h2.runs[0].font.color.rgb = RGBColor(15, 23, 42)
-    doc.add_paragraph("• 45% - Troca de Código/Bipagem no Checkout\n• 30% - Divergência de Cadastro de Caixa Máster\n• 15% - Erro Humano de Picking/Separação\n• 10% - Avarias e Quebras Não Baixadas")
-
-    h3 = doc.add_heading("3. Plano de Ação C-Level (30 / 60 / 90 Dias)", level=1)
-    h3.runs[0].font.color.rgb = RGBColor(15, 23, 42)
-    
-    t_plano = doc.add_table(rows=1, cols=4)
-    t_plano.alignment = WD_TABLE_ALIGNMENT.CENTER
-    hdr_p = t_plano.rows[0].cells
-    for i, h in enumerate(["Prazo", "Iniciativa Estratégica", "Responsável", "Meta de Resultado"]):
-        hdr_p[i].text = h
-        shading = parse_xml(r'<w:shd {} w:fill="0F172A"/>'.format(nsdecls('w')))
-        hdr_p[i]._tc.get_or_add_tcPr().append(shading)
-        hdr_p[i].paragraphs[0].runs[0].font.bold = True
-        hdr_p[i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
-
-    for row in [
-        ["30 Dias", "Inventário Cíclico Quinzenal nos Top 50 SKUs", "Gerente de Armazém", "Estabilizar Acuracidade Fin > 98%"],
-        ["30 Dias", "Bloqueio de Movimentação Manual no WMS sem Bipagem", "TI / Operações", "Eliminar Troca de SKUs"],
-        ["60 Dias", "Revisão de Cadastro de Caixa Máster", "Suprimentos", "Zerar Erros de Entrada"],
-        ["90 Dias", "Dashboard Semanal de Divergências Volumétricas", "Controladoria", "Acuracidade Volumétrica > 90%"]
-    ]:
-        cells = t_plano.add_row().cells
         for i, val in enumerate(row):
             cells[i].text = val
 
@@ -252,14 +238,13 @@ def main():
                 df_filtrado = lista_dfs[0]
                 todas_colunas = df_filtrado.columns.tolist()
 
-                # Detecção 100% Automática das Colunas Críticas
-                col_val_sel = auto_detectar_coluna(todas_colunas, ['valor', 'total', 'preco', 'custo', 'saldo', 'vlr'])
+                # Detecção 100% Automática blindada contra colunas de ajuste/diferença
+                col_val_sel = auto_detectar_coluna_valor(todas_colunas)
                 col_qtd_sel = auto_detectar_coluna(todas_colunas, ['quantidade', 'fisico', 'estoque', 'atual', 'qtd'])
                 col_aj_sel = auto_detectar_coluna(todas_colunas, ['ajuste', 'diferenca', 'dif', 'desvio'])
 
                 total_pos = len(df_filtrado)
                 
-                # Conversão e limpeza numérica automática e segura
                 serie_val = limpar_serie_numerica(df_filtrado[col_val_sel])
                 serie_qtd = limpar_serie_numerica(df_filtrado[col_qtd_sel])
                 serie_ajuste = limpar_serie_numerica(df_filtrado[col_aj_sel])
@@ -413,7 +398,7 @@ def main():
                 col_cards = st.columns(len(lista_dfs))
                 for idx, df_item in enumerate(lista_dfs):
                     total_pos = len(df_item)
-                    col_temp = auto_detectar_coluna(df_item.columns, ['valor', 'total', 'preco'])
+                    col_temp = auto_detectar_coluna_valor(df_item.columns)
                     soma_val_real = limpar_serie_numerica(df_item[col_temp]).sum()
                     
                     with col_cards[idx]:
