@@ -9,7 +9,6 @@ import xml.etree.ElementTree as ET
 import plotly.express as px
 import plotly.graph_objects as go
 
-# Dependências para relatórios executivos avançados C-Level
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -138,7 +137,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
         val_falta_aju = abs(df_falta[col_val_aju].sum()) if col_val_aju and not df_falta.empty else 0
         
         val_sobra_pre = (df_sobra[col_congelado] * df_sobra[col_custo]).sum() if col_congelado and col_custo and not df_sobra.empty else 0
-        val_sobra_pos = df_sobra[col_val_est].sum() if col_sobra_pos and not df_sobra.empty else 0
+        val_sobra_pos = df_sobra[col_val_est].sum() if col_val_est and not df_sobra.empty else 0
         val_sobra_aju = df_sobra[col_val_aju].sum() if col_val_aju and not df_sobra.empty else 0
         
         val_div_absoluto = val_falta_aju + val_sobra_aju
@@ -201,7 +200,6 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
         })
     return resumo_ficheiros
 
-# --- GERADORES DE RELATÓRIOS EXECUTIVOS C-LEVEL MEGAMODERNOS ---
 def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
     wb = openpyxl.Workbook()
@@ -585,12 +583,8 @@ def main():
         if lista_dfs:
             st.success(f"✅ {len(lista_dfs)} arquivo(s) carregado(s) e auditado(s) com sucesso!")
             
-            # Executa o motor centralizado de métricas para garantir consistência total
             resumos_gerenciais = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
             
-            # ====================================================================
-            # MODO 1: APENAS 1 FICHEIRO (VISÃO DETALHADA 5 ETAPAS)
-            # ====================================================================
             if len(lista_dfs) == 1:
                 r = resumos_gerenciais[0]
                 df_filtrado = r['df']
@@ -627,7 +621,6 @@ def main():
                     st.markdown(formatar_kpi_html("Impacto Geral", f"{r['desvio_fin_pct']:.2f}%", "Variação Apurada", eh_negativo=(r['desvio_fin_pct'] < 0), eh_positivo=(r['desvio_fin_pct'] >= 0)), unsafe_allow_html=True)
                 st.markdown("---")
                 
-                # ETAPA 2: CURVA ABC
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     if len(num_cols) >= 1:
                         idx_padrao_y = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
@@ -664,7 +657,6 @@ def main():
                             fig_abc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(type='category'))
                             st.plotly_chart(fig_abc, use_container_width=True)
                             
-                # ETAPA 3: COBERTURA
                 with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
                     if len(num_cols) >= 1:
                         idx_cob = identificar_coluna_ideal(num_cols, ['saldo', 'quantidade', 'estoque'])
@@ -682,7 +674,6 @@ def main():
                         fig_cob.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                         st.plotly_chart(fig_cob, use_container_width=True)
                         
-                # ETAPA 4: GIRO POR CATEGORIA
                 with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
                     if len(cat_cols) >= 1 and len(num_cols) >= 1:
                         idx_giro = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
@@ -697,7 +688,6 @@ def main():
                         fig_giro.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                         st.plotly_chart(fig_giro, use_container_width=True)
                         
-                # ETAPA 5: EVOLUÇÃO HISTÓRICA
                 with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
                     df_hist = pd.DataFrame({
                         "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
@@ -715,12 +705,9 @@ def main():
                         fig_hist.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                         st.plotly_chart(fig_hist, use_container_width=True)
                         
-            # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (VISÃO COMPARATIVA EXECUTIVA DE 4 ETAPAS)
-            # ====================================================================
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO (VISÃO EXEC.)")
-                st.markdown(f"<small style='color: #9ca3af;'>Comparison avançada de desvios, acuracidade e divergências entre <b>{len(lista_dfs)} inventários</b>.</small><br><br>", unsafe_allow_html=True)
+                st.markdown(f"<small style='color: #9ca3af;'>Comparação avançada de desvios, acuracidade e divergências entre <b>{len(lista_dfs)} inventários</b>.</small><br><br>", unsafe_allow_html=True)
                 
                 col_comum_x = list(set.intersection(*[set(df.columns) for df in lista_dfs]))
                 num_comum_y = list(set.intersection(*[set(df.select_dtypes(include=['number']).columns) for df in lista_dfs]))
@@ -730,7 +717,6 @@ def main():
                     num_comum_y = lista_dfs[0].select_dtypes(include=['number']).columns.tolist()
                 idx_padrao_comp_y = identificar_coluna_ideal(num_comum_y, ['valor de estoque', 'valor', 'saldo'])
                 
-                # 📌 ETAPA 1: INDICADORES EXECUTIVOS & ACURACIDADE POR FICHEIRO
                 st.markdown("### 📌 1. Indicadores Executivos & Acuracidade por Ficheiro")
                 col_cards = st.columns(len(lista_dfs))
                 
@@ -767,7 +753,6 @@ def main():
                             
                 st.markdown("<br>", unsafe_allow_html=True)
                 
-                # 📈 ETAPA 2: ANÁLISE GRÁFICA LADO A LADO
                 st.markdown("### 📈 2. Análise Gráfica Lado a Lado (Volume & Valores)")
                 dfs_unidos = [r['df'].assign(Origem_Inventario=r['nome']) for r in resumos_gerenciais]
                 df_consolidado = pd.concat(dfs_unidos, ignore_index=True)
@@ -798,7 +783,6 @@ def main():
                     
                 st.markdown("<br>", unsafe_allow_html=True)
                 
-                # 🔍 ETAPA 3: AUDITORIA DE VARIÂNCIA ITEM A ITEM
                 st.markdown("### 🔍 3. Auditoria de Variância Item a Item")
                 if len(lista_dfs) >= 2:
                     x_padrao_var = col_comum_x[0]
@@ -832,7 +816,6 @@ def main():
                     
                 st.markdown("<br>", unsafe_allow_html=True)
                 
-                # 🎛️ ETAPA 4: PARÂMETROS DINÂMICOS
                 with st.expander("🎛️ 4. Parâmetros Dinâmicos da Análise Comparativa (Eixos X e Y)", expanded=True):
                     st.info("💡 **Central de Inteligência Dinâmica:** Selecione os eixos abaixo para cruzar livremente qualquer dimensão e métrica dos seus ficheiros.")
                     c_cx, c_cy = st.columns(2)
@@ -875,9 +858,6 @@ def main():
                         )
                         st.plotly_chart(fig_din, use_container_width=True)
                         
-            # ====================================================================
-            # MÓDULO DE EXPORTAÇÃO EXECUTIVA C-LEVEL (.XLSX, .DOCX, .PDF, .PPTX)
-            # ====================================================================
             st.markdown("---")
             st.markdown("### 📥 CENTRAL TURBINADA DE RELATÓRIOS GERENCIAIS C-LEVEL")
             st.info("💡 **Relatórios Completos de Alta Administração:** Descarregue abaixo relatórios gerenciais estruturados com dados consolidados de governança, curvas de Pareto, diagnóstico de quebras físicas e plano de ação.")
@@ -896,7 +876,7 @@ def main():
                 pptx_bytes = gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos)
                 st.download_button("📊 Slides PPTX para Diretoria (.pptx)", data=pptx_bytes, file_name="Apresentacao_Gerencial_Executiva_NovaCore.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
         else:
-            st.error("❌ Não foi possível ler os dados dos arquivos enviados.")
+            st.error("❌ Não foi possível ler os arquivos enviados.")
 
 if __name__ == '__main__':
     main()
