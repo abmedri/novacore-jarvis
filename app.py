@@ -248,7 +248,24 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
 
 def main():
     st.set_page_config(page_title="NOVA-CORE // J.A.R.V.I.S. EXECUTIVO", page_icon="⚡", layout="wide")
-    st.markdown("## ⚡ NOVA-CORE // PAINEL EXECUTIVO DE INVENTÁRIO (LOJA 13372)")
+    st.markdown("""
+    <style>
+    .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
+    .main-header { padding: 20px 0; border-bottom: 1px solid #1f293d; margin-bottom: 20px; }
+    .jarvis-title {
+        font-size: 1.7rem; font-weight: 800; letter-spacing: 1.5px;
+        background: linear-gradient(90deg, #00f2fe 0%, #3b82f6 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="main-header">
+        <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
+        <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">AUDITORIA DE ESTOQUE & ANÁLISE COMPARATIVA MULTI-INVENTÁRIO</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     arquivos_submetidos = st.file_uploader("Carregue o arquivo oficial de inventário (ex: 13372.07.11.2026.csv) ou múltiplos arquivos", type=['csv', 'xlsx', 'xls'], accept_multiple_files=True)
     
@@ -292,9 +309,14 @@ def main():
                 vol_falta_un = abs(df_falta[col_ajuste].sum()) if col_ajuste and not df_falta.empty else 0
                 vol_sobra_un = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobra.empty else 0
                 vol_total_div = vol_falta_un + vol_sobra_un
+                perc_vol_div = (vol_total_div / total_itens_antes * 100) if total_itens_antes > 0 else 0
                 
                 qtd_exatos = (df_filtrado['Ajuste'] == 0).sum() if 'Ajuste' in df_filtrado.columns else int(total_pos * 0.5)
                 total_divergencias = qtd_falta + qtd_sobra
+                perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0
+                
+                perc_falta_itens = (qtd_falta / total_pos * 100) if total_pos > 0 else 0
+                perc_sobra_itens = (qtd_sobra / total_pos * 100) if total_pos > 0 else 0
                 
                 col_val_aju = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_filtrado.columns else ('Valor de Ajuste(R$)' if 'Valor de Ajuste(R$)' in df_filtrado.columns else None)
                 val_falta_fin = df_falta[col_val_aju].sum() if col_val_aju and not df_falta.empty else 0
@@ -303,28 +325,35 @@ def main():
                 soma_antes = soma_depois - soma_ajuste_val
                 diferenca_monetaria = soma_depois - soma_antes
                 impacto_perc = (diferenca_monetaria / soma_antes) * 100 if soma_antes > 0 else 0
+                soma_absoluta_val = abs(val_falta_fin) + abs(val_sobra_fin)
                 
                 acur_vol_real = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0
                 acur_fin_real = max(0.0, min(100.0, 100.0 - abs(impacto_perc) * 2.5))
                 
-                # ETAPA 1: Indicadores Executivos
+                # ETAPA 1: Indicadores Executivos & Bento Cards com Deltas e Percentuais
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
-                c1, c2, c3, c4 = st.columns(4)
-                with c1:
-                    st.metric("Total de Produtos", f"{total_pos:,}")
-                with c2:
-                    st.metric("Estoque Pós (unidades)", f"{total_itens_pos:,.0f}")
-                with c3:
-                    st.metric("Valor Total de Estoque", f"R$ {soma_depois:,.2f}")
-                with c4:
-                    st.metric("Ajuste Líquido Total", f"R$ {diferenca_monetaria:,.2f}")
+                st.markdown("<br>", unsafe_allow_html=True)
                 
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{total_pos:,}", f"Pré: {total_itens_antes:,.0f} un | Pós: {total_itens_pos:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{qtd_falta:,} SKUs ({perc_falta_itens:.2f}%)", f"Vol: -{vol_falta_un:,.0f} un | R$ {val_falta_fin:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{vol_total_div:,.0f} unidades ({perc_vol_div:.2f}%)", f"R$ {soma_absoluta_val:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                with c2:
+                    st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{qtd_sobra:,} SKUs ({perc_sobra_itens:.2f}%)", f"Vol: +{vol_sobra_un:,.0f} un | R$ +{val_sobra_fin:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{total_divergencias:,} SKUs ({perc_divergencia:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {acur_vol_real:.2f}% | Fin: {acur_fin_real:.2f}%", "Meta Corporativa 95%", eh_negativo=(acur_vol_real < 95), eh_positivo=(acur_vol_real >= 95)), unsafe_allow_html=True)
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("##### 💰 Balanço Patrimonial & Divergência Monetária (Antes vs Depois)")
+                col_kpi1, col_kpi2 = st.columns(2)
+                with col_kpi1:
+                    st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {soma_antes:,.2f}", f"Qtd Pré: {total_itens_antes:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"{impacto_perc:.2f}% Desvio", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
+                with col_kpi2:
+                    st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {soma_depois:,.2f}", f"Qtd Pós: {total_itens_pos:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Impacto Geral", f"{impacto_perc:.2f}%", "Variação Apurada", eh_negativo=(impacto_perc < 0), eh_positivo=(impacto_perc >= 0)), unsafe_allow_html=True)
                 st.markdown("---")
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.markdown(f"### 📈 Ajustes Positivos (Sobras)\n* **Produtos:** {qtd_sobra:,}\n* **Volume:** +{vol_sobra_un:,.0f} un\n* **Valor:** R$ {val_sobra_fin:,.2f}")
-                with col_b:
-                    st.markdown(f"### 📉 Ajustes Negativos (Faltas)\n* **Produtos:** {qtd_falta:,}\n* **Volume:** -{vol_falta_un:,.0f} un\n* **Valor:** R$ {val_falta_fin:,.2f}")
 
                 # ETAPA 2: Curva ABC
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
