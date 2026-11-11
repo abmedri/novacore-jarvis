@@ -454,15 +454,54 @@ def main():
                             else:
                                 st.warning("Nenhum produto encontrado para a classe selecionada.")
 
-                # ETAPA 3: Prevenção de Ruptura & Cobertura
-                with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
-                    if len(num_cols) >= 1:
-                        idx_cob = identificar_coluna_ideal(num_cols, ['saldo', 'quantidade', 'estoque'])
-                        col_cob = num_cols[idx_cob] if idx_cob < len(num_cols) else num_cols[0]
-                        df_cob = df_filtrado.copy()
-                        df_cob['Dias_Cobertura'] = df_cob[col_cob] / 25
-                        fig_cob = px.histogram(df_cob, x='Dias_Cobertura', nbins=30, template="plotly_dark", title="Distribuição de Dias de Cobertura")
-                        st.plotly_chart(fig_cob, use_container_width=True)
+                                # ETAPA 3: Matriz de Criticidade & Discrepância Financeira (Focos de Prejuízo)
+                with st.expander("🚨 ETAPA 3: Matriz de Criticidade & Discrepância Financeira", expanded=False):
+                    st.markdown("""
+                    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                        <span style="color: #ef4444; font-weight: 600; font-size: 0.9rem;">AUDITORIA DE DESVIOS CRÍTICOS (C-LEVEL)</span>
+                        <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
+                            Isolamento dos produtos com maior impacto financeiro negativo (faltas e quebras severas) para investigação prioritária de prevenção de perdas.
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    if len(num_cols) >= 2:
+                        # Identificar colunas relevantes para cálculo de divergência/impacto se existirem no dataframe
+                        col_nome_prod = 'Descrição do Produto' if 'Descrição do Produto' in df_filtrado.columns else all_cols[0]
+                        
+                        # Procurar por uma coluna de valor de divergência ou calcular com base nas numéricas disponíveis
+                        idx_val_div = identificar_coluna_ideal(num_cols, ['diferença', 'ajuste', 'valor', 'divergencia'])
+                        col_val_div = num_cols[idx_val_div] if idx_val_div < len(num_cols) else num_cols[0]
+
+                        # Filtrar apenas os itens com maior impacto absoluto (maiores desvios)
+                        df_critico = df_filtrado.copy()
+                        df_critico['Impacto_Absoluto'] = df_critico[col_val_div].abs()
+                        df_critico = df_critico.sort_values(by='Impacto_Absoluto', ascending=False).head(25)
+
+                        if not df_critico.empty:
+                            fig_critico = px.bar(
+                                df_critico,
+                                x=col_nome_prod,
+                                y=col_val_div,
+                                title="Top 25 Maiores Desvios Financeiros (Faltas e Sobras Críticas)",
+                                template="plotly_dark",
+                                color=col_val_div,
+                                color_continuous_scale=['#ef4444', '#f59e0b', '#3b82f6']
+                            )
+                            
+                            fig_critico.update_layout(
+                                paper_bgcolor='rgba(11, 15, 25, 0.9)',
+                                plot_bgcolor='rgba(11, 15, 25, 0.9)',
+                                height=450,
+                                margin=dict(l=30, r=30, t=40, b=30),
+                                xaxis=dict(showgrid=False),
+                                yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Valor da Divergência (R$)")
+                            )
+                            
+                            st.plotly_chart(fig_critico, use_container_width=True)
+                            st.info("ℹ️ **Foco de Investigação:** Barras em tons avermelhados indicam furos/faltas expressivas que exigem auditoria imediata de processos e câmeras de segurança.")
+                        else:
+                            st.warning("Não há dados suficientes para calcular a matriz de criticidade com as colunas atuais.")
 
                 # ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria
                 with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
