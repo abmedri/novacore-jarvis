@@ -139,28 +139,6 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
         desvio_fin_pct = (val_ajuste_liquido / soma_antes * 100) if soma_antes > 0 else 0
         acuracia_fin = max(0.0, min(100.0, 100.0 - abs(desvio_fin_pct) * 2.5))
         
-        # Curva ABC Pareto
-        df_calc = df.copy()
-        col_valor_abc = col_val if col_val else (col_val_aju if col_val_aju else num_cols[0] if num_cols else None)
-        if col_valor_abc and col_valor_abc in df_calc.columns:
-            df_calc['Val_Abs'] = df_calc[col_valor_abc].abs()
-            df_calc = df_calc.sort_values(by='Val_Abs', ascending=False)
-            df_calc['Soma_Acum'] = df_calc['Val_Abs'].cumsum()
-            total_acum = df_calc['Val_Abs'].sum()
-            df_calc['Pct_Acum'] = (df_calc['Soma_Acum'] / total_acum * 100) if total_acum > 0 else 0
-            df_calc['Classe_ABC'] = df_calc['Pct_Acum'].apply(lambda p: 'A' if p <= 80 else ('B' if p <= 95 else 'C'))
-            
-            val_a = df_calc[df_calc['Classe_ABC'] == 'A']['Val_Abs'].sum()
-            val_b = df_calc[df_calc['Classe_ABC'] == 'B']['Val_Abs'].sum()
-            val_c = df_calc[df_calc['Classe_ABC'] == 'C']['Val_Abs'].sum()
-            
-            skus_a = len(df_calc[df_calc['Classe_ABC'] == 'A'])
-            skus_b = len(df_calc[df_calc['Classe_ABC'] == 'B'])
-            skus_c = len(df_calc[df_calc['Classe_ABC'] == 'C'])
-        else:
-            val_a, val_b, val_c = 0, 0, 0
-            skus_a, skus_b, skus_c = 0, 0, 0
-            
         resumo_ficheiros.append({
             "nome": nomes_arquivos[idx],
             "total_skus": total_skus,
@@ -182,8 +160,6 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
             "val_div_absoluto": val_div_absoluto,
             "acuracia_vol": acuracia_vol,
             "acuracia_fin": acuracia_fin,
-            "val_a": val_a, "val_b": val_b, "val_c": val_c,
-            "skus_a": skus_a, "skus_b": skus_b, "skus_c": skus_c,
             "df": df
         })
     return resumo_ficheiros
@@ -399,36 +375,54 @@ def main():
                     st.plotly_chart(fig_hist, use_container_width=True)
 
             # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (VISÃO COMPARATIVA EXECUTIVA)
+            # MODO 2: MÚLTIPLOS FICHEIROS (VISÃO COMPARATIVA EXECUTIVA COMPLETA)
             # ====================================================================
             else:
-                st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO")
+                st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO C-LEVEL")
                 resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
                 
+                # Cartões de Comparação Lado a Lado Completos
                 col_cards = st.columns(len(lista_dfs))
                 for idx, r in enumerate(resumos):
                     with col_cards[idx]:
                         with st.container(border=True):
                             st.markdown(f"#### 📄 {r['nome']}")
-                            st.metric("Estoque Pós", f"R$ {r['soma_depois']:,.2f}")
-                            st.markdown(f"**SKUs:** `{r['total_skus']:,}`")
-                            st.markdown(f"**Ajuste Líquido:** R$ {r['val_ajuste_liquido']:,.2f}")
-                            st.markdown(f"**Faltas:** {r['skus_falta']} SKUs (R$ {r['val_falta']:,.2f})")
-                            st.markdown(f"**Sobras:** {r['skus_sobra']} SKUs (R$ {r['val_sobra']:,.2f})")
+                            st.markdown(formatar_kpi_html("Total SKUs", f"{r['total_skus']:,}", f"Exatos: {r['skus_exatos']} SKUs", eh_positivo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Estoque Antes (Teórico)", f"R$ {r['soma_antes']:,.2f}", f"Qtd: {r['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Estoque Depois (Auditado)", f"R$ {r['soma_depois']:,.2f}", f"Qtd: {r['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Ajuste Líquido", f"R$ {r['val_ajuste_liquido']:,.2f}", f"{r['desvio_fin_pct']:.2f}% Desvio", eh_negativo=(r['val_ajuste_liquido'] < 0), eh_positivo=(r['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Faltas / Sobras (SKUs)", f"Faltas: {r['skus_falta']} | Sobras: {r['skus_sobra']}", f"R$ Faltas: -{r['val_falta']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
 
                 st.markdown("---")
-                st.subheader("📊 Comparativo Gráfico de Valor e Volume")
-                dfs_unidos = [df.assign(Origem_Inventario=nomes_arquivos[i]) for i, df in enumerate(lista_dfs)]
-                df_cons = pd.concat(dfs_unidos, ignore_index=True)
+                st.subheader("📊 Gráficos Comparativos Consolidados")
                 
-                g_c1, g_c2 = st.columns(2)
-                with g_c1:
-                    num_col_demo = df_cons.select_dtypes(include=['number']).columns[0]
-                    fig_t = px.bar(df_cons.groupby('Origem_Inventario')[num_col_demo].sum().reset_index(), x='Origem_Inventario', y=num_col_demo, template="plotly_dark", title="Comparação de Totais")
-                    st.plotly_chart(fig_t, use_container_width=True)
-                with g_c2:
-                    fig_s = px.bar(df_cons.groupby('Origem_Inventario').size().reset_index(name='SKUs'), x='Origem_Inventario', y='SKUs', template="plotly_dark", title="Comparação de SKUs")
-                    st.plotly_chart(fig_s, use_container_width=True)
+                df_resumo_geral = pd.DataFrame([
+                    {
+                        "Ficheiro": r['nome'],
+                        "Estoque Antes": r['soma_antes'],
+                        "Estoque Depois": r['soma_depois'],
+                        "Ajuste Líquido": r['val_ajuste_liquido'],
+                        "Total SKUs": r['total_skus'],
+                        "Faltas (SKUs)": r['skus_falta'],
+                        "Sobras (SKUs)": r['skus_sobra']
+                    } for r in resumos
+                ])
+                
+                gc1, gc2 = st.columns(2)
+                with gc1:
+                    fig_val = px.bar(df_resumo_geral, x="Ficheiro", y=["Estoque Antes", "Estoque Depois"], barmode="group", template="plotly_dark", title="Comparativo Valor Estoque (Antes vs Depois)")
+                    st.plotly_chart(fig_val, use_container_width=True)
+                with gc2:
+                    fig_aj = px.bar(df_resumo_geral, x="Ficheiro", y="Ajuste Líquido", template="plotly_dark", title="Comparativo Ajuste Líquido (R$)")
+                    st.plotly_chart(fig_aj, use_container_width=True)
+                
+                gc3, gc4 = st.columns(2)
+                with gc3:
+                    fig_skus = px.bar(df_resumo_geral, x="Ficheiro", y=["Faltas (SKUs)", "Sobras (SKUs)"], barmode="group", template="plotly_dark", title="Comparativo Faltas vs Sobras (SKUs)")
+                    st.plotly_chart(fig_skus, use_container_width=True)
+                with gc4:
+                    fig_tot = px.bar(df_resumo_geral, x="Ficheiro", y="Total SKUs", template="plotly_dark", title="Volume Total de SKUs por Inventário")
+                    st.plotly_chart(fig_tot, use_container_width=True)
 
             # Central de Relatórios
             st.markdown("---")
