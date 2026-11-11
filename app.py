@@ -454,7 +454,7 @@ def main():
                             else:
                                 st.warning("Nenhum produto encontrado para a classe selecionada.")
 
-                                # ETAPA 3: Matriz de Criticidade & Discrepância Financeira (Focos de Prejuízo)
+                           # ETAPA 3: Matriz de Criticidade & Discrepância Financeira (Focos de Prejuízo)
                 with st.expander("🚨 ETAPA 3: Matriz de Criticidade & Discrepância Financeira", expanded=False):
                     st.markdown("""
                     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
@@ -503,14 +503,73 @@ def main():
                         else:
                             st.warning("Não há dados suficientes para calcular a matriz de criticidade com as colunas atuais.")
 
-                # ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria
-                with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
-                    if len(cat_cols) >= 1 and len(num_cols) >= 1:
-                        eixo_x_giro = cat_cols[0]
-                        eixo_y_giro = num_cols[0]
-                        df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().head(15)
-                        fig_giro = px.bar(df_giro, x=eixo_x_giro, y=eixo_y_giro, template="plotly_dark", title=f"Análise por {eixo_x_giro}")
-                        st.plotly_chart(fig_giro, use_container_width=True)
+                        # ETAPA 4: Matriz de Risco de Divergência & Acurácia Ponderada (C-Level Audit)
+                with st.expander("🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto", expanded=False):
+                    st.markdown("""
+                    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                        <span style="color: #f59e0b; font-weight: 600; font-size: 0.9rem;">GOVERNANÇA & ACURÁCIA FINANCEIRA DE INVENTÁRIO</span>
+                        <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
+                            Análise cruzada de desvios direcionada a medir a confiabilidade patrimonial (Acurácia em R$) e a separar quebras operacionais de distorções cadastrais.
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    if len(num_cols) >= 2 and len(all_cols) > 0:
+                        # Identificar colunas para simulação de acurácia e risco
+                        col_nome_cat = cat_cols[0] if len(cat_cols) > 0 else all_cols[0]
+                        
+                        # Criar cópia para processamento da matriz de risco
+                        df_risco = df_filtrado.copy()
+                        
+                        # Identificar coluna de valor/divergência para o cálculo de impacto
+                        idx_val_div = identificar_coluna_ideal(num_cols, ['diferença', 'ajuste', 'valor', 'divergencia'])
+                        col_val_div = num_cols[idx_val_div] if idx_val_div < len(num_cols) else num_cols[0]
+                        
+                        # Classificar o tipo de desvio (Positivo / Negativo / Sem Divergência)
+                        df_risco['Tipo_Desvio'] = df_risco[col_val_div].apply(
+                            lambda x: 'Déficit (Falta/Quebra)' if x < 0 else ('Superávit (Sobra)' if x > 0 else 'Conforme')
+                        )
+                        
+                        # Agrupamento analítico por categoria/setor para painel executivo
+                        df_resumo_risco = df_risco.groupby('Tipo_Desvio')[col_val_div].agg(['count', 'sum']).reset_index()
+                        df_resumo_risco.columns = ['Status do Inventário', 'Qtd SKUs', 'Impacto Financeiro (R$)']
+
+                        # Exibição de métricas consolidadas em colunas
+                        m1, m2 = st.columns(2)
+                        with m1:
+                            total_perdas = df_risco[df_risco[col_val_div] < 0][col_val_div].sum()
+                            st.metric("Total de Quebras/Faltas (R$)", f"R$ {total_perdas:,.2f}", delta_color="inverse")
+                        with m2:
+                            total_sobras = df_risco[df_risco[col_val_div] > 0][col_val_div].sum()
+                            st.metric("Total de Sobras/Ajustes (R$)", f"R$ {total_sobras:,.2f}")
+
+                        # Gráfico executivo de distribuição de risco por categoria se houver dimensão categórica
+                        if col_nome_cat in df_risco.columns:
+                            fig_risco = px.bar(
+                                df_risco.groupby(col_nome_cat)[col_val_div].sum().reset_index().head(15),
+                                x=col_nome_cat,
+                                y=col_val_div,
+                                title="Balanço Líquido de Divergências por Categoria/Setor",
+                                template="plotly_dark",
+                                color=col_val_div,
+                                color_continuous_scale=['#ef4444', '#3b82f6', '#10b981']
+                            )
+                            
+                            fig_risco.update_layout(
+                                paper_bgcolor='rgba(11, 15, 25, 0.9)',
+                                plot_bgcolor='rgba(11, 15, 25, 0.9)',
+                                height=420,
+                                margin=dict(l=30, r=30, t=40, b=30),
+                                xaxis=dict(showgrid=False),
+                                yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Impacto Líquido (R$)")
+                            )
+                            
+                            st.plotly_chart(fig_risco, use_container_width=True)
+                        
+                        st.info("💡 **Diretriz C-Level:** Um volume alto de sobras combinado com faltas expressivas na mesma categoria aponta falhas crônicas no processo de recebimento ou trocas não registradas.")
+                    else:
+                        st.warning("Dados insuficientes para estruturar a matriz de risco de acurácia.")
+
        
                 # ETAPA 5: Evolução Histórica
                 with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
