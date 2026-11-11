@@ -329,6 +329,7 @@ def main():
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"Variação Apurada", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
                 st.markdown("---")
 
+                
                 # ETAPA 2: Curva ABC (Visual Executivo Dark Mode & Pareto Avançado)
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     st.markdown("""
@@ -409,7 +410,7 @@ def main():
                                     range=[0, 105], 
                                     showgrid=False,
                                     titlefont=dict(color='#f59e0b', size=12)
-                                },
+                                ),
                                 xaxis=dict(
                                     showgrid=False,
                                     tickfont=dict(size=10, color='#9ca3af')
