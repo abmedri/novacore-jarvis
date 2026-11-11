@@ -329,111 +329,131 @@ def main():
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"Variação Apurada", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
                 st.markdown("---")
 
-                
-                                # ETAPA 2: Curva ABC (Visual Executivo Dark Mode & Pareto Avançado Blindado)
+                # ETAPA 2: Curva ABC com Seletores Dinâmicos de Eixos + Filtro de Classe A/B/C
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     st.markdown("""
                     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-                        <span style="color: #3b82f6; font-weight: 600; font-size: 0.9rem;">ANÁLISE DE PARETO C-LEVEL</span>
+                        <span style="color: #3b82f6; font-weight: 600; font-size: 0.9rem;">ANÁLISE DE PARETO C-LEVEL // DINÂMICA</span>
                         <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                            Identificação dos itens críticos de Classe A (80% do valor imobilizado), B (intermediários) e C (cauda longa). Foco estratégico para auditoria e prevenção de perdas.
+                            Selecione a dimensão, a métrica e filtre diretamente pelas classes estratégicas da Curva ABC.
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
 
-                    if len(num_cols) >= 1:
-                        idx_padrao_y = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
-                        eixo_y_abc = num_cols[idx_padrao_y] if idx_padrao_y < len(num_cols) else num_cols[0]
-                        col_nome_prod = 'Descrição do Produto' if 'Descrição do Produto' in df_filtrado.columns else all_cols[0]
-                        
-                        df_abc = df_filtrado.sort_values(by=eixo_y_abc, ascending=False).copy()
-                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_abc].cumsum()
-                        soma_total = df_abc[eixo_y_abc].sum()
+                    if len(num_cols) >= 1 and len(all_cols) > 0:
+                        # 3 Seletores interativos lado a lado
+                        col_sel1, col_sel2, col_sel3 = st.columns(3)
+                        with col_sel1:
+                            coluna_categoria_escolhida = st.selectbox(
+                                "Dimensão (Eixo X):", 
+                                options=all_cols, 
+                                index=all_cols.index('Descrição do Produto') if 'Descrição do Produto' in all_cols else 0,
+                                key="abc_eixo_x"
+                            )
+                        with col_sel2:
+                            idx_padrao_y = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
+                            eixo_y_escolhido = st.selectbox(
+                                "Métrica Principal (Eixo Y):", 
+                                options=num_cols, 
+                                index=idx_padrao_y if idx_padrao_y < len(num_cols) else 0,
+                                key="abc_eixo_y"
+                            )
+                        with col_sel3:
+                            filtro_classe_abc = st.selectbox(
+                                "Filtro Curva ABC:",
+                                options=["Todas as Classes (Geral)", "Classe A (80%)", "Classe B (95%)", "Classe C (100%)"],
+                                index=0,
+                                key="abc_filtro_classe"
+                            )
+
+                        # Cálculo completo da Curva ABC sobre toda a base filtrada
+                        df_abc = df_filtrado.sort_values(by=eixo_y_escolhido, ascending=False).copy()
+                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolhido].cumsum()
+                        soma_total = df_abc[eixo_y_escolhido].sum()
                         
                         if soma_total > 0:
                             df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
-                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (80%)" if p <= 80 else ("Classe B (95%)" if p <= 95 else "Classe C (100%)"))
-                            
-                            df_plot = df_abc.head(35).copy()
-                            
-                            fig_abc = go.Figure()
-                            
-                            # Barras de Valor Individual
-                            fig_abc.add_trace(go.Bar(
-                                x=df_plot[col_nome_prod],
-                                y=df_plot[eixo_y_abc],
-                                name="Valor de Estoque (R$)",
-                                marker=dict(
-                                    color=df_plot[eixo_y_abc],
-                                    colorscale=[[0, '#1e3a8a'], [0.5, '#3b82f6'], [1, '#00f2fe']],
-                                    opacity=0.85
-                                ),
-                                yaxis='y'
-                            ))
-                            
-                            # Linha de Porcentagem Acumulada
-                            fig_abc.add_trace(go.Scatter(
-                                x=df_plot[col_nome_prod],
-                                y=df_plot['%_Acumulado'],
-                                name="% Acumulado (Pareto)",
-                                mode='lines+markers',
-                                marker=dict(color='#f59e0b', size=8),
-                                line=dict(color='#f59e0b', width=3),
-                                yaxis='y2'
-                            ))
-                            
-                            # Layout C-Level Dark Mode Blindado
-                            fig_abc.update_layout(
-                                template="plotly_dark",
-                                paper_bgcolor='rgba(11, 15, 25, 0.9)',
-                                plot_bgcolor='rgba(11, 15, 25, 0.9)',
-                                height=480,
-                                margin=dict(l=30, r=30, t=40, b=30),
-                                legend=dict(
-                                    orientation="h", 
-                                    yanchor="bottom", 
-                                    y=1.05, 
-                                    xanchor="right", 
-                                    x=1,
-                                    font=dict(size=11, color="#f3f4f6")
-                                ),
-                                yaxis=dict(
-                                    title="Valor de Estoque (R$)", 
-                                    gridcolor='rgba(31, 41, 55, 0.6)'
-                                ),
-                                yaxis2=dict(
-                                    title="% Acumulado", 
-                                    overlaying='y', 
-                                    side='right', 
-                                    range=[0, 105], 
-                                    showgrid=False
-                                ),
-                                xaxis=dict(
-                                    showgrid=False
-                                )
+                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(
+                                lambda p: "Classe A (80%)" if p <= 80 else ("Classe B (95%)" if p <= 95 else "Classe C (100%)")
                             )
                             
-                            st.plotly_chart(fig_abc, use_container_width=True)
+                            # Aplicação do filtro selecionado
+                            if filtro_classe_abc != "Todas as Classes (Geral)":
+                                df_abc_filtrado = df_abc[df_abc['Classe_ABC'] == filtro_classe_abc].copy()
+                            else:
+                                df_abc_filtrado = df_abc.copy()
 
-                # ETAPA 3: Cobertura
-                with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
-                    if len(num_cols) >= 1:
-                        idx_cob = identificar_coluna_ideal(num_cols, ['saldo', 'quantidade', 'estoque'])
-                        col_cob = num_cols[idx_cob] if idx_cob < len(num_cols) else num_cols[0]
-                        df_cob = df_filtrado.copy()
-                        df_cob['Dias_Cobertura'] = df_cob[col_cob] / 25
-                        fig_cob = px.histogram(df_cob, x='Dias_Cobertura', nbins=30, template="plotly_dark", title="Distribuição de Dias de Cobertura")
-                        st.plotly_chart(fig_cob, use_container_width=True)
+                            # Exibição de resumo rápido da classe filtrada
+                            qtd_skus_classe = len(df_abc_filtrado)
+                            valor_classe = df_abc_filtrado[eixo_y_escolhido].sum()
+                            perc_valor_classe = (valor_classe / soma_total * 100) if soma_total > 0 else 0
+                            st.caption(f"📊 **Resumo da Seleção ({filtro_classe_abc}):** {qtd_skus_classe:,} SKUs | Total: R$ {valor_classe:,.2f} ({perc_valor_classe:.2f}% do estoque)")
 
-                # ETAPA 4: Giro por Categoria
-                with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
-                    if len(cat_cols) >= 1 and len(num_cols) >= 1:
-                        eixo_x_giro = cat_cols[0]
-                        eixo_y_giro = num_cols[0]
-                        df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().head(15)
-                        fig_giro = px.bar(df_giro, x=eixo_x_giro, y=eixo_y_giro, template="plotly_dark", title=f"Análise por {eixo_x_giro}")
-                        st.plotly_chart(fig_giro, use_container_width=True)
-
+                            # Top 35 da seleção para renderização limpa no gráfico
+                            df_plot = df_abc_filtrado.head(35).copy()
+                            
+                            if not df_plot.empty:
+                                fig_abc = go.Figure()
+                                
+                                # Barras de Valor Individual
+                                fig_abc.add_trace(go.Bar(
+                                    x=df_plot[coluna_categoria_escolhida],
+                                    y=df_plot[eixo_y_escolhido],
+                                    name=f"{eixo_y_escolhido}",
+                                    marker=dict(
+                                        color=df_plot[eixo_y_escolhido],
+                                        colorscale=[[0, '#1e3a8a'], [0.5, '#3b82f6'], [1, '#00f2fe']],
+                                        opacity=0.85
+                                    ),
+                                    yaxis='y'
+                                ))
+                                
+                                # Linha de Porcentagem Acumulada
+                                fig_abc.add_trace(go.Scatter(
+                                    x=df_plot[coluna_categoria_escolhida],
+                                    y=df_plot['%_Acumulado'],
+                                    name="% Acumulado (Pareto)",
+                                    mode='lines+markers',
+                                    marker=dict(color='#f59e0b', size=8),
+                                    line=dict(color='#f59e0b', width=3),
+                                    yaxis='y2'
+                                ))
+                                
+                                # Layout C-Level Dark Mode Blindado
+                                fig_abc.update_layout(
+                                    template="plotly_dark",
+                                    paper_bgcolor='rgba(11, 15, 25, 0.9)',
+                                    plot_bgcolor='rgba(11, 15, 25, 0.9)',
+                                    height=480,
+                                    margin=dict(l=30, r=30, t=40, b=30),
+                                    legend=dict(
+                                        orientation="h", 
+                                        yanchor="bottom", 
+                                        y=1.05, 
+                                        xanchor="right", 
+                                        x=1,
+                                        font=dict(size=11, color="#f3f4f6")
+                                    ),
+                                    yaxis=dict(
+                                        title=eixo_y_escolhido, 
+                                        gridcolor='rgba(31, 41, 55, 0.6)'
+                                    ),
+                                    yaxis2=dict(
+                                        title="% Acumulado", 
+                                        overlaying='y', 
+                                        side='right', 
+                                        range=[0, 105], 
+                                        showgrid=False
+                                    ),
+                                    xaxis=dict(
+                                        showgrid=False
+                                    )
+                                )
+                                
+                                st.plotly_chart(fig_abc, use_container_width=True)
+                            else:
+                                st.warning("Nenhum produto encontrado para a classe selecionada.")
+                                
                 # ETAPA 5: Evolução Histórica
                 with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
                     df_hist = pd.DataFrame({
