@@ -330,7 +330,7 @@ def main():
                 st.markdown("---")
 
                 
-                # ETAPA 2: Curva ABC (Visual Executivo Dark Mode & Pareto Avançado)
+                                # ETAPA 2: Curva ABC (Visual Executivo Dark Mode & Pareto Avançado Blindado)
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     st.markdown("""
                     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
@@ -354,12 +354,11 @@ def main():
                             df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
                             df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (80%)" if p <= 80 else ("Classe B (95%)" if p <= 95 else "Classe C (100%)"))
                             
-                            # Top 35 produtos críticos para manter a alta performance visual
                             df_plot = df_abc.head(35).copy()
                             
                             fig_abc = go.Figure()
                             
-                            # Barras de Valor Individual (Estilo Neon Executivo)
+                            # Barras de Valor Individual
                             fig_abc.add_trace(go.Bar(
                                 x=df_plot[col_nome_prod],
                                 y=df_plot[eixo_y_abc],
@@ -372,7 +371,7 @@ def main():
                                 yaxis='y'
                             ))
                             
-                            # Linha de Porcentagem Acumulada (Pareto)
+                            # Linha de Porcentagem Acumulada
                             fig_abc.add_trace(go.Scatter(
                                 x=df_plot[col_nome_prod],
                                 y=df_plot['%_Acumulado'],
@@ -383,7 +382,7 @@ def main():
                                 yaxis='y2'
                             ))
                             
-                            # Layout C-Level Dark Mode
+                            # Layout C-Level Dark Mode Blindado
                             fig_abc.update_layout(
                                 template="plotly_dark",
                                 paper_bgcolor='rgba(11, 15, 25, 0.9)',
@@ -400,20 +399,17 @@ def main():
                                 ),
                                 yaxis=dict(
                                     title="Valor de Estoque (R$)", 
-                                    gridcolor='rgba(31, 41, 55, 0.6)',
-                                    titlefont=dict(color='#9ca3af', size=12)
+                                    gridcolor='rgba(31, 41, 55, 0.6)'
                                 ),
                                 yaxis2=dict(
                                     title="% Acumulado", 
                                     overlaying='y', 
                                     side='right', 
                                     range=[0, 105], 
-                                    showgrid=False,
-                                    titlefont=dict(color='#f59e0b', size=12)
+                                    showgrid=False
                                 ),
                                 xaxis=dict(
-                                    showgrid=False,
-                                    tickfont=dict(size=10, color='#9ca3af')
+                                    showgrid=False
                                 )
                             )
                             
