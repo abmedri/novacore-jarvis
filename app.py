@@ -136,7 +136,6 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
         val_ajuste_liquido = soma_depois - soma_antes
         
         impacto_sobre_antes_pct = (val_ajuste_liquido / soma_antes * 100) if soma_antes > 0 else 0
-        impacto_sobre_pos_pct = (val_ajuste_liquido / soma_depois * 100) if soma_depois > 0 else 0
         
         acuracia_vol = (skus_exatos / total_skus * 100) if total_skus > 0 else 0
         acuracia_fin = max(0.0, min(100.0, 100.0 - abs(impacto_sobre_antes_pct) * 2.5))
@@ -150,7 +149,6 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
             "soma_depois": soma_depois,
             "val_ajuste_liquido": val_ajuste_liquido,
             "impacto_sobre_antes_pct": impacto_sobre_antes_pct,
-            "impacto_sobre_pos_pct": impacto_sobre_pos_pct,
             "skus_falta": skus_falta,
             "skus_sobra": skus_sobra,
             "skus_exatos": skus_exatos,
@@ -176,12 +174,12 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     
     ws1['A1'] = "⚡ NOVA-CORE // RELATÓRIO EXECUTIVO DE AUDITORIA"
     ws1.append([])
-    headers = ["Ficheiro", "SKUs", "Valor Teórico (Antes)", "Valor Auditado (Depois)", "Ajuste Líquido (R$)", "Impacto S/ Antes (%)", "Impacto S/ Pós (%)", "Status"]
+    headers = ["Ficheiro", "SKUs", "Valor Teórico (Antes)", "Valor Auditado (Depois)", "Ajuste Líquido (R$)", "Impacto S/ Antes (%)", "Status"]
     ws1.append(headers)
     
     for r in resumos:
         status = "CONFORME" if r['acuracia_vol'] >= 95 else "CRÍTICO"
-        ws1.append([r['nome'], r['total_skus'], r['soma_antes'], r['soma_depois'], r['val_ajuste_liquido'], f"{r['impacto_sobre_antes_pct']:.2f}%", f"{r['impacto_sobre_pos_pct']:.2f}%", status])
+        ws1.append([r['nome'], r['total_skus'], r['soma_antes'], r['soma_depois'], r['val_ajuste_liquido'], f"{r['impacto_sobre_antes_pct']:.2f}%", status])
         
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -193,7 +191,7 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
     doc = docx.Document()
     doc.add_heading("⚡ NOVA-CORE // RELATÓRIO EXECUTIVO C-LEVEL", level=1)
     for r in resumos:
-        doc.add_paragraph(f"Unidade: {r['nome']} | SKUs: {r['total_skus']:,} | Estoque Pré: R$ {r['soma_antes']:,.2f} | Estoque Pós: R$ {r['soma_depois']:,.2f} | Ajuste: R$ {r['val_ajuste_liquido']:,.2f} (Impacto Pré: {r['impacto_sobre_antes_pct']:.2f}% | Impacto Pós: {r['impacto_sobre_pos_pct']:.2f}%)")
+        doc.add_paragraph(f"Unidade: {r['nome']} | SKUs: {r['total_skus']:,} | Estoque Pré: R$ {r['soma_antes']:,.2f} | Estoque Pós: R$ {r['soma_depois']:,.2f} | Ajuste: R$ {r['val_ajuste_liquido']:,.2f} (Impacto Pré: {r['impacto_sobre_antes_pct']:.2f}%)")
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
@@ -206,7 +204,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     styles = getSampleStyleSheet()
     story = [Paragraph("⚡ NOVA-CORE // RELATÓRIO EXECUTIVO", styles['Heading1'])]
     for r in resumos:
-        story.append(Paragraph(f"<b>{r['nome']}</b>: {r['total_skus']:,} SKUs | Pré: R$ {r['soma_antes']:,.2f} | Pós: R$ {r['soma_depois']:,.2f} | Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f} | Impacto Pré: {r['impacto_sobre_antes_pct']:.2f}% | Impacto Pós: {r['impacto_sobre_pos_pct']:.2f}%", styles['Normal']))
+        story.append(Paragraph(f"<b>{r['nome']}</b>: {r['total_skus']:,} SKUs | Pré: R$ {r['soma_antes']:,.2f} | Pós: R$ {r['soma_depois']:,.2f} | Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f} | Impacto Pré: {r['impacto_sobre_antes_pct']:.2f}%", styles['Normal']))
     doc_pdf.build(story)
     buffer.seek(0)
     return buffer
@@ -301,7 +299,6 @@ def main():
                 diferenca_monetaria = soma_depois - soma_antes
                 
                 impacto_sobre_antes_pct = (diferenca_monetaria / soma_antes * 100) if soma_antes > 0 else 0
-                impacto_sobre_pos_pct = (diferenca_monetaria / soma_depois * 100) if soma_depois > 0 else 0
                 soma_absoluta_val = abs(val_falta_fin) + abs(val_sobra_fin)
                 
                 acur_vol_real = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0
@@ -322,14 +319,14 @@ def main():
                     st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {acur_vol_real:.2f}% | Fin: {acur_fin_real:.2f}%", "Meta Corporativa 95%", eh_negativo=(acur_vol_real < 95), eh_positivo=(acur_vol_real >= 95)), unsafe_allow_html=True)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("##### 💰 Balanço Patrimonial & Impacto Geral em Percentual (Antes vs Depois)")
+                st.markdown("##### 💰 Balanço Patrimonial & Impacto Geral s/ Valor Antes (%)")
                 col_kpi1, col_kpi2 = st.columns(2)
                 with col_kpi1:
                     st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {soma_antes:,.2f}", f"Qtd Pré: {total_itens_antes:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Impacto Geral s/ Valor Antes (%)", f"{impacto_sobre_antes_pct:.2f}%", f"Ajuste Líquido: R$ {diferenca_monetaria:,.2f}", eh_negativo=(impacto_sobre_antes_pct < 0), eh_positivo=(impacto_sobre_antes_pct >= 0)), unsafe_allow_html=True)
                 with col_kpi2:
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {soma_depois:,.2f}", f"Qtd Pós: {total_itens_pos:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Impacto Geral s/ Valor Pós (%)", f"{impacto_sobre_pos_pct:.2f}%", f"Ajuste Líquido: R$ {diferenca_monetaria:,.2f}", eh_negativo=(impacto_sobre_pos_pct < 0), eh_positivo=(impacto_sobre_pos_pct >= 0)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"Variação Apurada", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
                 st.markdown("---")
 
                 # ETAPA 2: Curva ABC
@@ -391,9 +388,8 @@ def main():
                             st.markdown(formatar_kpi_html("Total SKUs", f"{r['total_skus']:,}", f"Exatos: {r['skus_exatos']} SKUs", eh_positivo=True), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Estoque Antes (Teórico)", f"R$ {r['soma_antes']:,.2f}", f"Qtd: {r['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Estoque Depois (Auditado)", f"R$ {r['soma_depois']:,.2f}", f"Qtd: {r['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Ajuste Líquido (R$)", f"R$ {r['val_ajuste_liquido']:,.2f}", f"Impacto Pré: {r['impacto_sobre_antes_pct']:.2f}% | Pós: {r['impacto_sobre_pos_pct']:.2f}%", eh_negativo=(r['val_ajuste_liquido'] < 0), eh_positivo=(r['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Ajuste Líquido (R$)", f"R$ {r['val_ajuste_liquido']:,.2f}", f"Impacto Pré: {r['impacto_sobre_antes_pct']:.2f}%", eh_negativo=(r['val_ajuste_liquido'] < 0), eh_positivo=(r['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Impacto Geral s/ Antes (%)", f"{r['impacto_sobre_antes_pct']:.2f}%", f"Sobre R$ {r['soma_antes']:,.2f}", eh_negativo=(r['impacto_sobre_antes_pct'] < 0), eh_positivo=(r['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Impacto Geral s/ Pós (%)", f"{r['impacto_sobre_pos_pct']:.2f}%", f"Sobre R$ {r['soma_depois']:,.2f}", eh_negativo=(r['impacto_sobre_pos_pct'] < 0), eh_positivo=(r['impacto_sobre_pos_pct'] >= 0)), unsafe_allow_html=True)
 
                 st.markdown("---")
                 st.subheader("📊 Gráficos Comparativos Consolidados")
@@ -405,7 +401,6 @@ def main():
                         "Estoque Depois": r['soma_depois'],
                         "Ajuste Líquido": r['val_ajuste_liquido'],
                         "Impacto S/ Antes (%)": r['impacto_sobre_antes_pct'],
-                        "Impacto S/ Pós (%)": r['impacto_sobre_pos_pct'],
                         "Total SKUs": r['total_skus'],
                         "Faltas (SKUs)": r['skus_falta'],
                         "Sobras (SKUs)": r['skus_sobra']
@@ -417,7 +412,7 @@ def main():
                     fig_val = px.bar(df_resumo_geral, x="Ficheiro", y=["Estoque Antes", "Estoque Depois"], barmode="group", template="plotly_dark", title="Comparativo Valor Estoque (Antes vs Depois)")
                     st.plotly_chart(fig_val, use_container_width=True)
                 with gc2:
-                    fig_aj = px.bar(df_resumo_geral, x="Ficheiro", y=["Impacto S/ Antes (%)", "Impacto S/ Pós (%)"], barmode="group", template="plotly_dark", title="Impacto Geral em Percentual (Sobre Antes vs Sobre Pós)")
+                    fig_aj = px.bar(df_resumo_geral, x="Ficheiro", y="Impacto S/ Antes (%)", template="plotly_dark", title="Impacto Geral em Percentual (Sobre Antes)")
                     st.plotly_chart(fig_aj, use_container_width=True)
                 
                 gc3, gc4 = st.columns(2)
@@ -443,4 +438,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
