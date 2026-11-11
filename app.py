@@ -453,7 +453,26 @@ def main():
                                 st.plotly_chart(fig_abc, use_container_width=True)
                             else:
                                 st.warning("Nenhum produto encontrado para a classe selecionada.")
-                                
+
+                # ETAPA 3: Prevenção de Ruptura & Cobertura
+                with st.expander("⏱️ ETAPA 3: Prevenção de Ruptura & Cobertura", expanded=False):
+                    if len(num_cols) >= 1:
+                        idx_cob = identificar_coluna_ideal(num_cols, ['saldo', 'quantidade', 'estoque'])
+                        col_cob = num_cols[idx_cob] if idx_cob < len(num_cols) else num_cols[0]
+                        df_cob = df_filtrado.copy()
+                        df_cob['Dias_Cobertura'] = df_cob[col_cob] / 25
+                        fig_cob = px.histogram(df_cob, x='Dias_Cobertura', nbins=30, template="plotly_dark", title="Distribuição de Dias de Cobertura")
+                        st.plotly_chart(fig_cob, use_container_width=True)
+
+                # ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria
+                with st.expander("🔍 ETAPA 4: Diagnóstico de Causa Raiz & Giro por Categoria", expanded=False):
+                    if len(cat_cols) >= 1 and len(num_cols) >= 1:
+                        eixo_x_giro = cat_cols[0]
+                        eixo_y_giro = num_cols[0]
+                        df_giro = df_filtrado.groupby(eixo_x_giro)[eixo_y_giro].sum().reset_index().head(15)
+                        fig_giro = px.bar(df_giro, x=eixo_x_giro, y=eixo_y_giro, template="plotly_dark", title=f"Análise por {eixo_x_giro}")
+                        st.plotly_chart(fig_giro, use_container_width=True)
+       
                 # ETAPA 5: Evolução Histórica
                 with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
                     df_hist = pd.DataFrame({
