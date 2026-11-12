@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA COM LOGO OFICIAL & LOGIN)
+# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA COM LOGO & META 97%)
 # ====================================================================================
 import os
 import io
@@ -211,7 +211,7 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     ws1.append(headers_resumo)
     
     for r in resumos:
-        status = "CONFORME" if r['acuracia_vol'] >= 95 else "CRÍTICO"
+        status = "CONFORME" if r['acuracia_vol'] >= 97 else "CRÍTICO"
         ws1.append([
             r['nome'], r['total_skus'], r['soma_antes'], r['soma_depois'],
             r['val_ajuste_liquido'], f"{r['impacto_sobre_antes_pct']:.2f}%",
@@ -358,7 +358,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     
     story = []
     
-    story.append(Paragraph("⚡ GRUPO KMB // AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
+    story.append(Paragraph("⚡ GRUPO KMB // DOSSIÊ DE AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
     story.append(Paragraph("Relatório oficial consolidado contendo indicadores de impacto, análise de quebras, sobras e itens críticos.", estilo_texto))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3B82F6'), spaceBefore=8, spaceAfter=12))
     
@@ -405,7 +405,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     
     texto_assinatura = """
     <b>__________________________________________________</b><br/>
-    <b>Time de Inventário / Auditoria C-Level</b><br/>
+    <b>Time de Inventário & Loss Prevention / Auditoria C-Level</b><br/>
     Grupo KMB - Exatidão • Controle • Eficiência
     """
     story.append(Paragraph(texto_assinatura, estilo_texto))
@@ -434,7 +434,6 @@ def main():
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
-    # TELA DE LOGIN COM O BRASÃO DO GRUPO KMB
     if not st.session_state.autenticado:
         st.markdown("""
         <style>
@@ -446,7 +445,6 @@ def main():
         with col_l2:
             st.markdown("<br><br>", unsafe_allow_html=True)
             
-            # --- CARREGAMENTO DO BRASÃO LOCAL NA TELA DE LOGIN ---
             if os.path.exists("brasao_sem_fundo.png"):
                 st.image("brasao_sem_fundo.png", use_container_width=True)
             else:
@@ -465,7 +463,6 @@ def main():
                     st.error("❌ Senha incorreta. Acesso negado.")
         return
 
-    # APLICAÇÃO PRINCIPAL (APÓS LOGIN BEM-SUCEDIDO)
     st.markdown("""
     <style>
     .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
@@ -478,12 +475,11 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     
-    # --- BRASÃO NA BARRA LATERAL ---
     with st.sidebar:
         if os.path.exists("brasao_sem_fundo.png"):
             st.image("brasao_sem_fundo.png", use_container_width=True)
         st.markdown("### **GRUPO KMB**")
-        st.markdown("*Exatidão • Controle • Eficiência*[span_2](start_span)[span_2](end_span)")
+        st.markdown("*Exatidão • Controle • Eficiência*[span_0](start_span)[span_0](end_span)")
         st.markdown("---")
         if st.button("🔒 Encerrar Sessão (Sair)", use_container_width=True):
             st.session_state.autenticado = False
@@ -519,7 +515,7 @@ def main():
                 
                 resumo_unico = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)[0]
                 
-                # ETAPA 1: Indicadores Executivos & Bento Cards com Deltas e Percentuais
+                # ETAPA 1: Indicadores Executivos & Bento Cards com Deltas e Percentuais (Meta 97%)
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
                 st.markdown("<br>", unsafe_allow_html=True)
                 
@@ -531,7 +527,7 @@ def main():
                 with c2:
                     st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{resumo_unico['skus_sobra']:,} SKUs ({resumo_unico['perc_sobra_itens']:.2f}%)", f"Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{resumo_unico['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{resumo_unico['total_div']:,} SKUs ({resumo_unico['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {resumo_unico['acuracia_vol']:.2f}% | Fin: {resumo_unico['acuracia_fin']:.2f}%", "Meta Corporativa 95%", eh_negativo=(resumo_unico['acuracia_vol'] < 95), eh_positivo=(resumo_unico['acuracia_vol'] >= 95)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {resumo_unico['acuracia_vol']:.2f}% | Fin: {resumo_unico['acuracia_fin']:.2f}%", "Meta Corporativa 97%", eh_negativo=(resumo_unico['acuracia_vol'] < 97), eh_positivo=(resumo_unico['acuracia_vol'] >= 97)), unsafe_allow_html=True)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.markdown("##### 💰 Balanço Patrimonial & Impacto Geral")
@@ -718,10 +714,10 @@ def main():
                         m1, m2 = st.columns(2)
                         with m1:
                             total_perdas = df_risco[df_risco[col_val_div] < 0][col_val_div].sum()
-                            st.metric("Total de Quebras/Faltas (un)", f"R$ {total_perdas:,.2f}", delta_color="inverse")
+                            st.metric("Total de Quebras/Faltas (R$)", f"R$ {total_perdas:,.2f}", delta_color="inverse")
                         with m2:
                             total_sobras = df_risco[df_risco[col_val_div] > 0][col_val_div].sum()
-                            st.metric("Total de Sobras/Ajustes (un)", f"R$ {total_sobras:,.2f}")
+                            st.metric("Total de Sobras/Ajustes (R$)", f"R$ {total_sobras:,.2f}")
                             
                         if col_nome_cat in df_risco.columns:
                             fig_risco = px.bar(
@@ -774,7 +770,7 @@ def main():
                             st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%)", f"Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{r['total_div']:,} SKUs ({r['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{r['vol_div_total']:,.0f} unidades ({r['perc_vol_div']:.2f}%)", f"R$ {r['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {r['acuracia_vol']:.2f}% | Fin: {r['acuracia_fin']:.2f}%", "Meta Corporativa 95%", eh_negativo=(r['acuracia_vol'] < 95), eh_positivo=(r['acuracia_vol'] >= 95)), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {r['acuracia_vol']:.2f}% | Fin: {r['acuracia_fin']:.2f}%", "Meta Corporativa 97%", eh_negativo=(r['acuracia_vol'] < 97), eh_positivo=(r['acuracia_vol'] >= 97)), unsafe_allow_html=True)
                             
                             st.markdown("##### 💰 Balanço Patrimonial")
                             st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {r['soma_antes']:,.2f}", f"Qtd Pré: {r['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
