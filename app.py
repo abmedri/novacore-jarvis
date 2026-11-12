@@ -718,10 +718,10 @@ def main():
                         m1, m2 = st.columns(2)
                         with m1:
                             total_perdas = df_risco[df_risco[col_val_div] < 0][col_val_div].sum()
-                            st.metric("Total de Quebras/Faltas (R$)", f"R$ {total_perdas:,.2f}", delta_color="inverse")
+                            st.metric("Total de Quebras/Faltas (un)", f"R$ {total_perdas:,.2f}", delta_color="inverse")
                         with m2:
                             total_sobras = df_risco[df_risco[col_val_div] > 0][col_val_div].sum()
-                            st.metric("Total de Sobras/Ajustes (R$)", f"R$ {total_sobras:,.2f}")
+                            st.metric("Total de Sobras/Ajustes (un)", f"R$ {total_sobras:,.2f}")
                             
                         if col_nome_cat in df_risco.columns:
                             fig_risco = px.bar(
