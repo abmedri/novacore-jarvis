@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (ETAPA 5 DEFINITIVA // CORRIGIDA & ESTÁVEL)
+# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO OFICIAL // TOP 50 NAS ETAPAS 2 E 3)
 # ====================================================================================
 import os
 import io
@@ -540,11 +540,11 @@ def main():
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {resumo_unico['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(resumo_unico['val_ajuste_liquido'] < 0), eh_positivo=(resumo_unico['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
                 st.markdown("---")
                 
-                # ETAPA 2: Curva ABC com Seletores Dinâmicos de Eixos + Filtro de Classe A/B/C
+                # ETAPA 2: Curva ABC com Seletores Dinâmicos de Eixos + Filtro de Classe A/B/C (TOP 50)
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     st.markdown("""
                     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-                        <span style="color: #3b82f6; font-weight: 600; font-size: 0.9rem;">ANÁLISE DE PARETO C-LEVEL // DINÂMICA</span>
+                        <span style="color: #3b82f6; font-weight: 600; font-size: 0.9rem;">ANÁLISE DE PARETO C-LEVEL // DINÂMICA (TOP 50)</span>
                         <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
                             Selecione a dimensão, a métrica e filtre diretamente pelas classes estratégicas da Curva ABC.
                         </p>
@@ -577,7 +577,7 @@ def main():
                         
                         df_abc = df_filtrado.sort_values(by=eixo_y_escolhido, ascending=False).copy()
                         df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolhido].cumsum()
-                        soma_total = df_abc[eixo_y_escolhido].sum()
+                        soma_total = df_abc[eixo_y_escolh_val := eixo_y_escolhido].sum()
                         
                         if soma_total > 0:
                             df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
@@ -595,7 +595,8 @@ def main():
                             perc_valor_classe = (valor_classe / soma_total * 100) if soma_total > 0 else 0
                             st.caption(f"📊 **Resumo da Seleção ({filtro_classe_abc}):** {qtd_skus_classe:,} SKUs | Total: R$ {valor_classe:,.2f} ({perc_valor_classe:.2f}% do estoque)")
                             
-                            df_plot = df_abc_filtrado.head(35).copy()
+                            # ALTERADO PARA TOP 50
+                            df_plot = df_abc_filtrado.head(50).copy()
                             
                             if not df_plot.empty:
                                 fig_abc = go.Figure()
@@ -650,13 +651,13 @@ def main():
                             else:
                                 st.warning("Nenhum produto encontrado para a classe selecionada.")
                 
-                # ETAPA 3: Matriz de Criticidade & Discrepância Financeira (Focos de Prejuízo)
+                # ETAPA 3: Matriz de Criticidade & Discrepância Financeira (TOP 50)
                 with st.expander("🚨 ETAPA 3: Matriz de Criticidade & Discrepância Financeira", expanded=False):
                     st.markdown("""
                     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-                        <span style="color: #ef4444; font-weight: 600; font-size: 0.9rem;">AUDITORIA DE DESVIOS CRÍTICOS (C-LEVEL)</span>
+                        <span style="color: #ef4444; font-weight: 600; font-size: 0.9rem;">AUDITORIA DE DESVIOS CRÍTICOS (C-LEVEL // TOP 50)</span>
                         <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                            Isolamento dos produtos com maior impacto financeiro negativo (faltas e quebras severas) para investigação prioritária de prevenção de perdas.
+                            Isolamento dos 50 produtos com maior impacto financeiro negativo (faltas e quebras severas) para investigação prioritária de prevenção de perdas.
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
@@ -667,13 +668,14 @@ def main():
                         
                         df_critico = df_filtrado.copy()
                         df_critico['Impacto_Absoluto'] = df_critico[col_val_div].abs()
-                        df_critico = df_critico.sort_values(by='Impacto_Absoluto', ascending=False).head(25)
+                        # ALTERADO PARA TOP 50
+                        df_critico = df_critico.sort_values(by='Impacto_Absoluto', ascending=False).head(50)
                         if not df_critico.empty:
                             fig_critico = px.bar(
                                 df_critico,
                                 x=col_nome_prod,
                                 y=col_val_div,
-                                title="Top 25 Maiores Desvios Financeiros (Faltas e Sobras Críticas em R$)",
+                                title="Top 50 Maiores Desvios Financeiros (Faltas e Sobras Críticas em R$)",
                                 template="plotly_dark",
                                 color=col_val_div,
                                 color_continuous_scale=['#ef4444', '#f59e0b', '#3b82f6']
@@ -681,7 +683,7 @@ def main():
                             fig_critico.update_layout(
                                 paper_bgcolor='rgba(11, 15, 25, 0.9)',
                                 plot_bgcolor='rgba(11, 15, 25, 0.9)',
-                                height=450,
+                                height=480,
                                 margin=dict(l=30, r=30, t=40, b=30),
                                 xaxis=dict(showgrid=False),
                                 yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Valor da Divergência (R$)")
