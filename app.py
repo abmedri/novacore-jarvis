@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA COM LOGO & META 97%)
+# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA COMPLETA & CORRIGIDA)
 # ====================================================================================
 import os
 import io
@@ -479,7 +479,7 @@ def main():
         if os.path.exists("brasao_sem_fundo.png"):
             st.image("brasao_sem_fundo.png", use_container_width=True)
         st.markdown("### **GRUPO KMB**")
-        st.markdown("*Exatidão • Controle • Eficiência*[span_0](start_span)[span_0](end_span)")
+        st.markdown("*Exatidão • Controle • Eficiência*")
         st.markdown("---")
         if st.button("🔒 Encerrar Sessão (Sair)", use_container_width=True):
             st.session_state.autenticado = False
@@ -662,7 +662,7 @@ def main():
                     """, unsafe_allow_html=True)
                     if len(num_cols) >= 2:
                         col_nome_prod = 'Descrição do Produto' if 'Descrição do Produto' in df_filtrado.columns else all_cols[0]
-                        idx_val_div = identificar_coluna_ideal(num_cols, ['diferença', 'ajuste', 'valor', 'divergencia'])
+                        idx_val_div = identificar_coluna_ideal(num_cols, ['valor de ajuste', 'ajuste', 'valor', 'divergencia'])
                         col_val_div = num_cols[idx_val_div] if idx_val_div < len(num_cols) else num_cols[0]
                         
                         df_critico = df_filtrado.copy()
@@ -673,7 +673,7 @@ def main():
                                 df_critico,
                                 x=col_nome_prod,
                                 y=col_val_div,
-                                title="Top 25 Maiores Desvios Financeiros (Faltas e Sobras Críticas)",
+                                title="Top 25 Maiores Desvios Financeiros (Faltas e Sobras Críticas em R$)",
                                 template="plotly_dark",
                                 color=col_val_div,
                                 color_continuous_scale=['#ef4444', '#f59e0b', '#3b82f6']
@@ -691,55 +691,59 @@ def main():
                         else:
                             st.warning("Não há dados suficientes para calcular a matriz de criticidade com as colunas atuais.")
                 
-                # ETAPA 4: Matriz de Risco de Divergência & Acurácia Ponderada (C-Level Audit)
+                # ETAPA 4: Matriz de Risco de Divergência & Acurácia Ponderada (C-Level Audit) - CORRIGIDA EM VALOR (R$)
                 with st.expander("🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto", expanded=False):
                     st.markdown("""
                     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-                        <span style="color: #f59e0b; font-weight: 600; font-size: 0.9rem;">GOVERNANÇA & ACURÁCIA FINANCEIRA DE INVENTÁRIO</span>
+                        <span style="color: #f59e0b; font-weight: 600; font-size: 0.9rem;">GOVERNANÇA & ACURÁCIA FINANCEIRA DE INVENTÁRIO (EM VALOR)</span>
                         <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                            Análise cruzada de desvios direcionada a medir a confiabilidade patrimonial (Acurácia em R$) e a separar quebras operacionais de distorções cadastrais.
+                            Análise cruzada de desvios financeiros para medir o impacto no caixa e isolar quebras de distorções cadastrais por categoria.
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
                     if len(num_cols) >= 2 and len(all_cols) > 0:
-                        col_nome_cat = cat_cols[0] if len(cat_cols) > 0 else all_cols[0]
                         df_risco = df_filtrado.copy()
-                        idx_val_div = identificar_coluna_ideal(num_cols, ['diferença', 'ajuste', 'valor', 'divergencia'])
-                        col_val_div = num_cols[idx_val_div] if idx_val_div < len(num_cols) else num_cols[0]
                         
-                        df_risco['Tipo_Desvio'] = df_risco[col_val_div].apply(
+                        # Identificar explicitamente a coluna de Valor de Ajuste (R$)
+                        col_val_aju_etapa4 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_risco.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
+                        
+                        df_risco['Tipo_Desvio'] = df_risco[col_val_aju_etapa4].apply(
                             lambda x: 'Déficit (Falta/Quebra)' if x < 0 else ('Superávit (Sobra)' if x > 0 else 'Conforme')
                         )
                         
                         m1, m2 = st.columns(2)
                         with m1:
-                            total_perdas = df_risco[df_risco[col_val_div] < 0][col_val_div].sum()
+                            total_perdas = df_risco[df_risco[col_val_aju_etapa4] < 0][col_val_aju_etapa4].sum()
                             st.metric("Total de Quebras/Faltas (R$)", f"R$ {total_perdas:,.2f}", delta_color="inverse")
                         with m2:
-                            total_sobras = df_risco[df_risco[col_val_div] > 0][col_val_div].sum()
+                            total_sobras = df_risco[df_risco[col_val_aju_etapa4] > 0][col_val_aju_etapa4].sum()
                             st.metric("Total de Sobras/Ajustes (R$)", f"R$ {total_sobras:,.2f}")
                             
-                        if col_nome_cat in df_risco.columns:
-                            fig_risco = px.bar(
-                                df_risco.groupby(col_nome_cat)[col_val_div].sum().reset_index().head(15),
-                                x=col_nome_cat,
-                                y=col_val_div,
-                                title="Balanço Líquido de Divergências por Categoria/Setor",
-                                template="plotly_dark",
-                                color=col_val_div,
-                                color_continuous_scale=['#ef4444', '#3b82f6', '#10b981']
-                            )
-                            fig_risco.update_layout(
-                                paper_bgcolor='rgba(11, 15, 25, 0.9)',
-                                plot_bgcolor='rgba(11, 15, 25, 0.9)',
-                                height=420,
-                                margin=dict(l=30, r=30, t=40, b=30),
-                                xaxis=dict(showgrid=False),
-                                yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Impacto Líquido (R$)")
-                            )
-                            st.plotly_chart(fig_risco, use_container_width=True)
+                        # Criar categoria baseada na primeira palavra da descrição para agrupamento fiel em Valor
+                        df_risco['Categoria_Prod'] = df_risco['Descrição do Produto'].astype(str).str.split().str[0]
+                        df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index()
+                        df_agrupado_val = df_agrupado_val.sort_values(by=col_val_aju_etapa4, ascending=True).head(15)
+
+                        fig_risco = px.bar(
+                            df_agrupado_val,
+                            x='Categoria_Prod',
+                            y=col_val_aju_etapa4,
+                            title="Balanço Líquido de Divergências por Categoria (Em Reais - R$)",
+                            template="plotly_dark",
+                            color=col_val_aju_etapa4,
+                            color_continuous_scale=['#ef4444', '#3b82f6', '#10b981']
+                        )
+                        fig_risco.update_layout(
+                            paper_bgcolor='rgba(11, 15, 25, 0.9)',
+                            plot_bgcolor='rgba(11, 15, 25, 0.9)',
+                            height=420,
+                            margin=dict(l=30, r=30, t=40, b=30),
+                            xaxis=dict(showgrid=False, title="Categoria / Linha de Produto"),
+                            yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Impacto Líquido em Valor (R$)")
+                        )
+                        st.plotly_chart(fig_risco, use_container_width=True)
                         
-                        st.info("💡 **Diretriz C-Level:** Um volume alto de sobras combinado com faltas expressivas na mesma categoria aponta falhas crônicas no processo de recebimento ou trocas não registradas.")
+                        st.info("💡 **Diretriz C-Level:** O gráfico acima reflete estritamente o **Valor Financeiro Líquido (R$)**, permitindo identificar onde o caixa da empresa foi mais impactado.")
                     else:
                         st.warning("Dados insuficientes para estruturar a matriz de risco de acurácia.")
        
