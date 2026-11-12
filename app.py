@@ -196,7 +196,6 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
     wb = openpyxl.Workbook()
     
-    # Aba 1: Indicadores e Resumo Executivo
     ws1 = wb.active
     ws1.title = "Resumo Executivo"
     ws1.views.sheetView[0].showGridLines = True
@@ -207,7 +206,7 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     
     headers_resumo = [
         "Ficheiro / Unidade", "Total SKUs", "Estoque Antes (R$)", "Estoque Depois (R$)",
-        "Ajuste Líquido (R$)", "Impacto S/ Antes (%)", "Faltas (SKUs)", "Sobras (SKUs)",
+        "Ajuste Líquido (R$)", "Impacto Geral (%)", "Faltas (SKUs)", "Sobras (SKUs)",
         "Acurácia Vol. (%)", "Acurácia Fin. (%)", "Status"
     ]
     ws1.append(headers_resumo)
@@ -221,7 +220,6 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
             f"{r['acuracia_vol']:.2f}%", f"{r['acuracia_fin']:.2f}%", status
         ])
     
-    # Aba 2: Detalhamento Completo (Faltas, Sobras, Zerados e Data)
     ws2 = wb.create_sheet(title="Divergências e Zerados")
     ws2.views.sheetView[0].showGridLines = True
     
@@ -279,7 +277,7 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
         p.add_run(f"  - Produtos com Sobra: {r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%) | Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}\n")
         p.add_run(f"  - Volume Físico Total Divergências: {r['vol_div_total']:,.0f} un ({r['perc_vol_div']:.2f}%) | R$ {r['val_div_absoluto']:,.2f}\n")
         p.add_run(f"  - Valor Teórico Inicial: R$ {r['soma_antes']:,.2f} | Valor Auditado Final: R$ {r['soma_depois']:,.2f}\n")
-        p.add_run(f"  - Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f} (Impacto s/ Antes: {r['impacto_sobre_antes_pct']:.2f}%)\n")
+        p.add_run(f"  - Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f} (Impacto Geral: {r['impacto_sobre_antes_pct']:.2f}%)\n")
         p.add_run(f"  - Acurácia Volumétrica: {r['acuracia_vol']:.2f}% | Acurácia Financeira: {r['acuracia_fin']:.2f}%\n")
     
     doc.add_heading("2. Detalhamento de Divergências Críticas (Faltas, Sobras e Zerados)", level=2)
@@ -374,7 +372,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
         <b>- Produtos com Sobra:</b> {r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%) | Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}<br/>
         <b>- Volume Físico Total Divergências:</b> {r['vol_div_total']:,.0f} un ({r['perc_vol_div']:.2f}%) | R$ {r['val_div_absoluto']:,.2f}<br/>
         <b>- Valor Teórico Inicial (Antes):</b> R$ {r['soma_antes']:,.2f} | <b>Auditado Final (Depois):</b> R$ {r['soma_depois']:,.2f}<br/>
-        <b>- Ajuste Líquido:</b> R$ {r['val_ajuste_liquido']:,.2f} (Impacto s/ Antes: {r['impacto_sobre_antes_pct']:.2f}%)<br/>
+        <b>- Ajuste Líquido:</b> R$ {r['val_ajuste_liquido']:,.2f} (Impacto Geral: {r['impacto_sobre_antes_pct']:.2f}%)<br/>
         <b>- Acurácia Volumétrica:</b> {r['acuracia_vol']:.2f}% | <b>Acurácia Financeira:</b> {r['acuracia_fin']:.2f}%
         """
         story.append(Paragraph(texto_unidade, estilo_texto))
@@ -488,11 +486,11 @@ def main():
                     st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {resumo_unico['acuracia_vol']:.2f}% | Fin: {resumo_unico['acuracia_fin']:.2f}%", "Meta Corporativa 95%", eh_negativo=(resumo_unico['acuracia_vol'] < 95), eh_positivo=(resumo_unico['acuracia_vol'] >= 95)), unsafe_allow_html=True)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("##### 💰 Balanço Patrimonial & Impacto Geral s/ Valor Antes (%)")
+                st.markdown("##### 💰 Balanço Patrimonial & Impacto Geral")
                 col_kpi1, col_kpi2 = st.columns(2)
                 with col_kpi1:
                     st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {resumo_unico['soma_antes']:,.2f}", f"Qtd Pré: {resumo_unico['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Impacto Geral s/ Valor Antes (%)", f"{resumo_unico['impacto_sobre_antes_pct']:.2f}%", f"Ajuste Líquido: R$ {resumo_unico['val_ajuste_liquido']:,.2f}", eh_negativo=(resumo_unico['impacto_sobre_antes_pct'] < 0), eh_positivo=(resumo_unico['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Impacto Geral", f"{resumo_unico['impacto_sobre_antes_pct']:.2f}%", f"Ajuste Líquido: R$ {resumo_unico['val_ajuste_liquido']:,.2f}", eh_negativo=(resumo_unico['impacto_sobre_antes_pct'] < 0), eh_positivo=(resumo_unico['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
                 with col_kpi2:
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {resumo_unico['soma_depois']:,.2f}", f"Qtd Pós: {resumo_unico['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {resumo_unico['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(resumo_unico['val_ajuste_liquido'] < 0), eh_positivo=(resumo_unico['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
@@ -718,7 +716,6 @@ def main():
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO C-LEVEL")
                 resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
                 
-                # Cartões de Comparação Lado a Lado com TODOS os 10 Indicadores idênticos ao Modo 1
                 col_cards = st.columns(len(lista_dfs))
                 for idx, r in enumerate(resumos):
                     with col_cards[idx]:
@@ -734,7 +731,7 @@ def main():
                             st.markdown("##### 💰 Balanço Patrimonial")
                             st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {r['soma_antes']:,.2f}", f"Qtd Pré: {r['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {r['soma_depois']:,.2f}", f"Qtd Pós: {r['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Impacto Geral s/ Valor Antes (%)", f"{r['impacto_sobre_antes_pct']:.2f}%", f"Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f}", eh_negativo=(r['impacto_sobre_antes_pct'] < 0), eh_positivo=(r['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Impacto Geral", f"{r['impacto_sobre_antes_pct']:.2f}%", f"Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f}", eh_negativo=(r['impacto_sobre_antes_pct'] < 0), eh_positivo=(r['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {r['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(r['val_ajuste_liquido'] < 0), eh_positivo=(r['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
 
                 st.markdown("---")
@@ -746,7 +743,7 @@ def main():
                         "Estoque Antes": r['soma_antes'],
                         "Estoque Depois": r['soma_depois'],
                         "Ajuste Líquido": r['val_ajuste_liquido'],
-                        "Impacto S/ Antes (%)": r['impacto_sobre_antes_pct'],
+                        "Impacto Geral (%)": r['impacto_sobre_antes_pct'],
                         "Total SKUs": r['total_skus'],
                         "Faltas (SKUs)": r['skus_falta'],
                         "Sobras (SKUs)": r['skus_sobra']
@@ -758,7 +755,7 @@ def main():
                     fig_val = px.bar(df_resumo_geral, x="Ficheiro", y=["Estoque Antes", "Estoque Depois"], barmode="group", template="plotly_dark", title="Comparativo Valor Estoque (Antes vs Depois)")
                     st.plotly_chart(fig_val, use_container_width=True)
                 with gc2:
-                    fig_aj = px.bar(df_resumo_geral, x="Ficheiro", y="Impacto S/ Antes (%)", template="plotly_dark", title="Impacto Geral em Percentual (Sobre Antes)")
+                    fig_aj = px.bar(df_resumo_geral, x="Ficheiro", y="Impacto Geral (%)", template="plotly_dark", title="Impacto Geral em Percentual")
                     st.plotly_chart(fig_aj, use_container_width=True)
                 
                 gc3, gc4 = st.columns(2)
@@ -795,7 +792,7 @@ def main():
                             "Acuracidade Financeira (%)": r['acuracia_fin'],
                             "Estoque Antes (R$)": r['soma_antes'],
                             "Estoque Depois (R$)": r['soma_depois'],
-                            "Impacto Geral s/ Antes (%)": r['impacto_sobre_antes_pct'],
+                            "Impacto Geral (%)": r['impacto_sobre_antes_pct'],
                             "Divergência / Ajuste Líquido (R$)": r['val_ajuste_liquido']
                         } for r in resumos
                     ])
@@ -806,7 +803,7 @@ def main():
                             "Acuracidade Volumétrica (%)", 
                             "Acuracidade Financeira (%)", 
                             "Divergência / Ajuste Líquido (R$)", 
-                            "Impacto Geral s/ Antes (%)", 
+                            "Impacto Geral (%)", 
                             "Total Falta + Sobra (SKUs)",
                             "Produtos com Falta (SKUs)",
                             "Produtos com Sobra (SKUs)",
