@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA COMPLETA & CORRIGIDA)
+# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA COMPLETA & ETAPA 5 AVANÇADA)
 # ====================================================================================
 import os
 import io
@@ -691,7 +691,7 @@ def main():
                         else:
                             st.warning("Não há dados suficientes para calcular a matriz de criticidade com as colunas atuais.")
                 
-                # ETAPA 4: Matriz de Risco de Divergência & Acurácia Ponderada (C-Level Audit) - CORRIGIDA EM VALOR (R$)
+                # ETAPA 4: Matriz de Risco de Divergência & Acurácia Ponderada (C-Level Audit) - EM VALOR (R$)
                 with st.expander("🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto", expanded=False):
                     st.markdown("""
                     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
@@ -703,13 +703,7 @@ def main():
                     """, unsafe_allow_html=True)
                     if len(num_cols) >= 2 and len(all_cols) > 0:
                         df_risco = df_filtrado.copy()
-                        
-                        # Identificar explicitamente a coluna de Valor de Ajuste (R$)
                         col_val_aju_etapa4 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_risco.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
-                        
-                        df_risco['Tipo_Desvio'] = df_risco[col_val_aju_etapa4].apply(
-                            lambda x: 'Déficit (Falta/Quebra)' if x < 0 else ('Superávit (Sobra)' if x > 0 else 'Conforme')
-                        )
                         
                         m1, m2 = st.columns(2)
                         with m1:
@@ -719,7 +713,6 @@ def main():
                             total_sobras = df_risco[df_risco[col_val_aju_etapa4] > 0][col_val_aju_etapa4].sum()
                             st.metric("Total de Sobras/Ajustes (R$)", f"R$ {total_sobras:,.2f}")
                             
-                        # Criar categoria baseada na primeira palavra da descrição para agrupamento fiel em Valor
                         df_risco['Categoria_Prod'] = df_risco['Descrição do Produto'].astype(str).str.split().str[0]
                         df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index()
                         df_agrupado_val = df_agrupado_val.sort_values(by=col_val_aju_etapa4, ascending=True).head(15)
@@ -742,20 +735,53 @@ def main():
                             yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Impacto Líquido em Valor (R$)")
                         )
                         st.plotly_chart(fig_risco, use_container_width=True)
-                        
-                        st.info("💡 **Diretriz C-Level:** O gráfico acima reflete estritamente o **Valor Financeiro Líquido (R$)**, permitindo identificar onde o caixa da empresa foi mais impactado.")
                     else:
-                        st.warning("Dados insuficientes para estruturar a matriz de risco de acurácia.")
+                        st.warning("Dados insuficientes para estruturar a matriz de risco.")
        
-                # ETAPA 5: Evolução Histórica
-                with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
-                    df_hist = pd.DataFrame({
-                        "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
-                        "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, resumo_unico['acuracia_fin']],
-                        "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, resumo_unico['acuracia_vol']]
-                    })
-                    fig_hist = px.line(df_hist, x="Inventário", y=["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"], markers=True, template="plotly_dark", title="Evolução Histórica de Acuracidade")
-                    st.plotly_chart(fig_hist, use_container_width=True)
+                # ================================================================
+                # ETAPA 5 REFORMULADA: SCORE DE SAÚDE + SIMULADOR DE CENÁRIOS ("E SE...?")
+                # ================================================================
+                with st.expander("⚡ ETAPA 5: Score de Saúde do Armazém & Simulador Contábil C-Level", expanded=True):
+                    st.markdown("""
+                    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                        <span style="color: #10b981; font-weight: 600; font-size: 0.9rem;">DIAGNÓSTICO PREDITIVO & SIMULAÇÃO ESTRATÉGICA DE PERDAS</span>
+                        <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
+                            Avaliação ponderada da saúde do armazém e simulador interativo de impacto financeiro para metas futuras da diretoria.
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Cálculo do Score de Saúde (0 a 100)
+                    # Ponderação: 50% Acurácia Volumétrica, 30% Acurácia Financeira, 20% Impacto Relativo
+                    score_vol_peso = resumo_unico['acuracia_vol'] * 0.50
+                    score_fin_peso = resumo_unico['acuracia_fin'] * 0.30
+                    penalty_impacto = max(0.0, 20.0 - abs(resumo_unico['impacto_sobre_antes_pct']) * 2)
+                    score_total_saude = round(score_vol_peso + score_fin_peso + penalty_impacto, 1)
+                    score_total_saude = max(0.0, min(100.0, score_total_saude))
+
+                    col_sc1, col_sc2 = st.columns([1.2, 2.5])
+                    with col_sc1:
+                        cor_score = "#10b981" if score_total_saude >= 90 else ("#f59e0b" if score_total_saude >= 75 else "#ef4444")
+                        st.markdown(f"""
+                        <div style="background: rgba(17, 24, 39, 0.9); border: 2px solid {cor_score}; border-radius: 14px; padding: 24px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                            <div style="color: #9ca3af; font-size: 0.85rem; font-weight: 600; text-transform: uppercase;">Score de Saúde Geral</div>
+                            <div style="color: {cor_score}; font-size: 3rem; font-weight: 800; font-family: monospace; margin: 10px 0;">{score_total_saude} <span style="font-size: 1.2rem;">/100</span></div>
+                            <div style="color: #f3f4f6; font-size: 0.85rem; font-weight: 500;">Status: {'EXCELENTE' if score_total_saude >= 90 else ('ATENÇÃO REQUERIDA' if score_total_saude >= 75 else 'CRÍTICO / OPERAÇÃO EM RISCO')}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_sc2:
+                        st.markdown("##### 🎯 Simulador de Redução de Quebras (\"E se...?\")")
+                        st.markdown("Ajuste o cursor abaixo para simular a recuperação financeira caso o plano de prevenção de perdas reduza as quebras atuais:")
+                        
+                        perc_reducao = st.slider("Percentual de Redução de Quebras (%)", min_value=0, max_value=100, value=25, step=5, key="slider_reducao_quebras")
+                        
+                        total_quebras_atual = abs(df_filtrado[df_filtrado['Ajuste'] < 0][col_val_aju_etapa4].sum()) if 'Ajuste' in df_filtrado.columns else 0
+                        economia_projetada = total_quebras_atual * (perc_reducao / 100.0)
+                        novo_ajuste_liquido = resumo_unico['val_ajuste_liquido'] + economia_projetada
+                        novo_impacto_pct = (novo_ajuste_liquido / resumo_unico['soma_antes'] * 100) if resumo_unico['soma_antes'] > 0 else 0
+                        
+                        st.info(f"💡 **Projeção C-Level:** Reduzir as quebras em **{perc_reducao}%** economizaria **R$ {economia_projetada:,.2f}**, elevando o Ajuste Líquido para **R$ {novo_ajuste_liquido:,.2f}** (Impacto Geral de **{novo_impacto_pct:.2f}%**).")
 
             # ====================================================================
             # MODO 2: MÚLTIPLOS FICHEIROS (VISÃO COMPARATIVA EXECUTIVA COMPLETA)
@@ -805,90 +831,22 @@ def main():
                 with gc2:
                     fig_aj = px.bar(df_resumo_geral, x="Ficheiro", y="Impacto Geral (%)", template="plotly_dark", title="Impacto Geral em Percentual")
                     st.plotly_chart(fig_aj, use_container_width=True)
-                
-                gc3, gc4 = st.columns(2)
-                with gc3:
-                    fig_skus = px.bar(df_resumo_geral, x="Ficheiro", y=["Faltas (SKUs)", "Sobras (SKUs)"], barmode="group", template="plotly_dark", title="Comparativo Faltas vs Sobras (SKUs)")
-                    st.plotly_chart(fig_skus, use_container_width=True)
-                with gc4:
-                    fig_tot = px.bar(df_resumo_geral, x="Ficheiro", y="Total SKUs", template="plotly_dark", title="Volume Total de SKUs por Inventário")
-                    st.plotly_chart(fig_tot, use_container_width=True)
 
-                # --------------------------------------------------------------------
-                # ETAPA 5 (MODO 2): Simulador Contábil & Evolução Histórica (Multitemporal Avançado)
-                # --------------------------------------------------------------------
+                # ETAPA 5 (MODO 2): Evolução Multitemporal Avançada
                 st.markdown("---")
-                with st.expander("📈 ETAPA 5: Simulador Contábil & Evolução Histórica (Multitemporal Avançado)", expanded=True):
-                    st.markdown("""
-                    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-                        <span style="color: #10b981; font-weight: 600; font-size: 0.9rem;">ANÁLISE DE TENDÊNCIA & EVOLUÇÃO PATRIMONIAL COMPARATIVA</span>
-                        <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                            Cruzamento multitemporal dos inventários carregados para rastrear o comportamento histórico de todos os indicadores ao longo do tempo.
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
+                with st.expander("📈 ETAPA 5: Evolução Histórica & Tendência Multitemporal", expanded=True):
                     df_tendencia = pd.DataFrame([
                         {
                             "Inventario": r['nome'],
-                            "Total SKUs Auditados": r['total_skus'],
-                            "Produtos com Falta (SKUs)": r['skus_falta'],
-                            "Produtos com Sobra (SKUs)": r['skus_sobra'],
-                            "Total Falta + Sobra (SKUs)": r['total_div'],
-                            "Volume Físico Divergências (un)": r['vol_div_total'],
                             "Acuracidade Volumétrica (%)": r['acuracia_vol'],
                             "Acuracidade Financeira (%)": r['acuracia_fin'],
-                            "Estoque Antes (R$)": r['soma_antes'],
-                            "Estoque Depois (R$)": r['soma_depois'],
-                            "Impacto Geral (%)": r['impacto_sobre_antes_pct'],
-                            "Divergência / Ajuste Líquido (R$)": r['val_ajuste_liquido']
+                            "Divergência / Ajuste Líquido (R$)": r['val_ajuste_liquido'],
+                            "Impacto Geral (%)": r['impacto_sobre_antes_pct']
                         } for r in resumos
                     ])
-
-                    metrica_escolhida = st.selectbox(
-                        "Selecione o Indicador para Análise de Evolução Histórica:",
-                        options=[
-                            "Acuracidade Volumétrica (%)", 
-                            "Acuracidade Financeira (%)", 
-                            "Divergência / Ajuste Líquido (R$)", 
-                            "Impacto Geral (%)", 
-                            "Total Falta + Sobra (SKUs)",
-                            "Produtos com Falta (SKUs)",
-                            "Produtos com Sobra (SKUs)",
-                            "Volume Físico Divergências (un)",
-                            "Total SKUs Auditados",
-                            "Estoque Antes (R$)",
-                            "Estoque Depois (R$)"
-                        ],
-                        key="select_metrica_evolucao"
-                    )
-
-                    fig_tendencia = px.line(
-                        df_tendencia,
-                        x="Inventario",
-                        y=metrica_escolhida,
-                        markers=True,
-                        title=f"Evolução Histórica: {metrica_escolhida}",
-                        template="plotly_dark",
-                        color_discrete_sequence=['#3b82f6']
-                    )
-
-                    fig_tendencia.update_traces(line=dict(width=3), marker=dict(size=10))
-                    fig_tendencia.update_layout(
-                        paper_bgcolor='rgba(11, 15, 25, 0.9)',
-                        plot_bgcolor='rgba(11, 15, 25, 0.9)',
-                        height=420,
-                        margin=dict(l=30, r=30, t=40, b=30),
-                        xaxis=dict(showgrid=False, title="Ficheiro / Período"),
-                        yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title=metrica_escolhida)
-                    )
-
+                    metrica_escolhida = st.selectbox("Selecione o Indicador para Análise Histórica:", options=df_tendencia.columns[1:], key="select_metrica_evolucao")
+                    fig_tendencia = px.line(df_tendencia, x="Inventario", y=metrica_escolhida, markers=True, title=f"Evolução Histórica: {metrica_escolhida}", template="plotly_dark")
                     st.plotly_chart(fig_tendencia, use_container_width=True)
-
-                    st.markdown("#### 📋 Tabela Consolidada de Tendência Histórica (Todos os Indicadores)")
-                    st.dataframe(df_tendencia, use_container_width=True)
-
-                    st.success("✅ **Simulador Ativo:** Acompanhe o ganho ou perda de eficiência patrimonial à medida que novos arquivos de inventário são adicionados à análise.")
 
             # Central de Relatórios
             st.markdown("---")
@@ -901,7 +859,7 @@ def main():
             with col_e3:
                 st.download_button("📑 PDF Gerencial", data=gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.pdf", mime="application/pdf")
             with col_e4:
-                st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_GrupoKMB.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+                st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_GrupoKMB.pptx", mime="application/vnd.openxmlformats-offic2document.presentationml.presentation")
 
 if __name__ == "__main__":
     main()
