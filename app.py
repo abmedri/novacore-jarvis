@@ -110,19 +110,26 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
         num_cols = df.select_dtypes(include=['number']).columns.tolist()
         total_skus = len(df)
         
-        col_ajuste = 'Ajuste' if 'Ajuste' in df.columns else None
-        col_val_aju = next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df.columns else None)
-        col_val = next((c for c in num_cols if 'valor de estoque' in c.lower()), num_cols[0] if num_cols else None)
-        
+        idx_val = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
+        col_val = num_cols[idx_val] if num_cols else None
         soma_depois = df[col_val].sum() if col_val and col_val in df.columns else 0
-        col_qtd = 'Saldo em Estoque' if 'Saldo em Estoque' in df.columns else None
+        
+        idx_qtd = identificar_coluna_ideal(num_cols, ['quantidade', 'saldo', 'estoque', 'fisico', 'teorico'])
+        col_qtd = num_cols[idx_qtd] if num_cols else None
         qtd_pos = df[col_qtd].sum() if col_qtd and col_qtd in df.columns else total_skus
         
+        col_ajuste = 'Ajuste' if 'Ajuste' in df.columns else None
         soma_ajuste_qtd = df[col_ajuste].sum() if col_ajuste and col_ajuste in df.columns else 0
         qtd_antes = qtd_pos - soma_ajuste_qtd
         
+        col_val_aju = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df.columns else (
+            'Valor de Ajuste(R$)' if 'Valor de Ajuste(R$)' in df.columns else next(
+                (c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), None
+            )
+        )
         soma_ajuste_val = df[col_val_aju].sum() if col_val_aju and col_val_aju in df.columns else 0
         soma_antes = soma_depois - soma_ajuste_val
+        val_ajuste_liquido = soma_depois - soma_antes
             
         df_falta = df[df[col_ajuste] < 0] if col_ajuste and col_ajuste in df.columns else pd.DataFrame()
         df_sobra = df[df[col_ajuste] > 0] if col_ajuste and col_ajuste in df.columns else pd.DataFrame()
@@ -133,14 +140,18 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
         skus_exatos = len(df_exato)
         total_div = skus_falta + skus_sobra
         
-        vol_falta = abs(df_falta[col_ajuste].sum()) if not df_falta.empty else 0
-        vol_sobra = df_sobra[col_ajuste].sum() if not df_sobra.empty else 0
-        vol_div_total = vol_falta + vol_sobra
+        perc_falta_itens = (skus_falta / total_skus * 100) if total_skus > 0 else 0
+        perc_sobra_itens = (skus_sobra / total_skus * 100) if total_skus > 0 else 0
+        perc_divergencia = (total_div / total_skus * 100) if total_skus > 0 else 0
         
-        val_falta = abs(df_falta[col_val_aju].sum()) if col_val_aju and not df_falta.empty else 0
+        vol_falta = abs(df_falta[col_ajuste].sum()) if col_ajuste and not df_falta.empty else 0
+        vol_sobra = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobra.empty else 0
+        vol_div_total = vol_falta + vol_sobra
+        perc_vol_div = (vol_div_total / qtd_antes * 100) if qtd_antes > 0 else 0
+        
+        val_falta = df_falta[col_val_aju].sum() if col_val_aju and not df_falta.empty else 0
         val_sobra = df_sobra[col_val_aju].sum() if col_val_aju and not df_sobra.empty else 0
-        val_div_absoluto = val_falta + val_sobra
-        val_ajuste_liquido = soma_depois - soma_antes
+        val_div_absoluto = abs(val_falta) + abs(val_sobra)
         
         impacto_sobre_antes_pct = (val_ajuste_liquido / soma_antes * 100) if soma_antes > 0 else 0
         
@@ -160,9 +171,13 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
             "skus_sobra": skus_sobra,
             "skus_exatos": skus_exatos,
             "total_div": total_div,
+            "perc_falta_itens": perc_falta_itens,
+            "perc_sobra_itens": perc_sobra_itens,
+            "perc_divergencia": perc_divergencia,
             "vol_falta": vol_falta,
             "vol_sobra": vol_sobra,
             "vol_div_total": vol_div_total,
+            "perc_vol_div": perc_vol_div,
             "val_falta": val_falta,
             "val_sobra": val_sobra,
             "val_div_absoluto": val_div_absoluto,
@@ -174,14 +189,14 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# NOVOS RELATÓRIOS GERENCIAIS EXECUTIVOS (EXCEL, WORD, PDF E PPTX)
+# FUNÇÕES DE EXPORTAÇÃO ROBUSTAS (EXCEL, WORD, PDF E PPTX)
 # ====================================================================================
 
 def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
     wb = openpyxl.Workbook()
     
-    # Aba 1: Resumo Executivo
+    # Aba 1: Indicadores e Resumo Executivo
     ws1 = wb.active
     ws1.title = "Resumo Executivo"
     ws1.views.sheetView[0].showGridLines = True
@@ -190,41 +205,54 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     ws1['A1'].font = Font(size=14, bold=True, color="1F4E78")
     ws1.append([])
     
-    headers_resumo = ["Ficheiro / Unidade", "Total SKUs", "Estoque Antes (R$)", "Estoque Depois (R$)", "Ajuste Líquido (R$)", "Impacto S/ Antes (%)", "Acurácia Vol. (%)", "Status"]
+    headers_resumo = [
+        "Ficheiro / Unidade", "Total SKUs", "Estoque Antes (R$)", "Estoque Depois (R$)",
+        "Ajuste Líquido (R$)", "Impacto S/ Antes (%)", "Faltas (SKUs)", "Sobras (SKUs)",
+        "Acurácia Vol. (%)", "Acurácia Fin. (%)", "Status"
+    ]
     ws1.append(headers_resumo)
     
     for r in resumos:
         status = "CONFORME" if r['acuracia_vol'] >= 95 else "CRÍTICO"
-        ws1.append([r['nome'], r['total_skus'], r['soma_antes'], r['soma_depois'], r['val_ajuste_liquido'], f"{r['impacto_sobre_antes_pct']:.2f}%", f"{r['acuracia_vol']:.2f}%", status])
+        ws1.append([
+            r['nome'], r['total_skus'], r['soma_antes'], r['soma_depois'],
+            r['val_ajuste_liquido'], f"{r['impacto_sobre_antes_pct']:.2f}%",
+            r['skus_falta'], r['skus_sobra'],
+            f"{r['acuracia_vol']:.2f}%", f"{r['acuracia_fin']:.2f}%", status
+        ])
     
     # Aba 2: Detalhamento Completo (Faltas, Sobras, Zerados e Data)
     ws2 = wb.create_sheet(title="Divergências e Zerados")
     ws2.views.sheetView[0].showGridLines = True
     
-    headers_detalhe = ["Unidade / Ficheiro", "Data do Inventário", "Código do Produto", "Descrição", "Saldo Sistema", "Ajuste", "Valor Ajuste (R$)", "Classificação de Divergência"]
+    headers_detalhe = [
+        "Unidade / Ficheiro", "Data do Inventário", "Código do Produto", "Descrição",
+        "Saldo Sistema", "Ajuste", "Valor Ajuste (R$)", "Classificação de Divergência"
+    ]
     ws2.append(headers_detalhe)
     
     for idx, df in enumerate(lista_dfs):
         nome_arq = nomes_arquivos[idx]
         col_ajuste = 'Ajuste' if 'Ajuste' in df.columns else None
-        num_cols = df.select_dtypes(include=['number']).columns
-        col_val_aju = next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), None)
+        col_val_aju = next((c for c in df.select_dtypes(include=['number']).columns if 'ajuste' in c.lower() and 'valor' in c.lower()), None)
         
         for _, row in df.iterrows():
             ajuste = row[col_ajuste] if col_ajuste and col_ajuste in df.columns else 0
             val_aju = row[col_val_aju] if col_val_aju and col_val_aju in df.columns else 0
+            saldo_sis = row.get('Saldo em Estoque', 0)
             
             if ajuste < 0:
                 classificacao = "FALTA (QUEBRA)"
             elif ajuste > 0:
                 classificacao = "SOBRA"
+            elif saldo_sis == 0:
+                classificacao = "ESTOQUE CONGELADO ZERO"
             else:
-                classificacao = "CONFORME / ZERO"
+                classificacao = "CONFORME"
                 
             data_inv = str(row.get('Data de Abertura', row.get('Data', 'N/A')))
             cod_prod = str(row.get('Código do Produto', row.get('Codigo', 'N/A')))
             desc_prod = str(row.get('Descrição do Produto', row.get('Descricao', 'Item Diversos')))
-            saldo_sis = row.get('Saldo em Estoque', 0)
             
             ws2.append([nome_arq, data_inv, cod_prod, desc_prod, saldo_sis, ajuste, val_aju, classificacao])
             
@@ -246,10 +274,12 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
         p = doc.add_paragraph()
         p.add_run(f"• Unidade / Arquivo: ").bold = True
         p.add_run(f"{r['nome']}\n")
-        p.add_run(f"  - Total de SKUs Auditados: {r['total_skus']:,}\n")
-        p.add_run(f"  - Valor Teórico Inicial: R$ {r['soma_antes']:,.2f}\n")
-        p.add_run(f"  - Valor Auditado Final: R$ {r['soma_depois']:,.2f}\n")
-        p.add_run(f"  - Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f} (Impacto: {r['impacto_sobre_antes_pct']:.2f}%)\n")
+        p.add_run(f"  - Total de SKUs Auditados: {r['total_skus']:,} (Pré: {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un)\n")
+        p.add_run(f"  - Produtos com Falta: {r['skus_falta']:,} SKUs ({r['perc_falta_itens']:.2f}%) | Vol: -{r['vol_falta']:,.0f} un | R$ {r['val_falta']:,.2f}\n")
+        p.add_run(f"  - Produtos com Sobra: {r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%) | Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}\n")
+        p.add_run(f"  - Volume Físico Total Divergências: {r['vol_div_total']:,.0f} un ({r['perc_vol_div']:.2f}%) | R$ {r['val_div_absoluto']:,.2f}\n")
+        p.add_run(f"  - Valor Teórico Inicial: R$ {r['soma_antes']:,.2f} | Valor Auditado Final: R$ {r['soma_depois']:,.2f}\n")
+        p.add_run(f"  - Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f} (Impacto s/ Antes: {r['impacto_sobre_antes_pct']:.2f}%)\n")
         p.add_run(f"  - Acurácia Volumétrica: {r['acuracia_vol']:.2f}% | Acurácia Financeira: {r['acuracia_fin']:.2f}%\n")
     
     doc.add_heading("2. Detalhamento de Divergências Críticas (Faltas, Sobras e Zerados)", level=2)
@@ -260,8 +290,12 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
         if col_ajuste and col_ajuste in df.columns:
             total_faltas = len(df[df[col_ajuste] < 0])
             total_sobras = len(df[df[col_ajuste] > 0])
-            total_zerados = len(df[df[col_ajuste] == 0])
-            doc.add_paragraph(f"  - Itens em Falta (Quebras): {total_faltas:,}\n  - Itens em Sobra: {total_sobras:,}\n  - Itens Conformes / Estoque Congelado Zero: {total_zerados:,}")
+            total_zerados = len(df[(df[col_ajuste] == 0) & (df.get('Saldo em Estoque', 1) == 0)]) if 'Saldo em Estoque' in df.columns else len(df[df[col_ajuste] == 0])
+            doc.add_paragraph(
+                f"  - Itens em Falta (Quebras): {total_faltas:,}\n"
+                f"  - Itens em Sobra: {total_sobras:,}\n"
+                f"  - Itens com Estoque Congelado Zero: {total_zerados:,}"
+            )
         else:
             doc.add_paragraph("Coluna de ajuste não mapeada diretamente para listagem individual detalhada neste bloco.")
 
@@ -335,10 +369,12 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     for r in resumos:
         texto_unidade = f"""
         <b>• Unidade / Arquivo:</b> {r['nome']}<br/>
-        <b>- Total de SKUs Auditados:</b> {r['total_skus']:,}<br/>
-        <b>- Valor Teórico Inicial (Antes):</b> R$ {r['soma_antes']:,.2f}<br/>
-        <b>- Valor Auditado Final (Depois):</b> R$ {r['soma_depois']:,.2f}<br/>
-        <b>- Ajuste Líquido:</b> R$ {r['val_ajuste_liquido']:,.2f} (Impacto: {r['impacto_sobre_antes_pct']:.2f}%)<br/>
+        <b>- Total de SKUs Auditados:</b> {r['total_skus']:,} (Pré: {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un)<br/>
+        <b>- Produtos com Falta:</b> {r['skus_falta']:,} SKUs ({r['perc_falta_itens']:.2f}%) | Vol: -{r['vol_falta']:,.0f} un | R$ {r['val_falta']:,.2f}<br/>
+        <b>- Produtos com Sobra:</b> {r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%) | Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}<br/>
+        <b>- Volume Físico Total Divergências:</b> {r['vol_div_total']:,.0f} un ({r['perc_vol_div']:.2f}%) | R$ {r['val_div_absoluto']:,.2f}<br/>
+        <b>- Valor Teórico Inicial (Antes):</b> R$ {r['soma_antes']:,.2f} | <b>Auditado Final (Depois):</b> R$ {r['soma_depois']:,.2f}<br/>
+        <b>- Ajuste Líquido:</b> R$ {r['val_ajuste_liquido']:,.2f} (Impacto s/ Antes: {r['impacto_sobre_antes_pct']:.2f}%)<br/>
         <b>- Acurácia Volumétrica:</b> {r['acuracia_vol']:.2f}% | <b>Acurácia Financeira:</b> {r['acuracia_fin']:.2f}%
         """
         story.append(Paragraph(texto_unidade, estilo_texto))
@@ -352,13 +388,13 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
         if col_ajuste and col_ajuste in df.columns:
             total_faltas = len(df[df[col_ajuste] < 0])
             total_sobras = len(df[df[col_ajuste] > 0])
-            total_zerados = len(df[df[col_ajuste] == 0])
+            total_zerados = len(df[(df[col_ajuste] == 0) & (df.get('Saldo em Estoque', 1) == 0)]) if 'Saldo em Estoque' in df.columns else len(df[df[col_ajuste] == 0])
             
             texto_div = f"""
             <b>• Base: {nome_arq}</b><br/>
             - Itens em Falta (Quebras): {total_faltas:,}<br/>
             - Itens em Sobra: {total_sobras:,}<br/>
-            - Itens Conformes / Estoque Congelado Zero: {total_zerados:,}
+            - Itens com Estoque Congelado Zero: {total_zerados:,}
             """
             story.append(Paragraph(texto_div, estilo_texto))
         else:
@@ -435,48 +471,7 @@ def main():
                 cat_cols = df_filtrado.select_dtypes(include=['object']).columns.tolist()
                 all_cols = df_filtrado.columns.tolist()
                 
-                total_pos = len(df_filtrado)
-                idx_val = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
-                col_val = num_cols[idx_val] if num_cols else None
-                soma_depois = df_filtrado[col_val].sum() if col_val and col_val in df_filtrado.columns else 0
-                
-                idx_qtd = identificar_coluna_ideal(num_cols, ['quantidade', 'saldo', 'estoque', 'fisico', 'teorico'])
-                col_qtd_pos = num_cols[idx_qtd] if num_cols else None
-                total_itens_pos = df_filtrado[col_qtd_pos].sum() if col_qtd_pos and col_qtd_pos in df_filtrado.columns else total_pos
-                
-                col_ajuste = 'Ajuste' if 'Ajuste' in df_filtrado.columns else None
-                soma_ajuste_qtd = df_filtrado[col_ajuste].sum() if col_ajuste and col_ajuste in df_filtrado.columns else 0
-                total_itens_antes = total_itens_pos - soma_ajuste_qtd
-                
-                df_falta = df_filtrado[df_filtrado['Ajuste'] < 0] if 'Ajuste' in df_filtrado.columns else pd.DataFrame()
-                df_sobra = df_filtrado[df_filtrado['Ajuste'] > 0] if 'Ajuste' in df_filtrado.columns else pd.DataFrame()
-                
-                qtd_falta = len(df_falta)
-                qtd_sobra = len(df_sobra)
-                vol_falta_un = abs(df_falta[col_ajuste].sum()) if col_ajuste and not df_falta.empty else 0
-                vol_sobra_un = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobra.empty else 0
-                vol_total_div = vol_falta_un + vol_sobra_un
-                perc_vol_div = (vol_total_div / total_itens_antes * 100) if total_itens_antes > 0 else 0
-                
-                qtd_exatos = (df_filtrado['Ajuste'] == 0).sum() if 'Ajuste' in df_filtrado.columns else int(total_pos * 0.5)
-                total_divergencias = qtd_falta + qtd_sobra
-                perc_divergencia = (total_divergencias / total_pos * 100) if total_pos > 0 else 0
-                
-                perc_falta_itens = (qtd_falta / total_pos * 100) if total_pos > 0 else 0
-                perc_sobra_itens = (qtd_sobra / total_pos * 100) if total_pos > 0 else 0
-                
-                col_val_aju = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_filtrado.columns else ('Valor de Ajuste(R$)' if 'Valor de Ajuste(R$)' in df_filtrado.columns else None)
-                val_falta_fin = df_falta[col_val_aju].sum() if col_val_aju and not df_falta.empty else 0
-                val_sobra_fin = df_sobra[col_val_aju].sum() if col_val_aju and not df_sobra.empty else 0
-                soma_ajuste_val = df_filtrado[col_val_aju].sum() if col_val_aju and col_val_aju in df_filtrado.columns else 0
-                soma_antes = soma_depois - soma_ajuste_val
-                diferenca_monetaria = soma_depois - soma_antes
-                
-                impacto_sobre_antes_pct = (diferenca_monetaria / soma_antes * 100) if soma_antes > 0 else 0
-                soma_absoluta_val = abs(val_falta_fin) + abs(val_sobra_fin)
-                
-                acur_vol_real = (qtd_exatos / total_pos * 100) if total_pos > 0 else 0
-                acur_fin_real = max(0.0, min(100.0, 100.0 - abs(impacto_sobre_antes_pct) * 2.5))
+                resumo_unico = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)[0]
                 
                 # ETAPA 1: Indicadores Executivos & Bento Cards com Deltas e Percentuais
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
@@ -484,24 +479,25 @@ def main():
                 
                 c1, c2 = st.columns(2)
                 with c1:
-                    st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{total_pos:,}", f"Pré: {total_itens_antes:,.0f} un | Pós: {total_itens_pos:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{qtd_falta:,} SKUs ({perc_falta_itens:.2f}%)", f"Vol: -{vol_falta_un:,.0f} un | R$ {val_falta_fin:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{vol_total_div:,.0f} unidades ({perc_vol_div:.2f}%)", f"R$ {soma_absoluta_val:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{resumo_unico['total_skus']:,}", f"Pré: {resumo_unico['qtd_antes']:,.0f} un | Pós: {resumo_unico['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{resumo_unico['skus_falta']:,} SKUs ({resumo_unico['perc_falta_itens']:.2f}%)", f"Vol: -{resumo_unico['vol_falta']:,.0f} un | R$ {resumo_unico['val_falta']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{resumo_unico['vol_div_total']:,.0f} unidades ({resumo_unico['perc_vol_div']:.2f}%)", f"R$ {resumo_unico['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                 with c2:
-                    st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{qtd_sobra:,} SKUs ({perc_sobra_itens:.2f}%)", f"Vol: +{vol_sobra_un:,.0f} un | R$ +{val_sobra_fin:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{total_divergencias:,} SKUs ({perc_divergencia:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {acur_vol_real:.2f}% | Fin: {acur_fin_real:.2f}%", "Meta Corporativa 95%", eh_negativo=(acur_vol_real < 95), eh_positivo=(acur_vol_real >= 95)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{resumo_unico['skus_sobra']:,} SKUs ({resumo_unico['perc_sobra_itens']:.2f}%)", f"Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{resumo_unico['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{resumo_unico['total_div']:,} SKUs ({resumo_unico['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {resumo_unico['acuracia_vol']:.2f}% | Fin: {resumo_unico['acuracia_fin']:.2f}%", "Meta Corporativa 95%", eh_negativo=(resumo_unico['acuracia_vol'] < 95), eh_positivo=(resumo_unico['acuracia_vol'] >= 95)), unsafe_allow_html=True)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.markdown("##### 💰 Balanço Patrimonial & Impacto Geral s/ Valor Antes (%)")
                 col_kpi1, col_kpi2 = st.columns(2)
                 with col_kpi1:
-                    st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {soma_antes:,.2f}", f"Qtd Pré: {total_itens_antes:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Impacto Geral s/ Valor Antes (%)", f"{impacto_sobre_antes_pct:.2f}%", f"Ajuste Líquido: R$ {diferenca_monetaria:,.2f}", eh_negativo=(impacto_sobre_antes_pct < 0), eh_positivo=(impacto_sobre_antes_pct >= 0)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {resumo_unico['soma_antes']:,.2f}", f"Qtd Pré: {resumo_unico['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Impacto Geral s/ Valor Antes (%)", f"{resumo_unico['impacto_sobre_antes_pct']:.2f}%", f"Ajuste Líquido: R$ {resumo_unico['val_ajuste_liquido']:,.2f}", eh_negativo=(resumo_unico['impacto_sobre_antes_pct'] < 0), eh_positivo=(resumo_unico['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
                 with col_kpi2:
-                    st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {soma_depois:,.2f}", f"Qtd Pós: {total_itens_pos:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {diferenca_monetaria:,.2f}", f"Variação Apurada", eh_negativo=(diferenca_monetaria < 0), eh_positivo=(diferenca_monetaria >= 0)), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {resumo_unico['soma_depois']:,.2f}", f"Qtd Pós: {resumo_unico['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {resumo_unico['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(resumo_unico['val_ajuste_liquido'] < 0), eh_positivo=(resumo_unico['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
                 st.markdown("---")
+                
                 # ETAPA 2: Curva ABC com Seletores Dinâmicos de Eixos + Filtro de Classe A/B/C
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     st.markdown("""
@@ -513,7 +509,6 @@ def main():
                     </div>
                     """, unsafe_allow_html=True)
                     if len(num_cols) >= 1 and len(all_cols) > 0:
-                        # 3 Seletores interativos lado a lado
                         col_sel1, col_sel2, col_sel3 = st.columns(3)
                         with col_sel1:
                             coluna_categoria_escolhida = st.selectbox(
@@ -537,7 +532,7 @@ def main():
                                 index=0,
                                 key="abc_filtro_classe"
                             )
-                        # Cálculo completo da Curva ABC sobre toda a base filtrada
+                        
                         df_abc = df_filtrado.sort_values(by=eixo_y_escolhido, ascending=False).copy()
                         df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolhido].cumsum()
                         soma_total = df_abc[eixo_y_escolhido].sum()
@@ -548,23 +543,20 @@ def main():
                                 lambda p: "Classe A (80%)" if p <= 80 else ("Classe B (95%)" if p <= 95 else "Classe C (100%)")
                             )
                             
-                            # Aplicação do filtro selecionado
                             if filtro_classe_abc != "Todas as Classes (Geral)":
                                 df_abc_filtrado = df_abc[df_abc['Classe_ABC'] == filtro_classe_abc].copy()
                             else:
                                 df_abc_filtrado = df_abc.copy()
-                            # Exibição de resumo rápido da classe filtrada
+                            
                             qtd_skus_classe = len(df_abc_filtrado)
                             valor_classe = df_abc_filtrado[eixo_y_escolhido].sum()
                             perc_valor_classe = (valor_classe / soma_total * 100) if soma_total > 0 else 0
                             st.caption(f"📊 **Resumo da Seleção ({filtro_classe_abc}):** {qtd_skus_classe:,} SKUs | Total: R$ {valor_classe:,.2f} ({perc_valor_classe:.2f}% do estoque)")
-                            # Top 35 da seleção para renderização limpa no gráfico
+                            
                             df_plot = df_abc_filtrado.head(35).copy()
                             
                             if not df_plot.empty:
                                 fig_abc = go.Figure()
-                                
-                                # Barras de Valor Individual
                                 fig_abc.add_trace(go.Bar(
                                     x=df_plot[coluna_categoria_escolhida],
                                     y=df_plot[eixo_y_escolhido],
@@ -576,8 +568,6 @@ def main():
                                     ),
                                     yaxis='y'
                                 ))
-                                
-                                # Linha de Porcentagem Acumulada
                                 fig_abc.add_trace(go.Scatter(
                                     x=df_plot[coluna_categoria_escolhida],
                                     y=df_plot['%_Acumulado'],
@@ -587,8 +577,6 @@ def main():
                                     line=dict(color='#f59e0b', width=3),
                                     yaxis='y2'
                                 ))
-                                
-                                # Layout C-Level Dark Mode Blindado
                                 fig_abc.update_layout(
                                     template="plotly_dark",
                                     paper_bgcolor='rgba(11, 15, 25, 0.9)',
@@ -614,14 +602,12 @@ def main():
                                         range=[0, 105], 
                                         showgrid=False
                                     ),
-                                    xaxis=dict(
-                                        showgrid=False
-                                    )
+                                    xaxis=dict(showgrid=False)
                                 )
-                                
                                 st.plotly_chart(fig_abc, use_container_width=True)
                             else:
                                 st.warning("Nenhum produto encontrado para a classe selecionada.")
+                
                 # ETAPA 3: Matriz de Criticidade & Discrepância Financeira (Focos de Prejuízo)
                 with st.expander("🚨 ETAPA 3: Matriz de Criticidade & Discrepância Financeira", expanded=False):
                     st.markdown("""
@@ -634,9 +620,9 @@ def main():
                     """, unsafe_allow_html=True)
                     if len(num_cols) >= 2:
                         col_nome_prod = 'Descrição do Produto' if 'Descrição do Produto' in df_filtrado.columns else all_cols[0]
-                        
                         idx_val_div = identificar_coluna_ideal(num_cols, ['diferença', 'ajuste', 'valor', 'divergencia'])
                         col_val_div = num_cols[idx_val_div] if idx_val_div < len(num_cols) else num_cols[0]
+                        
                         df_critico = df_filtrado.copy()
                         df_critico['Impacto_Absoluto'] = df_critico[col_val_div].abs()
                         df_critico = df_critico.sort_values(by='Impacto_Absoluto', ascending=False).head(25)
@@ -650,7 +636,6 @@ def main():
                                 color=col_val_div,
                                 color_continuous_scale=['#ef4444', '#f59e0b', '#3b82f6']
                             )
-                            
                             fig_critico.update_layout(
                                 paper_bgcolor='rgba(11, 15, 25, 0.9)',
                                 plot_bgcolor='rgba(11, 15, 25, 0.9)',
@@ -659,11 +644,11 @@ def main():
                                 xaxis=dict(showgrid=False),
                                 yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Valor da Divergência (R$)")
                             )
-                            
                             st.plotly_chart(fig_critico, use_container_width=True)
                             st.info("ℹ️ **Foco de Investigação:** Barras em tons avermelhados indicam furos/faltas expressivas que exigem auditoria imediata de processos e câmeras de segurança.")
                         else:
                             st.warning("Não há dados suficientes para calcular a matriz de criticidade com as colunas atuais.")
+                
                 # ETAPA 4: Matriz de Risco de Divergência & Acurácia Ponderada (C-Level Audit)
                 with st.expander("🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto", expanded=False):
                     st.markdown("""
@@ -677,7 +662,6 @@ def main():
                     if len(num_cols) >= 2 and len(all_cols) > 0:
                         col_nome_cat = cat_cols[0] if len(cat_cols) > 0 else all_cols[0]
                         df_risco = df_filtrado.copy()
-                        
                         idx_val_div = identificar_coluna_ideal(num_cols, ['diferença', 'ajuste', 'valor', 'divergencia'])
                         col_val_div = num_cols[idx_val_div] if idx_val_div < len(num_cols) else num_cols[0]
                         
@@ -685,8 +669,6 @@ def main():
                             lambda x: 'Déficit (Falta/Quebra)' if x < 0 else ('Superávit (Sobra)' if x > 0 else 'Conforme')
                         )
                         
-                        df_resumo_risco = df_risco.groupby('Tipo_Desvio')[col_val_div].agg(['count', 'sum']).reset_index()
-                        df_resumo_risco.columns = ['Status do Inventário', 'Qtd SKUs', 'Impacto Financeiro (R$)']
                         m1, m2 = st.columns(2)
                         with m1:
                             total_perdas = df_risco[df_risco[col_val_div] < 0][col_val_div].sum()
@@ -694,6 +676,7 @@ def main():
                         with m2:
                             total_sobras = df_risco[df_risco[col_val_div] > 0][col_val_div].sum()
                             st.metric("Total de Sobras/Ajustes (R$)", f"R$ {total_sobras:,.2f}")
+                            
                         if col_nome_cat in df_risco.columns:
                             fig_risco = px.bar(
                                 df_risco.groupby(col_nome_cat)[col_val_div].sum().reset_index().head(15),
@@ -704,7 +687,6 @@ def main():
                                 color=col_val_div,
                                 color_continuous_scale=['#ef4444', '#3b82f6', '#10b981']
                             )
-                            
                             fig_risco.update_layout(
                                 paper_bgcolor='rgba(11, 15, 25, 0.9)',
                                 plot_bgcolor='rgba(11, 15, 25, 0.9)',
@@ -713,19 +695,18 @@ def main():
                                 xaxis=dict(showgrid=False),
                                 yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Impacto Líquido (R$)")
                             )
-                            
                             st.plotly_chart(fig_risco, use_container_width=True)
                         
                         st.info("💡 **Diretriz C-Level:** Um volume alto de sobras combinado com faltas expressivas na mesma categoria aponta falhas crônicas no processo de recebimento ou trocas não registradas.")
                     else:
                         st.warning("Dados insuficientes para estruturar a matriz de risco de acurácia.")
        
-                # ETAPA 5: Evolução Histórica (Modo 1)
+                # ETAPA 5: Evolução Histórica
                 with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica", expanded=False):
                     df_hist = pd.DataFrame({
                         "Inventário": ["Jul/2026", "Ago/2026", "Set/2026", "Out/2026", "Nov/2026 (Atual)"],
-                        "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, acur_fin_real],
-                        "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, acur_vol_real]
+                        "Acuracidade Financeira (%)": [81.2, 83.5, 85.0, 87.1, resumo_unico['acuracia_fin']],
+                        "Acuracidade Volumétrica (%)": [68.0, 70.4, 72.1, 74.8, resumo_unico['acuracia_vol']]
                     })
                     fig_hist = px.line(df_hist, x="Inventário", y=["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"], markers=True, template="plotly_dark", title="Evolução Histórica de Acuracidade")
                     st.plotly_chart(fig_hist, use_container_width=True)
@@ -737,17 +718,25 @@ def main():
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO C-LEVEL")
                 resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
                 
-                # Cartões de Comparação Lado a Lado Completos
+                # Cartões de Comparação Lado a Lado com TODOS os 10 Indicadores idênticos ao Modo 1
                 col_cards = st.columns(len(lista_dfs))
                 for idx, r in enumerate(resumos):
                     with col_cards[idx]:
                         with st.container(border=True):
                             st.markdown(f"#### 📄 {r['nome']}")
-                            st.markdown(formatar_kpi_html("Total SKUs", f"{r['total_skus']:,}", f"Exatos: {r['skus_exatos']} SKUs", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Estoque Antes (Teórico)", f"R$ {r['soma_antes']:,.2f}", f"Qtd: {r['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Estoque Depois (Auditado)", f"R$ {r['soma_depois']:,.2f}", f"Qtd: {r['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Ajuste Líquido (R$)", f"R$ {r['val_ajuste_liquido']:,.2f}", f"Impacto Pré: {r['impacto_sobre_antes_pct']:.2f}%", eh_negativo=(r['val_ajuste_liquido'] < 0), eh_positivo=(r['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Impacto Geral s/ Antes (%)", f"{r['impacto_sobre_antes_pct']:.2f}%", f"Sobre R$ {r['soma_antes']:,.2f}", eh_negativo=(r['impacto_sobre_antes_pct'] < 0), eh_positivo=(r['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{r['total_skus']:,}", f"Pré: {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{r['skus_falta']:,} SKUs ({r['perc_falta_itens']:.2f}%)", f"Vol: -{r['vol_falta']:,.0f} un | R$ {r['val_falta']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%)", f"Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{r['total_div']:,} SKUs ({r['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{r['vol_div_total']:,.0f} unidades ({r['perc_vol_div']:.2f}%)", f"R$ {r['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {r['acuracia_vol']:.2f}% | Fin: {r['acuracia_fin']:.2f}%", "Meta Corporativa 95%", eh_negativo=(r['acuracia_vol'] < 95), eh_positivo=(r['acuracia_vol'] >= 95)), unsafe_allow_html=True)
+                            
+                            st.markdown("##### 💰 Balanço Patrimonial")
+                            st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {r['soma_antes']:,.2f}", f"Qtd Pré: {r['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {r['soma_depois']:,.2f}", f"Qtd Pós: {r['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Impacto Geral s/ Valor Antes (%)", f"{r['impacto_sobre_antes_pct']:.2f}%", f"Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f}", eh_negativo=(r['impacto_sobre_antes_pct'] < 0), eh_positivo=(r['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {r['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(r['val_ajuste_liquido'] < 0), eh_positivo=(r['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
+
                 st.markdown("---")
                 st.subheader("📊 Gráficos Comparativos Consolidados")
                 
@@ -780,76 +769,82 @@ def main():
                     fig_tot = px.bar(df_resumo_geral, x="Ficheiro", y="Total SKUs", template="plotly_dark", title="Volume Total de SKUs por Inventário")
                     st.plotly_chart(fig_tot, use_container_width=True)
 
-                # ETAPA 5: Simulador Contábil & Evolução Histórica (INCLUÍDA NO MODO 2)
+                # --------------------------------------------------------------------
+                # ETAPA 5 (MODO 2): Simulador Contábil & Evolução Histórica (Multitemporal Avançado)
+                # --------------------------------------------------------------------
+                st.markdown("---")
                 with st.expander("📈 ETAPA 5: Simulador Contábil & Evolução Histórica (Multitemporal Avançado)", expanded=True):
                     st.markdown("""
                     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
                         <span style="color: #10b981; font-weight: 600; font-size: 0.9rem;">ANÁLISE DE TENDÊNCIA & EVOLUÇÃO PATRIMONIAL COMPARATIVA</span>
                         <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                            Cruzamento multitemporal dos inventários carregados para rastrear o comportamento histórico da acurácia, desvios e impacto financeiro ao longo do tempo.
+                            Cruzamento multitemporal dos inventários carregados para rastrear o comportamento histórico de todos os indicadores ao longo do tempo.
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
 
-                    if len(lista_dfs) >= 2:
-                        resumos_m2 = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
-                        df_tendencia = pd.DataFrame([
-                            {
-                                "Inventario": r['nome'],
-                                "Acuracia Volumetrica (%)": r['acuracia_vol'],
-                                "Acuracia Financeira (%)": r['acuracia_fin'],
-                                "Ajuste Liquido (R$)": r['val_ajuste_liquido'],
-                                "Impacto s/ Antes (%)": r['impacto_sobre_antes_pct'],
-                                "Total Divergencias (SKUs)": r['total_div'],
-                                "Faltas (SKUs)": r['skus_falta'],
-                                "Sobras (SKUs)": r['skus_sobra']
-                            } for r in resumos_m2
-                        ])
+                    df_tendencia = pd.DataFrame([
+                        {
+                            "Inventario": r['nome'],
+                            "Total SKUs Auditados": r['total_skus'],
+                            "Produtos com Falta (SKUs)": r['skus_falta'],
+                            "Produtos com Sobra (SKUs)": r['skus_sobra'],
+                            "Total Falta + Sobra (SKUs)": r['total_div'],
+                            "Volume Físico Divergências (un)": r['vol_div_total'],
+                            "Acuracidade Volumétrica (%)": r['acuracia_vol'],
+                            "Acuracidade Financeira (%)": r['acuracia_fin'],
+                            "Estoque Antes (R$)": r['soma_antes'],
+                            "Estoque Depois (R$)": r['soma_depois'],
+                            "Impacto Geral s/ Antes (%)": r['impacto_sobre_antes_pct'],
+                            "Divergência / Ajuste Líquido (R$)": r['val_ajuste_liquido']
+                        } for r in resumos
+                    ])
 
-                        # Seletor interativo para escolher qual indicador analisar na linha do tempo
-                        metrica_escolhida = st.selectbox(
-                            "Selecione o Indicador para Análise de Evolução Histórica:",
-                            options=[
-                                "Acuracia Volumetrica (%)", 
-                                "Acuracia Financeira (%)", 
-                                "Ajuste Liquido (R$)", 
-                                "Impacto s/ Antes (%)", 
-                                "Total Divergencias (SKUs)"
-                            ],
-                            key="select_metrica_evolucao"
-                        )
+                    metrica_escolhida = st.selectbox(
+                        "Selecione o Indicador para Análise de Evolução Histórica:",
+                        options=[
+                            "Acuracidade Volumétrica (%)", 
+                            "Acuracidade Financeira (%)", 
+                            "Divergência / Ajuste Líquido (R$)", 
+                            "Impacto Geral s/ Antes (%)", 
+                            "Total Falta + Sobra (SKUs)",
+                            "Produtos com Falta (SKUs)",
+                            "Produtos com Sobra (SKUs)",
+                            "Volume Físico Divergências (un)",
+                            "Total SKUs Auditados",
+                            "Estoque Antes (R$)",
+                            "Estoque Depois (R$)"
+                        ],
+                        key="select_metrica_evolucao"
+                    )
 
-                        # Gráfico de Linha com Marcadores para Tendência Temporal
-                        fig_tendencia = px.line(
-                            df_tendencia,
-                            x="Inventario",
-                            y=metrica_escolhida,
-                            markers=True,
-                            title=f"Evolução Histórica: {metrica_escolhida}",
-                            template="plotly_dark",
-                            color_discrete_sequence=['#3b82f6']
-                        )
+                    fig_tendencia = px.line(
+                        df_tendencia,
+                        x="Inventario",
+                        y=metrica_escolhida,
+                        markers=True,
+                        title=f"Evolução Histórica: {metrica_escolhida}",
+                        template="plotly_dark",
+                        color_discrete_sequence=['#3b82f6']
+                    )
 
-                        fig_tendencia.update_traces(line=dict(width=3), marker=dict(size=10))
-                        fig_tendencia.update_layout(
-                            paper_bgcolor='rgba(11, 15, 25, 0.9)',
-                            plot_bgcolor='rgba(11, 15, 25, 0.9)',
-                            height=420,
-                            margin=dict(l=30, r=30, t=40, b=30),
-                            xaxis=dict(showgrid=False, title="Ficheiro / Período"),
-                            yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title=metrica_escolhida)
-                        )
+                    fig_tendencia.update_traces(line=dict(width=3), marker=dict(size=10))
+                    fig_tendencia.update_layout(
+                        paper_bgcolor='rgba(11, 15, 25, 0.9)',
+                        plot_bgcolor='rgba(11, 15, 25, 0.9)',
+                        height=420,
+                        margin=dict(l=30, r=30, t=40, b=30),
+                        xaxis=dict(showgrid=False, title="Ficheiro / Período"),
+                        yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title=metrica_escolhida)
+                    )
 
-                        st.plotly_chart(fig_tendencia, use_container_width=True)
+                    st.plotly_chart(fig_tendencia, use_container_width=True)
 
-                        # Tabela Comparativa de Evolução
-                        st.markdown("#### 📋 Tabela Consolidada de Tendência Histórica")
-                        st.dataframe(df_tendencia, use_container_width=True)
+                    st.markdown("#### 📋 Tabela Consolidada de Tendência Histórica (Todos os Indicadores)")
+                    st.dataframe(df_tendencia, use_container_width=True)
 
-                        st.success("✅ **Simulador Ativo:** Acompanhe o ganho ou perda de eficiência patrimonial à medida que novos arquivos de inventário são adicionados à análise.")
-                    else:
-                        st.warning("⚠️ O Modo 2 requer pelo menos **2 arquivos** carregados simultaneamente para gerar as curvas de evolução histórica e comparativos temporais.")
-                        
+                    st.success("✅ **Simulador Ativo:** Acompanhe o ganho ou perda de eficiência patrimonial à medida que novos arquivos de inventário são adicionados à análise.")
+
             # Central de Relatórios
             st.markdown("---")
             st.subheader("📥 Central de Relatórios Executivos C-Level")
@@ -862,7 +857,6 @@ def main():
                 st.download_button("📑 PDF Gerencial", data=gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_Novacore.pdf", mime="application/pdf")
             with col_e4:
                 st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_Novacore.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
-
 
 if __name__ == "__main__":
     main()
