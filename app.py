@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA COMPLETA & ETAPA 5 AVANÇADA)
+# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (ETAPA 5 DEFINITIVA // C-LEVEL COMMAND CENTER)
 # ====================================================================================
 import os
 import io
@@ -739,49 +739,117 @@ def main():
                         st.warning("Dados insuficientes para estruturar a matriz de risco.")
        
                 # ================================================================
-                # ETAPA 5 REFORMULADA: SCORE DE SAÚDE + SIMULADOR DE CENÁRIOS ("E SE...?")
+                # ETAPA 5 DEFINITIVA: CENTRO DE COMANDO C-LEVEL (4 MÓDULOS UNIFICADOS)
                 # ================================================================
-                with st.expander("⚡ ETAPA 5: Score de Saúde do Armazém & Simulador Contábil C-Level", expanded=True):
+                with st.expander("⚡ ETAPA 5: CENTRO DE COMANDO C-LEVEL (PRESCRITIVO & OPERACIONAL)", expanded=True):
                     st.markdown("""
-                    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-                        <span style="color: #10b981; font-weight: 600; font-size: 0.9rem;">DIAGNÓSTICO PREDITIVO & SIMULAÇÃO ESTRATÉGICA DE PERDAS</span>
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(0, 242, 254, 0.4); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                        <span style="color: #00f2fe; font-weight: 700; font-size: 0.95rem;">J.A.R.V.I.S. // INTELIGÊNCIA PRESCRITIVA E PLANO DE AÇÃO AUTOMÁTICO</span>
                         <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                            Avaliação ponderada da saúde do armazém e simulador interativo de impacto financeiro para metas futuras da diretoria.
+                            Módulo unificado contendo Matriz de Causa Raiz, Quadrante de Risco 4D, Simulador de Meta 97% e o Plano de Ação Prioritário para a auditoria de segunda-feira.
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Cálculo do Score de Saúde (0 a 100)
-                    # Ponderação: 50% Acurácia Volumétrica, 30% Acurácia Financeira, 20% Impacto Relativo
-                    score_vol_peso = resumo_unico['acuracia_vol'] * 0.50
-                    score_fin_peso = resumo_unico['acuracia_fin'] * 0.30
-                    penalty_impacto = max(0.0, 20.0 - abs(resumo_unico['impacto_sobre_antes_pct']) * 2)
-                    score_total_saude = round(score_vol_peso + score_fin_peso + penalty_impacto, 1)
-                    score_total_saude = max(0.0, min(100.0, score_total_saude))
+                    tab_e5_1, tab_e5_2, tab_e5_3, tab_e5_4 = st.tabs([
+                        "🔍 1. Matriz Causa Raiz", 
+                        "📈 2. Quadrante 4D", 
+                        "🎯 3. Simulador Meta 97%", 
+                        "📋 4. Plano de Ação Prioritário"
+                    ])
 
-                    col_sc1, col_sc2 = st.columns([1.2, 2.5])
-                    with col_sc1:
-                        cor_score = "#10b981" if score_total_saude >= 90 else ("#f59e0b" if score_total_saude >= 75 else "#ef4444")
-                        st.markdown(f"""
-                        <div style="background: rgba(17, 24, 39, 0.9); border: 2px solid {cor_score}; border-radius: 14px; padding: 24px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-                            <div style="color: #9ca3af; font-size: 0.85rem; font-weight: 600; text-transform: uppercase;">Score de Saúde Geral</div>
-                            <div style="color: {cor_score}; font-size: 3rem; font-weight: 800; font-family: monospace; margin: 10px 0;">{score_total_saude} <span style="font-size: 1.2rem;">/100</span></div>
-                            <div style="color: #f3f4f6; font-size: 0.85rem; font-weight: 500;">Status: {'EXCELENTE' if score_total_saude >= 90 else ('ATENÇÃO REQUERIDA' if score_total_saude >= 75 else 'CRÍTICO / OPERAÇÃO EM RISCO')}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    with col_sc2:
-                        st.markdown("##### 🎯 Simulador de Redução de Quebras (\"E se...?\")")
-                        st.markdown("Ajuste o cursor abaixo para simular a recuperação financeira caso o plano de prevenção de perdas reduza as quebras atuais:")
+                    col_val_aju_e5 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_filtrado.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
+                    col_ajuste_e5 = 'Ajuste' if 'Ajuste' in df_filtrado.columns else 'Ajuste'
+
+                    # Processamento para a Causa Raiz
+                    df_causa = df_filtrado.copy()
+                    def classificar_causa(row):
+                        aj = row.get(col_ajuste_e5, 0)
+                        val = abs(row.get(col_val_aju_e5, 0))
+                        saldo_sis = row.get('Saldo em Estoque', 1)
+                        if aj < 0 and val > 200:
+                            return "🚨 Furto / Extravio Crítico (Alto Valor)"
+                        elif aj == 0 and saldo_sis == 0:
+                            return "👻 Estoque Fantasma / Zumbi"
+                        elif abs(aj) in [6, 12, 24]:
+                            return "📦 Erro de Recebimento / Caixa Fechada"
+                        elif aj != 0:
+                            return "🔄 Divergência Operacional / Quebra Padrão"
+                        else:
+                            return "✅ Conforme"
+
+                    df_causa['Perfil_Causa'] = df_causa.apply(classificar_causa, axis=1)
+
+                    with tab_e5_1:
+                        st.markdown("##### 🔍 Diagnóstico Automático de Causas de Divergência")
+                        resumo_causas = df_causa.groupby('Perfil_Causa').agg(
+                            SKUs=('Código do Produto', 'count'),
+                            Impacto_Financeiro=(col_val_aju_etapa4, 'sum')
+                        ).reset_index()
                         
-                        perc_reducao = st.slider("Percentual de Redução de Quebras (%)", min_value=0, max_value=100, value=25, step=5, key="slider_reducao_quebras")
+                        st.dataframe(resumo_causas.style.format({
+                            'SKUs': '{:,}',
+                            'Impacto_Financeiro': 'R$ {:,.2f}'
+                        }), use_container_width=True)
+                        st.info("💡 **Insights C-Level:** O sistema isola automaticamente furos em itens de alto valor (risco de furto) vs. erros de embalagem e estoques fantasma que travam o reabastecimento.")
+
+                    with tab_e5_2:
+                        st.markdown("##### 📈 Quadrante de Risco Estratégico 4D (Outliers de Perda)")
+                        if len(num_cols) >= 2:
+                            fig_4d = px.scatter(
+                                df_causa[df_causa[col_ajuste_e5] != 0],
+                                x='Saldo em Estoque',
+                                y=col_val_aju_etapa4,
+                                size=df_causa[col_causa['Ajuste'] != 0][col_val_aju_etapa4].abs().clip(lower=1),
+                                color='Perfil_Causa',
+                                hover_name='Descrição do Produto',
+                                title="Dispersão de Divergências: Volume vs Impacto Financeiro",
+                                template="plotly_dark",
+                                height=450
+                            )
+                            fig_4d.update_layout(
+                                paper_bgcolor='rgba(11, 15, 25, 0.9)',
+                                plot_bgcolor='rgba(11, 15, 25, 0.9)',
+                                margin=dict(l=30, r=30, t=40, b=30),
+                                xaxis=dict(showgrid=False, title="Saldo em Estoque (Sistema)"),
+                                yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Valor do Ajuste (R$)")
+                            )
+                            st.plotly_chart(fig_4d, use_container_width=True)
+
+                    with tab_e5_3:
+                        st.markdown("##### 🎯 Simulador Interativo & Progresso rumo à Meta 97%")
+                        c_sim1, c_sim2 = st.columns(2)
+                        with c_sim1:
+                            meta_atual_val = resumo_unico['acuracia_vol']
+                            st.metric("Acurácia Volumétrica Atual", f"{meta_atual_val:.2f}%", delta=f"{meta_atual_val - 97:.2f}% vs Meta 97%")
+                            skus_totais = resumo_unico['total_skus']
+                            skus_exatos_atuais = resumo_unico['skus_exatos']
+                            skus_necessarios_97 = int(skus_totais * 0.97)
+                            deficit_skus = max(0, skus_necessarios_97 - skus_exatos_atuais)
+                            st.warning(f"⚠️ Para atingir a **Meta Corporativa de 97%**, faltam recontar ou corrigir exatamente **{deficit_skus:,} SKUs** nesta unidade.")
+                        with c_sim2:
+                            perc_recup = st.slider("Simular % de Recuperação de Faltas", 0, 100, 30, 5, key="slider_meta_e5")
+                            quebras_totais = abs(df_causa[df_causa[col_ajuste_e5] < 0][col_val_aju_etapa4].sum())
+                            economia_sim = quebras_totais * (perc_recup / 100.0)
+                            st.success(f"💰 **Ganho de Caixa Projetado:** Recuperar {perc_recup}% das quebras representa uma injeção de **R$ {economia_sim:,.2f}** no resultado operacional.")
+
+                    with tab_e5_4:
+                        st.markdown("##### 📋 Plano de Ação Prioritário para Auditoria (Top Alvos de Maior ROI)")
+                        st.markdown("Lista cirúrgica dos SKUs que concentram o maior impacto financeiro negativo, ordenada para prioridade máxima da equipe de Prevenção de Perdas:")
                         
-                        total_quebras_atual = abs(df_filtrado[df_filtrado['Ajuste'] < 0][col_val_aju_etapa4].sum()) if 'Ajuste' in df_filtrado.columns else 0
-                        economia_projetada = total_quebras_atual * (perc_reducao / 100.0)
-                        novo_ajuste_liquido = resumo_unico['val_ajuste_liquido'] + economia_projetada
-                        novo_impacto_pct = (novo_ajuste_liquido / resumo_unico['soma_antes'] * 100) if resumo_unico['soma_antes'] > 0 else 0
-                        
-                        st.info(f"💡 **Projeção C-Level:** Reduzir as quebras em **{perc_reducao}%** economizaria **R$ {economia_projetada:,.2f}**, elevando o Ajuste Líquido para **R$ {novo_ajuste_liquido:,.2f}** (Impacto Geral de **{novo_impacto_pct:.2f}%**).")
+                        df_plano = df_causa[df_causa[col_ajuste_e5] < 0].sort_values(by=col_val_aju_etapa4, ascending=True).head(15).copy()
+                        if not df_plano.empty:
+                            df_exibicao_plano = df_plano[['Código do Produto', 'Descrição do Produto', 'Saldo em Estoque', col_ajuste_e5, col_val_aju_etapa4, 'Perfil_Causa']].rename(
+                                columns={col_ajuste_e5: 'Ajuste Qtd', col_val_aju_etapa4: 'Impacto (R$)'}
+                            )
+                            st.dataframe(df_exibicao_plano.style.format({
+                                'Impacto (R$)': 'R$ {:,.2f}',
+                                'Ajuste Qtd': '{:,}',
+                                'Saldo em Estoque': '{:,}'
+                            }), use_container_width=True)
+                            st.info("🎯 **Instrução Operacional:** Imprima esta tabela e entregue diretamente ao encarregado de estoque e chefe de segurança para a recontagem física imediata dos itens listados.")
+                        else:
+                            st.warning("Nenhum item com quebra encontrado para gerar o plano de ação.")
 
             # ====================================================================
             # MODO 2: MÚLTIPLOS FICHEIROS (VISÃO COMPARATIVA EXECUTIVA COMPLETA)
@@ -859,7 +927,7 @@ def main():
             with col_e3:
                 st.download_button("📑 PDF Gerencial", data=gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.pdf", mime="application/pdf")
             with col_e4:
-                st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_GrupoKMB.pptx", mime="application/vnd.openxmlformats-offic2document.presentationml.presentation")
+                st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_GrupoKMB.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
 if __name__ == "__main__":
     main()
