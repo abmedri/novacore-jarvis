@@ -739,7 +739,7 @@ def main():
                                 height=420,
                                 margin=dict(l=30, r=30, t=40, b=30),
                                 xaxis=dict(showgrid=False),
-                                yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Impacto Líquido (R$)")
+                                yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Impacto Líquido (un)")
                             )
                             st.plotly_chart(fig_risco, use_container_width=True)
                         
