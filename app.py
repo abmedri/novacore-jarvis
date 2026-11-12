@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (ETAPA 5 DEFINITIVA // C-LEVEL COMMAND CENTER)
+# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (ETAPA 5 DEFINITIVA // CORRIGIDA & ESTÁVEL)
 # ====================================================================================
 import os
 import io
@@ -796,11 +796,14 @@ def main():
                     with tab_e5_2:
                         st.markdown("##### 📈 Quadrante de Risco Estratégico 4D (Outliers de Perda)")
                         if len(num_cols) >= 2:
+                            df_scatter = df_causa[df_causa[col_ajuste_e5] != 0].copy()
+                            df_scatter['Tamanho_Bolha'] = df_scatter[col_val_aju_etapa4].abs().clip(lower=1)
+                            
                             fig_4d = px.scatter(
-                                df_causa[df_causa[col_ajuste_e5] != 0],
+                                df_scatter,
                                 x='Saldo em Estoque',
                                 y=col_val_aju_etapa4,
-                                size=df_causa[col_causa['Ajuste'] != 0][col_val_aju_etapa4].abs().clip(lower=1),
+                                size='Tamanho_Bolha',
                                 color='Perfil_Causa',
                                 hover_name='Descrição do Produto',
                                 title="Dispersão de Divergências: Volume vs Impacto Financeiro",
