@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA UNIVERSAL & BLINDADA)
+# ⚡ NOVA-CORE // PROTOCOLO J.A.R.V.I.S. (VERSÃO EXECUTIVA COM LOGO OFICIAL & LOGIN)
 # ====================================================================================
 import os
 import io
@@ -42,7 +42,6 @@ def processar_arquivo_upload(arquivo_carregado):
                         arquivo_carregado.seek(0)
                         df = pd.read_csv(arquivo_carregado, encoding=enc, sep=',', low_memory=False)
                     
-                    # Padronização automática de nomes de colunas
                     col_mapping = {}
                     for col in df.columns:
                         col_lower = col.lower().strip()
@@ -200,7 +199,7 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     ws1.title = "Resumo Executivo"
     ws1.views.sheetView[0].showGridLines = True
     
-    ws1['A1'] = "⚡ NOVA-CORE // PAINEL DE GOVERNANÇA E AUDITORIA PATRIMONIAL"
+    ws1['A1'] = "⚡ GRUPO KMB // PAINEL DE GOVERNANÇA E AUDITORIA PATRIMONIAL"
     ws1['A1'].font = Font(size=14, bold=True, color="1F4E78")
     ws1.append([])
     
@@ -264,8 +263,8 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
     doc = docx.Document()
     
-    doc.add_heading("⚡ NOVA-CORE // RELATÓRIO EXECUTIVO DE AUDITORIA C-LEVEL", level=1)
-    doc.add_paragraph("Documento oficial consolidado de governança patrimonial, contendo indicadores de impacto, análise de quebras, sobras e itens críticos.")
+    doc.add_heading("⚡ GRUPO KMB // RELATÓRIO EXECUTIVO DE AUDITORIA C-LEVEL", level=1)
+    doc.add_paragraph("Documento oficial consolidado de governança patrimonial, contendo indicadores de exatidão, controle e eficiência.")
     
     doc.add_heading("1. Indicadores Consolidados por Unidade", level=2)
     for r in resumos:
@@ -298,12 +297,12 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
             doc.add_paragraph("Coluna de ajuste não mapeada diretamente para listagem individual detalhada neste bloco.")
 
     doc.add_heading("3. Validação e Assinatura C-Level", level=2)
-    doc.add_paragraph("Declaro que os dados acima foram auditados eletronicamente através do Protocolo J.A.R.V.I.S. / NovaCore e refletem com fidelidade a apuração patrimonial realizada.\n\n\n")
+    doc.add_paragraph("Declaro que os dados acima foram auditados eletronicamente através do Protocolo J.A.R.V.I.S. / Grupo KMB e refletem com fidelidade a apuração patrimonial realizada.\n\n\n")
     
     p_assinatura = doc.add_paragraph()
     p_assinatura.add_run("__________________________________________________\n").bold = True
-    p_assinatura.add_run("Diretoria de Operações & Loss Prevention / Auditoria C-Level\n")
-    p_assinatura.add_run("NovaCore Analytics & Governance System")
+    p_assinatura.add_run("Time de Inventário & Loss Prevention / Auditoria C-Level\n")
+    p_assinatura.add_run("Grupo KMB - Exatidão • Controle • Eficiência")
 
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -359,7 +358,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     
     story = []
     
-    story.append(Paragraph("⚡ NOVA-CORE // DOSSIÊ DE AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
+    story.append(Paragraph("⚡ GRUPO KMB // DOSSIÊ DE AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
     story.append(Paragraph("Relatório oficial consolidado contendo indicadores de impacto, análise de quebras, sobras e itens críticos.", estilo_texto))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3B82F6'), spaceBefore=8, spaceAfter=12))
     
@@ -401,13 +400,13 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     story.append(Spacer(1, 10))
     
     story.append(Paragraph("3. Validação e Assinatura C-Level", estilo_sub))
-    story.append(Paragraph("Declaro que os dados acima foram auditados eletronicamente através do Protocolo J.A.R.V.I.S. / NovaCore e refletem com fidelidade a apuração patrimonial realizada.", estilo_texto))
+    story.append(Paragraph("Declaro que os dados acima foram auditados eletronicamente através do Protocolo J.A.R.V.I.S. / Grupo KMB e refletem com fidelidade a apuração patrimonial realizada.", estilo_texto))
     story.append(Spacer(1, 20))
     
     texto_assinatura = """
     <b>__________________________________________________</b><br/>
-    <b>Diretoria de Operações & Loss Prevention / Auditoria C-Level</b><br/>
-    NovaCore Analytics & Governance System
+    <b>Time de Inventário & Loss Prevention / Auditoria C-Level</b><br/>
+    Grupo KMB - Exatidão • Controle • Eficiência
     """
     story.append(Paragraph(texto_assinatura, estilo_texto))
     
@@ -420,7 +419,7 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     prs = Presentation()
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     tb = slide.shapes.add_textbox(PptxInches(1), PptxInches(1), PptxInches(11), PptxInches(2))
-    tb.text_frame.text = "⚡ NOVA-CORE // RELATÓRIO EXECUTIVO C-LEVEL"
+    tb.text_frame.text = "⚡ GRUPO KMB // RELATÓRIO EXECUTIVO C-LEVEL"
     buffer = io.BytesIO()
     prs.save(buffer)
     buffer.seek(0)
@@ -428,7 +427,45 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
 
 
 def main():
-    st.set_page_config(page_title="NOVA-CORE // J.A.R.V.I.S. EXECUTIVO", page_icon="⚡", layout="wide")
+    st.set_page_config(page_title="GRUPO KMB // TIME DE INVENTÁRIO", page_icon="⚡", layout="wide")
+    
+    SENHA_MESTRE = "novacore2026"
+
+    if "autenticado" not in st.session_state:
+        st.session_state.autenticado = False
+
+    # TELA DE LOGIN COM O BRASÃO DO GRUPO KMB
+    if not st.session_state.autenticado:
+        st.markdown("""
+        <style>
+        .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        col_l1, col_l2, col_l3 = st.columns([1, 1.5, 1])
+        with col_l2:
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            
+            # --- CARREGAMENTO DO BRASÃO LOCAL NA TELA DE LOGIN ---
+            if os.path.exists("brasao_sem_fundo.png"):
+                st.image("brasao_sem_fundo.png", use_container_width=True)
+            else:
+                st.warning("⚠️ Arquivo 'brasao_sem_fundo.png' não encontrado na pasta. Coloque-o no mesmo diretório do script.")
+            
+            st.markdown("## ⚡ TIME DE INVENTÁRIO // AUTENTICAÇÃO")
+            st.markdown("Insira a senha de acesso executivo para desbloquear o sistema.")
+            
+            senha_digitada = st.text_input("Senha de Acesso", type="password", key="input_senha")
+            
+            if st.button("🔓 Entrar no Sistema", use_container_width=True):
+                if senha_digitada == SENHA_MESTRE:
+                    st.session_state.autenticado = True
+                    st.rerun()
+                else:
+                    st.error("❌ Senha incorreta. Acesso negado.")
+        return
+
+    # APLICAÇÃO PRINCIPAL (APÓS LOGIN BEM-SUCEDIDO)
     st.markdown("""
     <style>
     .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
@@ -441,9 +478,20 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     
+    # --- BRASÃO NA BARRA LATERAL ---
+    with st.sidebar:
+        if os.path.exists("brasao_sem_fundo.png"):
+            st.image("brasao_sem_fundo.png", use_container_width=True)
+        st.markdown("### **GRUPO KMB**")
+        st.markdown("*Exatidão • Controle • Eficiência*[span_2](start_span)[span_2](end_span)")
+        st.markdown("---")
+        if st.button("🔒 Encerrar Sessão (Sair)", use_container_width=True):
+            st.session_state.autenticado = False
+            st.rerun()
+
     st.markdown("""
     <div class="main-header">
-        <div class="jarvis-title">⚡ NOVA-CORE // DIRETORIA EXECUTIVA</div>
+        <div class="jarvis-title">⚡ GRUPO KMB // DIRETORIA EXECUTIVA</div>
         <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">AUDITORIA DE ESTOQUE & ANÁLISE COMPARATIVA MULTI-INVENTÁRIO</div>
     </div>
     """, unsafe_allow_html=True)
@@ -847,13 +895,13 @@ def main():
             st.subheader("📥 Central de Relatórios Executivos C-Level")
             col_e1, col_e2, col_e3, col_e4 = st.columns(4)
             with col_e1:
-                st.download_button("📊 Excel Gerencial", data=gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_Novacore.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                st.download_button("📊 Excel Gerencial", data=gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             with col_e2:
-                st.download_button("📄 Word Gerencial", data=gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_Novacore.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                st.download_button("📄 Word Gerencial", data=gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             with col_e3:
-                st.download_button("📑 PDF Gerencial", data=gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_Novacore.pdf", mime="application/pdf")
+                st.download_button("📑 PDF Gerencial", data=gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.pdf", mime="application/pdf")
             with col_e4:
-                st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_Novacore.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+                st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_GrupoKMB.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
 if __name__ == "__main__":
     main()
