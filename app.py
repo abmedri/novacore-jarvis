@@ -781,26 +781,75 @@ def main():
                     st.plotly_chart(fig_tot, use_container_width=True)
 
                 # ETAPA 5: Simulador Contábil & Evolução Histórica (INCLUÍDA NO MODO 2)
-                st.markdown("---")
-                with st.expander("🧮 ETAPA 5: Simulador Contábil & Evolução Histórica (Multitemporal)", expanded=False):
-                    dados_hist_modo2 = []
-                    for r in resumos:
-                        dados_hist_modo2.append({
-                            "Inventário": r['nome'],
-                            "Acuracidade Financeira (%)": r['acuracia_fin'],
-                            "Acuracidade Volumétrica (%)": r['acuracia_vol']
-                        })
-                    df_hist_m2 = pd.DataFrame(dados_hist_modo2)
-                    fig_hist_m2 = px.line(
-                        df_hist_m2,
-                        x="Inventário",
-                        y=["Acuracidade Financeira (%)", "Acuracidade Volumétrica (%)"],
-                        markers=True,
-                        template="plotly_dark",
-                        title="Evolução Histórica e Comparativa da Acuracidade por Inventário"
-                    )
-                    st.plotly_chart(fig_hist_m2, use_container_width=True)
+                with st.expander("📈 ETAPA 5: Simulador Contábil & Evolução Histórica (Multitemporal Avançado)", expanded=True):
+                    st.markdown("""
+                    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                        <span style="color: #10b981; font-weight: 600; font-size: 0.9rem;">ANÁLISE DE TENDÊNCIA & EVOLUÇÃO PATRIMONIAL COMPARATIVA</span>
+                        <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
+                            Cruzamento multitemporal dos inventários carregados para rastrear o comportamento histórico da acurácia, desvios e impacto financeiro ao longo do tempo.
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
+                    if len(lista_dfs) >= 2:
+                        resumos_m2 = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
+                        df_tendencia = pd.DataFrame([
+                            {
+                                "Inventario": r['nome'],
+                                "Acuracia Volumetrica (%)": r['acuracia_vol'],
+                                "Acuracia Financeira (%)": r['acuracia_fin'],
+                                "Ajuste Liquido (R$)": r['val_ajuste_liquido'],
+                                "Impacto s/ Antes (%)": r['impacto_sobre_antes_pct'],
+                                "Total Divergencias (SKUs)": r['total_div'],
+                                "Faltas (SKUs)": r['skus_falta'],
+                                "Sobras (SKUs)": r['skus_sobra']
+                            } for r in resumos_m2
+                        ])
+
+                        # Seletor interativo para escolher qual indicador analisar na linha do tempo
+                        metrica_escolhida = st.selectbox(
+                            "Selecione o Indicador para Análise de Evolução Histórica:",
+                            options=[
+                                "Acuracia Volumetrica (%)", 
+                                "Acuracia Financeira (%)", 
+                                "Ajuste Liquido (R$)", 
+                                "Impacto s/ Antes (%)", 
+                                "Total Divergencias (SKUs)"
+                            ],
+                            key="select_metrica_evolucao"
+                        )
+
+                        # Gráfico de Linha com Marcadores para Tendência Temporal
+                        fig_tendencia = px.line(
+                            df_tendencia,
+                            x="Inventario",
+                            y=metrica_escolhida,
+                            markers=True,
+                            title=f"Evolução Histórica: {metrica_escolhida}",
+                            template="plotly_dark",
+                            color_discrete_sequence=['#3b82f6']
+                        )
+
+                        fig_tendencia.update_traces(line=dict(width=3), marker=dict(size=10))
+                        fig_tendencia.update_layout(
+                            paper_bgcolor='rgba(11, 15, 25, 0.9)',
+                            plot_bgcolor='rgba(11, 15, 25, 0.9)',
+                            height=420,
+                            margin=dict(l=30, r=30, t=40, b=30),
+                            xaxis=dict(showgrid=False, title="Ficheiro / Período"),
+                            yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title=metrica_escolhida)
+                        )
+
+                        st.plotly_chart(fig_tendencia, use_container_width=True)
+
+                        # Tabela Comparativa de Evolução
+                        st.markdown("#### 📋 Tabela Consolidada de Tendência Histórica")
+                        st.dataframe(df_tendencia, use_container_width=True)
+
+                        st.success("✅ **Simulador Ativo:** Acompanhe o ganho ou perda de eficiência patrimonial à medida que novos arquivos de inventário são adicionados à análise.")
+                    else:
+                        st.warning("⚠️ O Modo 2 requer pelo menos **2 arquivos** carregados simultaneamente para gerar as curvas de evolução histórica e comparativos temporais.")
+                        
             # Central de Relatórios
             st.markdown("---")
             st.subheader("📥 Central de Relatórios Executivos C-Level")
