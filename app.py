@@ -181,7 +181,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM AJUSTE AUTOMÁTICO DE LARGURA
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM AUTO-EXPANSÃO DINÂMICA
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -246,7 +246,8 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     
     locais_por_produto = {}
     soma_comptar_por_produto = {}
-    max_locais_encontrados = 12
+    
+    # Auto expansão dinâmica baseada estritamente no arquivo enviado
     for _, row in df_localizacao.iterrows():
         loc = str(row.get(col_loc, ''))
         cod = str(row.get(col_cod_loc, ''))
@@ -265,8 +266,8 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         locais_por_produto[cod].append((loc, qtd))
         soma_comptar_por_produto[cod] += qtd
         
-        if len(locais_por_produto[cod]) > max_locais_encontrados:
-            max_locais_encontrados = len(locais_por_produto[cod])
+    # Calcula dinamicamente o máximo de locais que qualquer produto possui no inventário carregado
+    max_locais_encontrados = max([len(v) for v in locais_por_produto.values()]) if locais_por_produto else 1
     
     for row in ws_comp.iter_rows(min_row=2, max_row=ws_comp.max_row, min_col=1, max_col=4):
         for cell in row:
@@ -287,7 +288,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
     
-    # Inserção correta da logo corporativa
+    # Inserção da logo corporativa
     caminho_logo = "logo_kmb.jpg" if os.path.exists("logo_kmb.jpg") else ("brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None)
     if caminho_logo:
         try:
@@ -430,7 +431,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         max_len = 0
         col_letter = get_column_letter(col[0].column)
         for cell in col:
-            # Ignoramos a linha 1 e 2 para não distorcer a largura por causa do cabeçalho de loja/data
             if cell.row >= 3 and cell.value:
                 val_str = str(cell.value)
                 if not val_str.startswith("="):
@@ -763,7 +763,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM AJUSTE AUTOMÁTICO DE LARGURA
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM AUTO-EXPANSÃO DINÂMICA
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -787,7 +787,7 @@ def main():
                 # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA)
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
-                st.caption("Abaixo está a prévia interativa formatada com largura dinâmica baseada no conteúdo:")
+                st.caption("Abaixo está a prévia interativa formatada com colunas dinâmicas baseadas na quantidade de locais:")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2).fillna("")
@@ -801,7 +801,7 @@ def main():
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas automaticamente com A4 Paisagem, AutoFit inteligente e rodapé executivo.")
+                st.caption("Configuradas automaticamente com A4 Paisagem, auto expansão e rodapé executivo.")
                 
                 c_imp1, c_imp2, c_imp3 = st.columns(3)
                 
@@ -874,7 +874,7 @@ def main():
                     st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{resumo_unico['skus_falta']:,} SKUs ({resumo_unico['perc_falta_itens']:.2f}%)", f"Vol: -{resumo_unico['vol_falta']:,.0f} un | R$ {resumo_unico['val_falta']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{resumo_unico['vol_div_total']:,.0f} unidades ({resumo_unico['perc_vol_div']:.2f}%)", f"R$ {resumo_unico['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                 with c2:
-                    st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{resumo_unico['skus_sobra']:,} SKUs ({resumo_unico['perc_sobra_itens']:.2f}%)", f"Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{resumo_unico['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{resumo_unico['skus_sobra']:,} SKUs ({resumo_unico['perc_sobra_itens']:.2f}%)", f"Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}" if 'r' in locals() else f"Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{resumo_unico['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{resumo_unico['total_div']:,} SKUs ({resumo_unico['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {resumo_unico['acuracia_vol']:.2f}% | Fin: {resumo_unico['acuracia_fin']:.2f}%", "Meta Corporativa 97%", eh_negativo=(resumo_unico['acuracia_vol'] < 97), eh_positivo=(resumo_unico['acuracia_vol'] >= 97)), unsafe_allow_html=True)
                 
