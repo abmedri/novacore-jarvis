@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO OFICIAL // TOP 50 NAS ETAPAS 2 E 3)
+# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO OFICIAL DEFINITIVA - MODO 1 E MODO 2 COMPLETOS)
 # ====================================================================================
 import os
 import io
@@ -188,8 +188,107 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# FUNÇÕES DE EXPORTAÇÃO ROBUSTAS (EXCEL, WORD, PDF E PPTX)
+# GERADOR DA PLANILHA DE CONFERÊNCIA (MODO PLANILHA DE CONFERÊNCIA COM ABA LOJA)
 # ====================================================================================
+def gerar_planilha_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input=13016):
+    wb = openpyxl.Workbook()
+    
+    # 1. Aba LOJA (Base de referência de lojas e cidades)
+    ws_loja = wb.active
+    ws_loja.title = "LOJA"
+    ws_loja.views.sheetView[0].showGridLines = True
+    
+    tabela_lojas = [
+        [4684, 'MINAS', 'CATANDUVA'], [4685, 'MIRASSOL', 'MIRASSOL'], [4701, 'FARIA', 'RIO PRETO'],
+        [4794, 'GARDEN', 'CATANDUVA'], [5036, 'GENERAL', 'RIO PRETO'], [5037, 'ATA CENTRO', 'ARAÇATUBA'],
+        [5783, 'TANABI', 'TANABI'], [6119, 'PRAÇA', 'RIO PRETO'], [11021, 'ELDORADO', 'RIO PRETO'],
+        [12524, 'FERNANDÓPOLIS QUIOSQUE', 'FERNANDÓPOLIS'], [12760, 'MUFFATO', 'RIO PRETO'], [12853, 'CARREFOUR', 'RIO PRETO'],
+        [12901, 'PLAZA', 'RIO PRETO'], [13015, 'RONDON', 'ARAÇATUBA'], [13016, 'POTIRENDABA', 'POTIRENDABA'],
+        [13017, 'NOVA GRANADA', 'NOVA GRANADA'], [13018, 'JALES', 'JALES'], [13019, 'FERNANDÓPOLIS', 'FERNANDÓPOLIS'],
+        [13123, 'TABAPUÃ', 'TABAPUÃ'], [13372, 'VD RIO PRETO', 'RIO PRETO'], [13904, 'PROENÇA', 'CATANDUVA'],
+        [13922, 'CIDADE NORTE', 'RIO PRETO'], [14252, 'AMIGÃO', 'ARAÇATUBA'], [14268, 'ATACADÃO', 'CATANDUVA'],
+        [14378, 'GUAPIAÇU', 'GUAPIAÇU'], [14736, 'MUFFATO ARAÇATUBA', 'ARAÇATUBA'], [17315, 'IGUATEMI', 'RIO PRETO'],
+        [17612, 'DAMHA', 'RIO PRETO'], [18591, 'PRAÇA NOVA', 'ARAÇATUBA'], [20385, 'CONTAINER VETORASSO', 'RIO PRETO'],
+        [22373, 'SAUDADES', 'BIRIGUI'], [22374, 'GUARARAPES', 'GUARARAPES'], [22375, 'AMIGÃO MIRAGAIA', 'BIRIGUI'],
+        [22401, 'ANDRADINA SHOPPING', 'ANDRADINA'], [22402, 'CASTILHO', 'CASTILHO'], [22403, 'BANDEIRANTE', 'BIRIGUI'],
+        [22404, 'BARÃO', 'BIRIGUI'], [22405, 'ANDRADINA CENTRO', 'ANDRADINA'], [22406, 'MIRANDÓPOLIS', 'MIRANDÓPOLIS'],
+        [22491, 'VD ARAÇATUBA', 'ARAÇATUBA'], [22511, 'VD CATANDUVA', 'CATANDUVA'], [22512, 'VD JALES', 'JALES'],
+        [23015, 'VD BIRIGUI', 'BIRIGUI'], [23505, 'SANTA FÉ DO SUL', 'SANTA FÉ DO SUL'], [23514, 'PEREIRA BARRETO', 'PEREIRA BARRETO'],
+        [23515, 'GENERAL SALGADO', 'GENERAL SALGADO'], [23518, 'ILHA SOLTEIRA', 'ILHA SOLTEIRA'], [23525, 'AURIFLAMA', 'AURIFLAMA'],
+        [23526, "PALMEIRA D'OESTE", "PALMEIRA D'OESTE"], [23527, 'ILHA SOLTEIRA QUIOSQUE', 'ILHA SOLTEIRA'],
+        [23528, 'VD FERNANDÓPOLIS', 'FERNANDÓPOLIS'], [23529, 'SANTA FÉ DO SUL QUIOSQUE', 'SANTA FÉ DO SUL'],
+        [23530, 'PEREIRA BARRETO QUIOSQUE', 'PEREIRA BARRETO'], [24756, 'BADY BASSITT', 'BADY BASSITT']
+    ]
+    for row_loja in tabela_lojas:
+        ws_loja.append(row_loja)
+
+    # 2. Aba CompTar
+    ws_comp = wb.create_sheet(title="CompTar")
+    ws_comp.views.sheetView[0].showGridLines = True
+    
+    headers_comp = ["Local", "Codigo", "Descricao", "Qtd"]
+    ws_comp.append(headers_comp)
+    
+    col_loc = next((c for c in df_localizacao.columns if 'local' in c.lower()), df_localizacao.columns[2])
+    col_cod_loc = next((c for c in df_localizacao.columns if 'codigo' in c.lower() or 'cod' in c.lower()), df_localizacao.columns[3])
+    col_desc_loc = next((c for c in df_localizacao.columns if 'desc' in c.lower()), df_localizacao.columns[4])
+    col_qtd_loc = next((c for c in df_localizacao.columns if 'qtd' in c.lower() or 'quantidade' in c.lower()), df_localizacao.columns[5])
+    
+    for _, row in df_localizacao.iterrows():
+        ws_comp.append([
+            str(row.get(col_loc, '')),
+            str(row.get(col_cod_loc, '')),
+            str(row.get(col_desc_loc, '')),
+            row.get(col_qtd_loc, 0)
+        ])
+        
+    # 3. Aba Saldo Loja
+    ws_saldo = wb.create_sheet(title="Saldo Loja")
+    ws_saldo.views.sheetView[0].showGridLines = True
+    ws_saldo.page_setup.orientation = ws_saldo.ORIENTATION_LANDSCAPE
+    ws_saldo.page_setup.paperSize = ws_saldo.PAPERSIZE_A4
+    
+    ws_saldo['D1'] = "DATA:"
+    ws_saldo['E1'] = pd.Timestamp.now().strftime('%d/%m/%Y')
+    ws_saldo['D2'] = "LOJA:"
+    ws_saldo['E2'] = int(numero_loja_input)
+    ws_saldo['G2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!B:B,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!B:B,""))'
+    ws_saldo['Q2'] = "CIDADE:"
+    ws_saldo['R2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,""))'
+    
+    headers_saldo = [
+        "Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA", 
+        "CONT. 1", "2", "3", "4", "5", "6", "7", "8", "9", "10", 
+        "11", "12", "Local", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24"
+    ]
+    ws_saldo.append([])
+    ws_saldo.append(headers_saldo)
+    
+    col_cod_est = next((c for c in df_estoque.columns if 'codigo' in c.lower()), 'Codigo')
+    col_desc_est = next((c for c in df_estoque.columns if 'desc' in c.lower()), 'Descrição')
+    col_est = next((c for c in df_estoque.columns if 'estoque' in c.lower()), 'Estoque')
+    
+    for idx, row in df_estoque.iterrows():
+        r = idx + 4
+        cod = row.get(col_cod_est, '')
+        desc = row.get(col_desc_est, '')
+        est = row.get(col_est, 0)
+        
+        formula_comptar = f"=SUMIF(CompTar!B:B, A{r}, CompTar!D:D)"
+        formula_divergencia = f"=D{r}-C{r}"
+        formula_local = f"=IFERROR(INDEX(CompTar!A:A, MATCH(A{r}, CompTar!B:B, 0)), \"Sem Local\")"
+        
+        ws_saldo.append([
+            cod, desc, est, formula_comptar, formula_divergencia,
+            None, None, None, None, None, None, None, None, None, None,
+            None, None, formula_local, None, None, None, None, None, None, None, None, None, None, None
+        ])
+        
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
 
 def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
@@ -481,6 +580,11 @@ def main():
         st.markdown("### **GRUPO KMB**")
         st.markdown("*Exatidão • Controle • Eficiência*")
         st.markdown("---")
+        
+        # Seleção de Modo no Sidebar (Modo 1 e Modo 2)
+        modo_operacao = st.radio("Modo de Operação:", ["Auditoria de Inventário (5 Etapas)", "Modo Planilha de Conferência"])
+        
+        st.markdown("---")
         if st.button("🔒 Encerrar Sessão (Sair)", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
@@ -488,10 +592,48 @@ def main():
     st.markdown("""
     <div class="main-header">
         <div class="jarvis-title">⚡ GRUPO KMB // DIRETORIA EXECUTIVA</div>
-        <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">AUDITORIA DE ESTOQUE & ANÁLISE COMPARATIVA MULTI-INVENTÁRIO</div>
+        <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">AUDITORIA DE ESTOQUE & AUTOMAÇÃO DE PLANILHAS DE CONFERÊNCIA</div>
     </div>
     """, unsafe_allow_html=True)
     
+    # ====================================================================
+    # MODO 2: MODO PLANILHA DE CONFERÊNCIA
+    # ====================================================================
+    if modo_operacao == "Modo Planilha de Conferência":
+        st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
+        st.markdown("Insira o número da loja e carregue os arquivos de origem abaixo para gerar a planilha unificada (`LOJA`, `CompTar` e `Saldo Loja`):")
+        
+        numero_loja_ui = st.number_input("Número da Loja (ex: 13016 ou 17315)", min_value=1, max_value=99999, value=13016, step=1)
+        
+        col_up1, col_up2 = st.columns(2)
+        with col_up1:
+            arq_loc = st.file_uploader("1. Arquivo de Itens por Localização (ex: Itens_localizacao.csv)", type=['csv', 'xlsx', 'xls'], key="up_loc")
+        with col_up2:
+            arq_est = st.file_uploader("2. Arquivo de Saldo de Estoque (ex: saldo-estoque.csv)", type=['csv', 'xlsx', 'xls'], key="up_est")
+            
+        if arq_loc and arq_est:
+            df_loc_temp, msg1 = processar_arquivo_upload(arq_loc)
+            df_est_temp, msg2 = processar_arquivo_upload(arq_est)
+            
+            if df_loc_temp is not None and df_est_temp is not None:
+                st.success("✅ Arquivos carregados e validados com sucesso!")
+                
+                if st.button("⚡ Gerar Planilha Oficial de Conferência", use_container_width=True):
+                    buffer_planilha = gerar_planilha_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui)
+                    st.download_button(
+                        label="📥 Baixar Planilha de Conferência KMB (.xlsx)",
+                        data=buffer_planilha,
+                        file_name=f"Plano_de_Inventario_Loja_{numero_loja_ui}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+            else:
+                st.error("❌ Erro ao processar um ou ambos os arquivos. Verifique o formato.")
+        return
+
+    # ====================================================================
+    # MODO 1: AUDITORIA DE INVENTÁRIO (PADRÃO 5 ETAPAS)
+    # ====================================================================
     arquivos_submetidos = st.file_uploader("Carregue o arquivo oficial de inventário (ex: 13372.07.11.2026.csv) ou múltiplos arquivos", type=['csv', 'xlsx', 'xls'], accept_multiple_files=True)
     
     if arquivos_submetidos:
@@ -504,9 +646,6 @@ def main():
                 nomes_arquivos.append(arq.name)
         
         if lista_dfs:
-            # ====================================================================
-            # MODO 1: APENAS 1 FICHEIRO (VISÃO DETALHADA DE 5 ETAPAS)
-            # ====================================================================
             if len(lista_dfs) == 1:
                 df_filtrado = lista_dfs[0]
                 num_cols = df_filtrado.select_dtypes(include=['number']).columns.tolist()
@@ -540,127 +679,46 @@ def main():
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {resumo_unico['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(resumo_unico['val_ajuste_liquido'] < 0), eh_positivo=(resumo_unico['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
                 st.markdown("---")
                 
-                # ETAPA 2: Curva ABC com Seletores Dinâmicos de Eixos + Filtro de Classe A/B/C (TOP 50)
+                # ETAPA 2: Curva ABC (TOP 50)
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     st.markdown("""
                     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
                         <span style="color: #3b82f6; font-weight: 600; font-size: 0.9rem;">ANÁLISE DE PARETO C-LEVEL // DINÂMICA (TOP 50)</span>
-                        <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                            Selecione a dimensão, a métrica e filtre diretamente pelas classes estratégicas da Curva ABC.
-                        </p>
                     </div>
                     """, unsafe_allow_html=True)
                     if len(num_cols) >= 1 and len(all_cols) > 0:
                         col_sel1, col_sel2, col_sel3 = st.columns(3)
                         with col_sel1:
-                            coluna_categoria_escolhida = st.selectbox(
-                                "Dimensão (Eixo X):", 
-                                options=all_cols, 
-                                index=all_cols.index('Descrição do Produto') if 'Descrição do Produto' in all_cols else 0,
-                                key="abc_eixo_x"
-                            )
+                            coluna_categoria_escolhida = st.selectbox("Dimensão (Eixo X):", options=all_cols, index=all_cols.index('Descrição do Produto') if 'Descrição do Produto' in all_cols else 0, key="abc_eixo_x")
                         with col_sel2:
                             idx_padrao_y = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
-                            eixo_y_escolhido = st.selectbox(
-                                "Métrica Principal (Eixo Y):", 
-                                options=num_cols, 
-                                index=idx_padrao_y if idx_padrao_y < len(num_cols) else 0,
-                                key="abc_eixo_y"
-                            )
+                            eixo_y_escolhido = st.selectbox("Métrica Principal (Eixo Y):", options=num_cols, index=idx_padrao_y if idx_padrao_y < len(num_cols) else 0, key="abc_eixo_y")
                         with col_sel3:
-                            filtro_classe_abc = st.selectbox(
-                                "Filtro Curva ABC:",
-                                options=["Todas as Classes (Geral)", "Classe A (80%)", "Classe B (95%)", "Classe C (100%)"],
-                                index=0,
-                                key="abc_filtro_classe"
-                            )
+                            filtro_classe_abc = st.selectbox("Filtro Curva ABC:", options=["Todas as Classes (Geral)", "Classe A (80%)", "Classe B (95%)", "Classe C (100%)"], index=0, key="abc_filtro_classe")
                         
                         df_abc = df_filtrado.sort_values(by=eixo_y_escolhido, ascending=False).copy()
                         df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolhido].cumsum()
-                        soma_total = df_abc[eixo_y_escolh_val := eixo_y_escolhido].sum()
+                        soma_total = df_abc[eixo_y_escolhido].sum()
                         
                         if soma_total > 0:
                             df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
-                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(
-                                lambda p: "Classe A (80%)" if p <= 80 else ("Classe B (95%)" if p <= 95 else "Classe C (100%)")
-                            )
+                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (80%)" if p <= 80 else ("Classe B (95%)" if p <= 95 else "Classe C (100%)"))
                             
                             if filtro_classe_abc != "Todas as Classes (Geral)":
                                 df_abc_filtrado = df_abc[df_abc['Classe_ABC'] == filtro_classe_abc].copy()
                             else:
                                 df_abc_filtrado = df_abc.copy()
                             
-                            qtd_skus_classe = len(df_abc_filtrado)
-                            valor_classe = df_abc_filtrado[eixo_y_escolhido].sum()
-                            perc_valor_classe = (valor_classe / soma_total * 100) if soma_total > 0 else 0
-                            st.caption(f"📊 **Resumo da Seleção ({filtro_classe_abc}):** {qtd_skus_classe:,} SKUs | Total: R$ {valor_classe:,.2f} ({perc_valor_classe:.2f}% do estoque)")
-                            
-                            # ALTERADO PARA TOP 50
                             df_plot = df_abc_filtrado.head(50).copy()
-                            
                             if not df_plot.empty:
                                 fig_abc = go.Figure()
-                                fig_abc.add_trace(go.Bar(
-                                    x=df_plot[coluna_categoria_escolhida],
-                                    y=df_plot[eixo_y_escolhido],
-                                    name=f"{eixo_y_escolhido}",
-                                    marker=dict(
-                                        color=df_plot[eixo_y_escolhido],
-                                        colorscale=[[0, '#1e3a8a'], [0.5, '#3b82f6'], [1, '#00f2fe']],
-                                        opacity=0.85
-                                    ),
-                                    yaxis='y'
-                                ))
-                                fig_abc.add_trace(go.Scatter(
-                                    x=df_plot[coluna_categoria_escolhida],
-                                    y=df_plot['%_Acumulado'],
-                                    name="% Acumulado (Pareto)",
-                                    mode='lines+markers',
-                                    marker=dict(color='#f59e0b', size=8),
-                                    line=dict(color='#f59e0b', width=3),
-                                    yaxis='y2'
-                                ))
-                                fig_abc.update_layout(
-                                    template="plotly_dark",
-                                    paper_bgcolor='rgba(11, 15, 25, 0.9)',
-                                    plot_bgcolor='rgba(11, 15, 25, 0.9)',
-                                    height=480,
-                                    margin=dict(l=30, r=30, t=40, b=30),
-                                    legend=dict(
-                                        orientation="h", 
-                                        yanchor="bottom", 
-                                        y=1.05, 
-                                        xanchor="right", 
-                                        x=1,
-                                        font=dict(size=11, color="#f3f4f6")
-                                    ),
-                                    yaxis=dict(
-                                        title=eixo_y_escolhido, 
-                                        gridcolor='rgba(31, 41, 55, 0.6)'
-                                    ),
-                                    yaxis2=dict(
-                                        title="% Acumulado", 
-                                        overlaying='y', 
-                                        side='right', 
-                                        range=[0, 105], 
-                                        showgrid=False
-                                    ),
-                                    xaxis=dict(showgrid=False)
-                                )
+                                fig_abc.add_trace(go.Bar(x=df_plot[coluna_categoria_escolhida], y=df_plot[eixo_y_escolhido], name=eixo_y_escolhido, marker=dict(color=df_plot[eixo_y_escolhido], colorscale=[[0, '#1e3a8a'], [0.5, '#3b82f6'], [1, '#00f2fe']])))
+                                fig_abc.add_trace(go.Scatter(x=df_plot[coluna_categoria_escolhida], y=df_plot['%_Acumulado'], name="% Acumulado (Pareto)", mode='lines+markers', yaxis='y2', line=dict(color='#f59e0b', width=3)))
+                                fig_abc.update_layout(template="plotly_dark", paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=480, yaxis=dict(title=eixo_y_escolhido), yaxis2=dict(title="% Acumulado", overlaying='y', side='right', range=[0, 105], showgrid=False))
                                 st.plotly_chart(fig_abc, use_container_width=True)
-                            else:
-                                st.warning("Nenhum produto encontrado para a classe selecionada.")
-                
-                # ETAPA 3: Matriz de Criticidade & Discrepância Financeira (TOP 50)
+
+                # ETAPA 3: Matriz de Criticidade (TOP 50)
                 with st.expander("🚨 ETAPA 3: Matriz de Criticidade & Discrepância Financeira", expanded=False):
-                    st.markdown("""
-                    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-                        <span style="color: #ef4444; font-weight: 600; font-size: 0.9rem;">AUDITORIA DE DESVIOS CRÍTICOS (C-LEVEL // TOP 50)</span>
-                        <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                            Isolamento dos 50 produtos com maior impacto financeiro negativo (faltas e quebras severas) para investigação prioritária de prevenção de perdas.
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
                     if len(num_cols) >= 2:
                         col_nome_prod = 'Descrição do Produto' if 'Descrição do Produto' in df_filtrado.columns else all_cols[0]
                         idx_val_div = identificar_coluna_ideal(num_cols, ['valor de ajuste', 'ajuste', 'valor', 'divergencia'])
@@ -668,271 +726,70 @@ def main():
                         
                         df_critico = df_filtrado.copy()
                         df_critico['Impacto_Absoluto'] = df_critico[col_val_div].abs()
-                        # ALTERADO PARA TOP 50
                         df_critico = df_critico.sort_values(by='Impacto_Absoluto', ascending=False).head(50)
                         if not df_critico.empty:
-                            fig_critico = px.bar(
-                                df_critico,
-                                x=col_nome_prod,
-                                y=col_val_div,
-                                title="Top 50 Maiores Desvios Financeiros (Faltas e Sobras Críticas em R$)",
-                                template="plotly_dark",
-                                color=col_val_div,
-                                color_continuous_scale=['#ef4444', '#f59e0b', '#3b82f6']
-                            )
-                            fig_critico.update_layout(
-                                paper_bgcolor='rgba(11, 15, 25, 0.9)',
-                                plot_bgcolor='rgba(11, 15, 25, 0.9)',
-                                height=480,
-                                margin=dict(l=30, r=30, t=40, b=30),
-                                xaxis=dict(showgrid=False),
-                                yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Valor da Divergência (R$)")
-                            )
+                            fig_critico = px.bar(df_critico, x=col_nome_prod, y=col_val_div, title="Top 50 Maiores Desvios Financeiros (R$)", template="plotly_dark", color=col_val_div, color_continuous_scale=['#ef4444', '#f59e0b', '#3b82f6'])
+                            fig_critico.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=480)
                             st.plotly_chart(fig_critico, use_container_width=True)
-                            st.info("ℹ️ **Foco de Investigação:** Barras em tons avermelhados indicam furos/faltas expressivas que exigem auditoria imediata de processos e câmeras de segurança.")
-                        else:
-                            st.warning("Não há dados suficientes para calcular a matriz de criticidade com as colunas atuais.")
-                
-                # ETAPA 4: Matriz de Risco de Divergência & Acurácia Ponderada (C-Level Audit) - EM VALOR (R$)
+
+                # ETAPA 4: Matriz de Risco
                 with st.expander("🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto", expanded=False):
-                    st.markdown("""
-                    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-                        <span style="color: #f59e0b; font-weight: 600; font-size: 0.9rem;">GOVERNANÇA & ACURÁCIA FINANCEIRA DE INVENTÁRIO (EM VALOR)</span>
-                        <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                            Análise cruzada de desvios financeiros para medir o impacto no caixa e isolar quebras de distorções cadastrais por categoria.
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
                     if len(num_cols) >= 2 and len(all_cols) > 0:
                         df_risco = df_filtrado.copy()
                         col_val_aju_etapa4 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_risco.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
-                        
-                        m1, m2 = st.columns(2)
-                        with m1:
-                            total_perdas = df_risco[df_risco[col_val_aju_etapa4] < 0][col_val_aju_etapa4].sum()
-                            st.metric("Total de Quebras/Faltas (R$)", f"R$ {total_perdas:,.2f}", delta_color="inverse")
-                        with m2:
-                            total_sobras = df_risco[df_risco[col_val_aju_etapa4] > 0][col_val_aju_etapa4].sum()
-                            st.metric("Total de Sobras/Ajustes (R$)", f"R$ {total_sobras:,.2f}")
-                            
                         df_risco['Categoria_Prod'] = df_risco['Descrição do Produto'].astype(str).str.split().str[0]
-                        df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index()
-                        df_agrupado_val = df_agrupado_val.sort_values(by=col_val_aju_etapa4, ascending=True).head(15)
-
-                        fig_risco = px.bar(
-                            df_agrupado_val,
-                            x='Categoria_Prod',
-                            y=col_val_aju_etapa4,
-                            title="Balanço Líquido de Divergências por Categoria (Em Reais - R$)",
-                            template="plotly_dark",
-                            color=col_val_aju_etapa4,
-                            color_continuous_scale=['#ef4444', '#3b82f6', '#10b981']
-                        )
-                        fig_risco.update_layout(
-                            paper_bgcolor='rgba(11, 15, 25, 0.9)',
-                            plot_bgcolor='rgba(11, 15, 25, 0.9)',
-                            height=420,
-                            margin=dict(l=30, r=30, t=40, b=30),
-                            xaxis=dict(showgrid=False, title="Categoria / Linha de Produto"),
-                            yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Impacto Líquido em Valor (R$)")
-                        )
+                        df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index().sort_values(by=col_val_aju_etapa4, ascending=True).head(15)
+                        fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
+                        fig_risco.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=420)
                         st.plotly_chart(fig_risco, use_container_width=True)
-                    else:
-                        st.warning("Dados insuficientes para estruturar a matriz de risco.")
-       
-                # ================================================================
-                # ETAPA 5 DEFINITIVA: CENTRO DE COMANDO C-LEVEL (4 MÓDULOS UNIFICADOS)
-                # ================================================================
+
+                # ETAPA 5: Centro de Comando C-Level
                 with st.expander("⚡ ETAPA 5: CENTRO DE COMANDO C-LEVEL (PRESCRITIVO & OPERACIONAL)", expanded=True):
-                    st.markdown("""
-                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(0, 242, 254, 0.4); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-                        <span style="color: #00f2fe; font-weight: 700; font-size: 0.95rem;">J.A.R.V.I.S. // INTELIGÊNCIA PRESCRITIVA E PLANO DE AÇÃO AUTOMÁTICO</span>
-                        <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px; margin-bottom: 0;">
-                            Módulo unificado contendo Matriz de Causa Raiz, Quadrante de Risco 4D, Simulador de Meta 97% e o Plano de Ação Prioritário para a auditoria de segunda-feira.
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    tab_e5_1, tab_e5_2, tab_e5_3, tab_e5_4 = st.tabs([
-                        "🔍 1. Matriz Causa Raiz", 
-                        "📈 2. Quadrante 4D", 
-                        "🎯 3. Simulador Meta 97%", 
-                        "📋 4. Plano de Ação Prioritário"
-                    ])
-
+                    tab_e5_1, tab_e5_2, tab_e5_3, tab_e5_4 = st.tabs(["🔍 1. Matriz Causa Raiz", "📈 2. Quadrante 4D", "🎯 3. Simulador Meta 97%", "📋 4. Plano de Ação Prioritário"])
                     col_val_aju_e5 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_filtrado.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
                     col_ajuste_e5 = 'Ajuste' if 'Ajuste' in df_filtrado.columns else 'Ajuste'
-
-                    # Processamento para a Causa Raiz
+                    
                     df_causa = df_filtrado.copy()
                     def classificar_causa(row):
                         aj = row.get(col_ajuste_e5, 0)
                         val = abs(row.get(col_val_aju_e5, 0))
                         saldo_sis = row.get('Saldo em Estoque', 1)
-                        if aj < 0 and val > 200:
-                            return "🚨 Furto / Extravio Crítico (Alto Valor)"
-                        elif aj == 0 and saldo_sis == 0:
-                            return "👻 Estoque Fantasma / Zumbi"
-                        elif abs(aj) in [6, 12, 24]:
-                            return "📦 Erro de Recebimento / Caixa Fechada"
-                        elif aj != 0:
-                            return "🔄 Divergência Operacional / Quebra Padrão"
-                        else:
-                            return "✅ Conforme"
-
+                        if aj < 0 and val > 200: return "🚨 Furto / Extravio Crítico (Alto Valor)"
+                        elif aj == 0 and saldo_sis == 0: return "👻 Estoque Fantasma / Zumbi"
+                        elif abs(aj) in [6, 12, 24]: return "📦 Erro de Recebimento / Caixa Fechada"
+                        elif aj != 0: return "🔄 Divergência Operacional / Quebra Padrão"
+                        else: return "✅ Conforme"
                     df_causa['Perfil_Causa'] = df_causa.apply(classificar_causa, axis=1)
 
                     with tab_e5_1:
-                        st.markdown("##### 🔍 Diagnóstico Automático de Causas de Divergência")
-                        resumo_causas = df_causa.groupby('Perfil_Causa').agg(
-                            SKUs=('Código do Produto', 'count'),
-                            Impacto_Financeiro=(col_val_aju_etapa4, 'sum')
-                        ).reset_index()
-                        
-                        st.dataframe(resumo_causas.style.format({
-                            'SKUs': '{:,}',
-                            'Impacto_Financeiro': 'R$ {:,.2f}'
-                        }), use_container_width=True)
-                        st.info("💡 **Insights C-Level:** O sistema isola automaticamente furos em itens de alto valor (risco de furto) vs. erros de embalagem e estoques fantasma que travam o reabastecimento.")
-
+                        resumo_causas = df_causa.groupby('Perfil_Causa').agg(SKUs=('Código do Produto', 'count'), Impacto_Financeiro=(col_val_aju_etapa4, 'sum')).reset_index()
+                        st.dataframe(resumo_causas.style.format({'SKUs': '{:,}', 'Impacto_Financeiro': 'R$ {:,.2f}'}), use_container_width=True)
                     with tab_e5_2:
-                        st.markdown("##### 📈 Quadrante de Risco Estratégico 4D (Outliers de Perda)")
-                        if len(num_cols) >= 2:
-                            df_scatter = df_causa[df_causa[col_ajuste_e5] != 0].copy()
-                            df_scatter['Tamanho_Bolha'] = df_scatter[col_val_aju_etapa4].abs().clip(lower=1)
-                            
-                            fig_4d = px.scatter(
-                                df_scatter,
-                                x='Saldo em Estoque',
-                                y=col_val_aju_etapa4,
-                                size='Tamanho_Bolha',
-                                color='Perfil_Causa',
-                                hover_name='Descrição do Produto',
-                                title="Dispersão de Divergências: Volume vs Impacto Financeiro",
-                                template="plotly_dark",
-                                height=450
-                            )
-                            fig_4d.update_layout(
-                                paper_bgcolor='rgba(11, 15, 25, 0.9)',
-                                plot_bgcolor='rgba(11, 15, 25, 0.9)',
-                                margin=dict(l=30, r=30, t=40, b=30),
-                                xaxis=dict(showgrid=False, title="Saldo em Estoque (Sistema)"),
-                                yaxis=dict(gridcolor='rgba(31, 41, 55, 0.6)', title="Valor do Ajuste (R$)")
-                            )
-                            st.plotly_chart(fig_4d, use_container_width=True)
-
+                        df_scatter = df_causa[df_causa[col_ajuste_e5] != 0].copy()
+                        df_scatter['Tamanho_Bolha'] = df_scatter[col_val_aju_etapa4].abs().clip(lower=1)
+                        fig_4d = px.scatter(df_scatter, x='Saldo em Estoque', y=col_val_aju_etapa4, size='Tamanho_Bolha', color='Perfil_Causa', hover_name='Descrição do Produto', template="plotly_dark", height=450)
+                        st.plotly_chart(fig_4d, use_container_width=True)
                     with tab_e5_3:
-                        st.markdown("##### 🎯 Simulador Interativo & Progresso rumo à Meta 97%")
                         c_sim1, c_sim2 = st.columns(2)
                         with c_sim1:
-                            meta_atual_val = resumo_unico['acuracia_vol']
-                            st.metric("Acurácia Volumétrica Atual", f"{meta_atual_val:.2f}%", delta=f"{meta_atual_val - 97:.2f}% vs Meta 97%")
-                            skus_totais = resumo_unico['total_skus']
-                            skus_exatos_atuais = resumo_unico['skus_exatos']
-                            skus_necessarios_97 = int(skus_totais * 0.97)
-                            deficit_skus = max(0, skus_necessarios_97 - skus_exatos_atuais)
-                            st.warning(f"⚠️ Para atingir a **Meta Corporativa de 97%**, faltam recontar ou corrigir exatamente **{deficit_skus:,} SKUs** nesta unidade.")
+                            st.metric("Acurácia Volumétrica Atual", f"{resumo_unico['acuracia_vol']:.2f}%")
                         with c_sim2:
                             perc_recup = st.slider("Simular % de Recuperação de Faltas", 0, 100, 30, 5, key="slider_meta_e5")
                             quebras_totais = abs(df_causa[df_causa[col_ajuste_e5] < 0][col_val_aju_etapa4].sum())
-                            economia_sim = quebras_totais * (perc_recup / 100.0)
-                            st.success(f"💰 **Ganho de Caixa Projetado:** Recuperar {perc_recup}% das quebras representa uma injeção de **R$ {economia_sim:,.2f}** no resultado operacional.")
-
+                            st.success(f"💰 Ganho de Caixa: R$ {quebras_totais * (perc_recup / 100.0):,.2f}")
                     with tab_e5_4:
-                        st.markdown("##### 📋 Plano de Ação Prioritário para Auditoria (Top Alvos de Maior ROI)")
-                        st.markdown("Lista cirúrgica dos SKUs que concentram o maior impacto financeiro negativo, ordenada para prioridade máxima da equipe de Prevenção de Perdas:")
-                        
                         df_plano = df_causa[df_causa[col_ajuste_e5] < 0].sort_values(by=col_val_aju_etapa4, ascending=True).head(15).copy()
                         if not df_plano.empty:
-                            df_exibicao_plano = df_plano[['Código do Produto', 'Descrição do Produto', 'Saldo em Estoque', col_ajuste_e5, col_val_aju_etapa4, 'Perfil_Causa']].rename(
-                                columns={col_ajuste_e5: 'Ajuste Qtd', col_val_aju_etapa4: 'Impacto (R$)'}
-                            )
-                            st.dataframe(df_exibicao_plano.style.format({
-                                'Impacto (R$)': 'R$ {:,.2f}',
-                                'Ajuste Qtd': '{:,}',
-                                'Saldo em Estoque': '{:,}'
-                            }), use_container_width=True)
-                            st.info("🎯 **Instrução Operacional:** Imprima esta tabela e entregue diretamente ao encarregado de estoque e chefe de segurança para a recontagem física imediata dos itens listados.")
-                        else:
-                            st.warning("Nenhum item com quebra encontrado para gerar o plano de ação.")
-
-            # ====================================================================
-            # MODO 2: MÚLTIPLOS FICHEIROS (VISÃO COMPARATIVA EXECUTIVA COMPLETA)
-            # ====================================================================
-            else:
-                st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO C-LEVEL")
-                resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
-                
-                col_cards = st.columns(len(lista_dfs))
-                for idx, r in enumerate(resumos):
-                    with col_cards[idx]:
-                        with st.container(border=True):
-                            st.markdown(f"#### 📄 {r['nome']}")
-                            st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{r['total_skus']:,}", f"Pré: {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{r['skus_falta']:,} SKUs ({r['perc_falta_itens']:.2f}%)", f"Vol: -{r['vol_falta']:,.0f} un | R$ {r['val_falta']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%)", f"Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{r['total_div']:,} SKUs ({r['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{r['vol_div_total']:,.0f} unidades ({r['perc_vol_div']:.2f}%)", f"R$ {r['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {r['acuracia_vol']:.2f}% | Fin: {r['acuracia_fin']:.2f}%", "Meta Corporativa 97%", eh_negativo=(r['acuracia_vol'] < 97), eh_positivo=(r['acuracia_vol'] >= 97)), unsafe_allow_html=True)
-                            
-                            st.markdown("##### 💰 Balanço Patrimonial")
-                            st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {r['soma_antes']:,.2f}", f"Qtd Pré: {r['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {r['soma_depois']:,.2f}", f"Qtd Pós: {r['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Impacto Geral", f"{r['impacto_sobre_antes_pct']:.2f}%", f"Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f}", eh_negativo=(r['impacto_sobre_antes_pct'] < 0), eh_positivo=(r['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {r['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(r['val_ajuste_liquido'] < 0), eh_positivo=(r['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
-
-                st.markdown("---")
-                st.subheader("📊 Gráficos Comparativos Consolidados")
-                
-                df_resumo_geral = pd.DataFrame([
-                    {
-                        "Ficheiro": r['nome'],
-                        "Estoque Antes": r['soma_antes'],
-                        "Estoque Depois": r['soma_depois'],
-                        "Ajuste Líquido": r['val_ajuste_liquido'],
-                        "Impacto Geral (%)": r['impacto_sobre_antes_pct'],
-                        "Total SKUs": r['total_skus'],
-                        "Faltas (SKUs)": r['skus_falta'],
-                        "Sobras (SKUs)": r['skus_sobra']
-                    } for r in resumos
-                ])
-                
-                gc1, gc2 = st.columns(2)
-                with gc1:
-                    fig_val = px.bar(df_resumo_geral, x="Ficheiro", y=["Estoque Antes", "Estoque Depois"], barmode="group", template="plotly_dark", title="Comparativo Valor Estoque (Antes vs Depois)")
-                    st.plotly_chart(fig_val, use_container_width=True)
-                with gc2:
-                    fig_aj = px.bar(df_resumo_geral, x="Ficheiro", y="Impacto Geral (%)", template="plotly_dark", title="Impacto Geral em Percentual")
-                    st.plotly_chart(fig_aj, use_container_width=True)
-
-                # ETAPA 5 (MODO 2): Evolução Multitemporal Avançada
-                st.markdown("---")
-                with st.expander("📈 ETAPA 5: Evolução Histórica & Tendência Multitemporal", expanded=True):
-                    df_tendencia = pd.DataFrame([
-                        {
-                            "Inventario": r['nome'],
-                            "Acuracidade Volumétrica (%)": r['acuracia_vol'],
-                            "Acuracidade Financeira (%)": r['acuracia_fin'],
-                            "Divergência / Ajuste Líquido (R$)": r['val_ajuste_liquido'],
-                            "Impacto Geral (%)": r['impacto_sobre_antes_pct']
-                        } for r in resumos
-                    ])
-                    metrica_escolhida = st.selectbox("Selecione o Indicador para Análise Histórica:", options=df_tendencia.columns[1:], key="select_metrica_evolucao")
-                    fig_tendencia = px.line(df_tendencia, x="Inventario", y=metrica_escolhida, markers=True, title=f"Evolução Histórica: {metrica_escolhida}", template="plotly_dark")
-                    st.plotly_chart(fig_tendencia, use_container_width=True)
+                            st.dataframe(df_plano[['Código do Produto', 'Descrição do Produto', 'Saldo em Estoque', col_ajuste_e5, col_val_aju_etapa4, 'Perfil_Causa']].style.format({col_val_aju_etapa4: 'R$ {:,.2f}'}), use_container_width=True)
 
             # Central de Relatórios
             st.markdown("---")
             st.subheader("📥 Central de Relatórios Executivos C-Level")
             col_e1, col_e2, col_e3, col_e4 = st.columns(4)
-            with col_e1:
-                st.download_button("📊 Excel Gerencial", data=gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            with col_e2:
-                st.download_button("📄 Word Gerencial", data=gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            with col_e3:
-                st.download_button("📑 PDF Gerencial", data=gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.pdf", mime="application/pdf")
-            with col_e4:
-                st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_GrupoKMB.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+            with col_e1: st.download_button("📊 Excel Gerencial", data=gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            with col_e2: st.download_button("📄 Word Gerencial", data=gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            with col_e3: st.download_button("📑 PDF Gerencial", data=gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.pdf", mime="application/pdf")
+            with col_e4: st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_GrupoKMB.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
 if __name__ == "__main__":
     main()
