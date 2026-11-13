@@ -180,8 +180,15 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
     return resumo_ficheiros
 
 
+def limpar_nome_local(val):
+    s = str(val).strip()
+    if s.endswith('.0'):
+        s = s[:-2]
+    return s
+
+
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM CONTROLE ESTRITO DE COLUNAS
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM LIMPEZA DE LOCAIS SEM PONTO DESNECESSÁRIO
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -248,7 +255,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     soma_comptar_por_produto = {}
     
     for _, row in df_localizacao.iterrows():
-        loc = str(row.get(col_loc, '')).strip()
+        loc = limpar_nome_local(row.get(col_loc, ''))
         cod = str(row.get(col_cod_loc, '')).strip()
         desc = str(row.get(col_desc_loc, '')).strip()
         
@@ -265,9 +272,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         locais_por_produto[cod].append((loc, qtd))
         soma_comptar_por_produto[cod] += qtd
         
-    # CÁLCULO EXATO DE LOCAIS COM BASE APENAS NOS ITENS FILTRADOS OU NA LISTA GERAL
-    # Para evitar colunas vazias desnecessárias, calculamos o máximo de locais reais considerando o filtro atual.
-    # Vamos primeiro pré-filtrar os itens que vão aparecer para saber exatamente quantos locais máximos precisamos.
     col_cod_est = next((c for c in df_estoque.columns if 'codigo' in c.lower()), 'Codigo')
     col_desc_est = next((c for c in df_estoque.columns if 'desc' in c.lower()), 'Descrição')
     col_est = next((c for c in df_estoque.columns if 'estoque' in c.lower()), 'Estoque')
@@ -302,7 +306,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         if incluir:
             itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
 
-    # Descobre o número máximo de locais apenas para os produtos que VÃO APARECER e têm contagem real (>0)
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
 
@@ -401,9 +404,8 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 else:
                     contagens_vals.append("")
                     
-            locais_vals = [locs_prod[i][0] if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
+            locais_vals = [limpar_nome_local(locs_prod[i][0]) if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
         else:
-            # Para itens sem contagem, preenche o primeiro com os avisos e deixa o resto vazio estritamente limitado
             contagens_vals = ["0 - Comptar"] + [""] * (max_locais_encontrados - 1)
             locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
             
@@ -763,7 +765,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM TRATAMENTO CIRÚRGICO DE LOCAIS
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM LIMPEZA DE LOCAIS
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -787,7 +789,7 @@ def main():
                 # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA)
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
-                st.caption("Abaixo está a prévia interativa limpa, exibindo apenas as colunas necessárias para cada filtro:")
+                st.caption("Abaixo está a prévia interativa limpa, exibindo os números reais dos locais sem pontos decimais indesejados:")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2).fillna("")
@@ -801,7 +803,7 @@ def main():
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas automaticamente com A4 Paisagem, sem colunas vazias sobrando em nenhum dos botões.")
+                st.caption("Configuradas automaticamente com A4 Paisagem e locais limpos.")
                 
                 c_imp1, c_imp2, c_imp3 = st.columns(3)
                 
