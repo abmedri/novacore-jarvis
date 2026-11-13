@@ -262,14 +262,12 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo = wb.create_sheet(title="Saldo Loja")
     ws_saldo.views.sheetView[0].showGridLines = True
     
-    # Configurações de Impressão: A4 Paisagem, ajuste a 1 página de largura
     ws_saldo.page_setup.orientation = ws_saldo.ORIENTATION_LANDSCAPE
     ws_saldo.page_setup.paperSize = ws_saldo.PAPERSIZE_A4
     ws_saldo.sheet_properties.pageSetUpPr.fitToPage = True
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # Configuração do Rodapé (Esquerda: Loja, Centro: Data atual, Direita: Página X de Y)
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input}"
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
@@ -321,7 +319,9 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         divergencia_val = soma_comptar_val - est
         
         incluir = False
-        if tipo_filtro == "ZERADOS":
+        if tipo_filtro == "TODOS":
+            incluir = True
+        elif tipo_filtro == "ZERADOS":
             if not tem_na_comptar:
                 incluir = True
         elif tipo_filtro == "FALTAS":
@@ -686,11 +686,11 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM OS 3 BOTÕES DE IMPRESSÃO CIRÚRGICA
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO E OS 3 BOTÕES
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
-        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar o plano de inventário unificado e as listas cirúrgicas de impressão:")
+        st.markdown("Insira o número da loja e carregue os arquivos abaixo para visualizar e gerar o plano de inventário unificado:")
         
         numero_loja_ui = st.number_input("Número da Loja (ex: 13016 ou 17315)", min_value=1, max_value=99999, value=13016, step=1)
         
@@ -706,6 +706,16 @@ def main():
             
             if df_loc_temp is not None and df_est_temp is not None:
                 st.success("✅ Arquivos carregados e validados com sucesso!")
+                
+                # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA)
+                st.markdown("---")
+                st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
+                st.caption("Abaixo está a prévia interativa de como os dados serão consolidados para conferência:")
+                
+                # Geramos um buffer temporário em memória para extrair a prévia com pandas
+                buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
+                df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2)
+                st.dataframe(df_preview_exibir, use_container_width=True, height=350)
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
