@@ -181,7 +181,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM TRATAMENTO CIRÚRGICO DE LOCAIS
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM CONTROLE ESTRITO DE COLUNAS
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -265,14 +265,46 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         locais_por_produto[cod].append((loc, qtd))
         soma_comptar_por_produto[cod] += qtd
         
-    # Cálculo enxuto do máximo de locais com contagem real
-    locais_com_contagem = [len(v) for v in locais_por_produto.values() if len(v) > 0]
-    max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
+    # CÁLCULO EXATO DE LOCAIS COM BASE APENAS NOS ITENS FILTRADOS OU NA LISTA GERAL
+    # Para evitar colunas vazias desnecessárias, calculamos o máximo de locais reais considerando o filtro atual.
+    # Vamos primeiro pré-filtrar os itens que vão aparecer para saber exatamente quantos locais máximos precisamos.
+    col_cod_est = next((c for c in df_estoque.columns if 'codigo' in c.lower()), 'Codigo')
+    col_desc_est = next((c for c in df_estoque.columns if 'desc' in c.lower()), 'Descrição')
+    col_est = next((c for c in df_estoque.columns if 'estoque' in c.lower()), 'Estoque')
     
-    for row in ws_comp.iter_rows(min_row=2, max_row=ws_comp.max_row, min_col=1, max_col=4):
-        for cell in row:
-            cell.font = fonte_padrao
-            cell.border = borda_fina
+    itens_filtrados_temp = []
+    for idx, row in df_estoque.iterrows():
+        cod = str(row.get(col_cod_est, '')).strip()
+        desc = row.get(col_desc_est, '')
+        try:
+            est = int(float(row.get(col_est, 0)))
+        except Exception:
+            est = 0
+        
+        locs_prod = locais_por_produto.get(cod, [])
+        tem_na_comptar = len(locs_prod) > 0
+        soma_comptar_val = soma_comptar_por_produto.get(cod, 0) if tem_na_comptar else 0
+        divergencia_val = soma_comptar_val - est
+        
+        incluir = False
+        if tipo_filtro == "TODOS":
+            incluir = True
+        elif tipo_filtro == "ZERADOS":
+            if not tem_na_comptar:
+                incluir = True
+        elif tipo_filtro == "FALTAS":
+            if tem_na_comptar and divergencia_val < 0:
+                incluir = True
+        elif tipo_filtro == "SOBRAS":
+            if tem_na_comptar and divergencia_val > 0:
+                incluir = True
+                
+        if incluir:
+            itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
+
+    # Descobre o número máximo de locais apenas para os produtos que VÃO APARECER e têm contagem real (>0)
+    locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
+    max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
 
     # 3. Aba Saldo Loja
     ws_saldo = wb.create_sheet(title="Saldo Loja")
@@ -350,66 +382,34 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = borda_fina
         
-    col_cod_est = next((c for c in df_estoque.columns if 'codigo' in c.lower()), 'Codigo')
-    col_desc_est = next((c for c in df_estoque.columns if 'desc' in c.lower()), 'Descrição')
-    col_est = next((c for c in df_estoque.columns if 'estoque' in c.lower()), 'Estoque')
-    
-    for idx, row in df_estoque.iterrows():
-        cod = str(row.get(col_cod_est, '')).strip()
-        desc = row.get(col_desc_est, '')
-        try:
-            est = int(float(row.get(col_est, 0)))
-        except Exception:
-            est = 0
+    for cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod in itens_filtrados_temp:
+        cel_comptar = soma_comptar_val if tem_na_comptar else 0
+        cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
         
-        locs_prod = locais_por_produto.get(cod, [])
-        tem_na_comptar = len(locs_prod) > 0
+        linha_dados = [cod, desc, est, cel_comptar, cel_divergencia]
         
-        soma_comptar_val = soma_comptar_por_produto.get(cod, 0) if tem_na_comptar else 0
-        divergencia_val = soma_comptar_val - est
-        
-        incluir = False
-        if tipo_filtro == "TODOS":
-            incluir = True
-        elif tipo_filtro == "ZERADOS":
-            if not tem_na_comptar:
-                incluir = True
-        elif tipo_filtro == "FALTAS":
-            if tem_na_comptar and divergencia_val < 0:
-                incluir = True
-        elif tipo_filtro == "SOBRAS":
-            if tem_na_comptar and divergencia_val > 0:
-                incluir = True
-                
-        if incluir:
-            r = ws_saldo.max_row + 1
+        if tem_na_comptar:
+            contagens_vals = []
+            for i in range(max_locais_encontrados):
+                if i < len(locs_prod):
+                    val_num = locs_prod[i][1]
+                    try:
+                        val_int = int(float(val_num))
+                        contagens_vals.append(val_int)
+                    except Exception:
+                        contagens_vals.append(val_num)
+                else:
+                    contagens_vals.append("")
+                    
+            locais_vals = [locs_prod[i][0] if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
+        else:
+            # Para itens sem contagem, preenche o primeiro com os avisos e deixa o resto vazio estritamente limitado
+            contagens_vals = ["0 - Comptar"] + [""] * (max_locais_encontrados - 1)
+            locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
             
-            cel_comptar = soma_comptar_val if tem_na_comptar else 0
-            cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
-            
-            linha_dados = [cod, desc, est, cel_comptar, cel_divergencia]
-            if tem_na_comptar:
-                contagens_vals = []
-                for i in range(max_locais_encontrados):
-                    if i < len(locs_prod):
-                        val_num = locs_prod[i][1]
-                        try:
-                            val_int = int(float(val_num))
-                            contagens_vals.append(val_int)
-                        except Exception:
-                            contagens_vals.append(val_num)
-                    else:
-                        contagens_vals.append("")
-                        
-                locais_vals = [locs_prod[i][0] if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
-            else:
-                # Mantém o padrão correto para itens sem contagem sem inflar colunas desnecessárias
-                contagens_vals = ["0 - Comptar"] + [""] * (max_locais_encontrados - 1)
-                locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
-                
-            linha_dados.extend(contagens_vals)
-            linha_dados.extend(locais_vals)
-            ws_saldo.append(linha_dados)
+        linha_dados.extend(contagens_vals)
+        linha_dados.extend(locais_vals)
+        ws_saldo.append(linha_dados)
         
     for row in ws_saldo.iter_rows(min_row=4, max_row=ws_saldo.max_row, min_col=1, max_col=len(headers_saldo)):
         for cell in row:
@@ -787,7 +787,7 @@ def main():
                 # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA)
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
-                st.caption("Abaixo está a prévia interativa com o retorno dos status '0 - CompTar' e 'Sem local' sem colunas vazias em excesso:")
+                st.caption("Abaixo está a prévia interativa limpa, exibindo apenas as colunas necessárias para cada filtro:")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2).fillna("")
@@ -801,7 +801,7 @@ def main():
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas automaticamente com A4 Paisagem e formatação perfeita.")
+                st.caption("Configuradas automaticamente com A4 Paisagem, sem colunas vazias sobrando em nenhum dos botões.")
                 
                 c_imp1, c_imp2, c_imp3 = st.columns(3)
                 
