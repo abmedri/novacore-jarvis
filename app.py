@@ -181,7 +181,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA IDÊNTICA AO PADRÃO KMB & LOGO
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA IDÊNTICA AO PADRÃO KMB & VALORES CALCULADOS
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -245,16 +245,26 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     col_qtd_loc = next((c for c in df_localizacao.columns if 'qtd' in c.lower() or 'quantidade' in c.lower()), df_localizacao.columns[5])
     
     locais_por_produto = {}
+    soma_comptar_por_produto = {}
     max_locais_encontrados = 12
     for _, row in df_localizacao.iterrows():
         loc = str(row.get(col_loc, ''))
         cod = str(row.get(col_cod_loc, ''))
         desc = str(row.get(col_desc_loc, ''))
-        qtd = row.get(col_qtd_loc, 0)
+        
+        try:
+            qtd = int(float(row.get(col_qtd_loc, 0)))
+        except Exception:
+            qtd = 0
+            
         ws_comp.append([loc, cod, desc, qtd])
         if cod not in locais_por_produto:
             locais_por_produto[cod] = []
+            soma_comptar_por_produto[cod] = 0
+            
         locais_por_produto[cod].append((loc, qtd))
+        soma_comptar_por_produto[cod] += qtd
+        
         if len(locais_por_produto[cod]) > max_locais_encontrados:
             max_locais_encontrados = len(locais_por_produto[cod])
     
@@ -263,7 +273,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             cell.font = fonte_padrao
             cell.border = borda_fina
 
-    # 3. Aba Saldo Loja (Padrão visual idêntico ao plano de inventário KMB)
+    # 3. Aba Saldo Loja
     ws_saldo = wb.create_sheet(title="Saldo Loja")
     ws_saldo.views.sheetView[0].showGridLines = True
     
@@ -277,7 +287,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
     
-    # Inserção da Logo KMB se disponível no diretório
     caminho_logo = "logo_kmb.jpg" if os.path.exists("logo_kmb.jpg") else ("brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None)
     if caminho_logo:
         try:
@@ -288,7 +297,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         except Exception:
             pass
 
-    # Cabeçalho Superior Estilizado KMB
     ws_saldo['D1'] = "DATA:"
     ws_saldo['D1'].font = fonte_negrito
     ws_saldo['D1'].alignment = Alignment(horizontal="center", vertical="center")
@@ -348,12 +356,15 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     for idx, row in df_estoque.iterrows():
         cod = str(row.get(col_cod_est, ''))
         desc = row.get(col_desc_est, '')
-        est = row.get(col_est, 0)
+        try:
+            est = int(float(row.get(col_est, 0)))
+        except Exception:
+            est = 0
         
         locs_prod = locais_por_produto.get(cod, [])
         tem_na_comptar = len(locs_prod) > 0
         
-        soma_comptar_val = sum([item[1] for item in locs_prod]) if tem_na_comptar else 0
+        soma_comptar_val = soma_comptar_por_produto.get(cod, 0) if tem_na_comptar else 0
         divergencia_val = soma_comptar_val - est
         
         incluir = False
@@ -371,10 +382,12 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 
         if incluir:
             r = ws_saldo.max_row + 1
-            formula_comptar = f"=SUMIF(CompTar!B:B, A{r}, CompTar!D:D)"
-            formula_divergencia = f"=D{r}-C{r}"
             
-            linha_dados = [cod, desc, est, formula_comptar, formula_divergencia]
+            # Calculamos o valor e inserimos tanto a fórmula quanto o valor numérico calculado para aparecer na pré-visualização do Streamlit
+            cel_comptar = soma_comptar_val if tem_na_comptar else 0
+            cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
+            
+            linha_dados = [cod, desc, est, cel_comptar, cel_divergencia]
             if tem_na_comptar:
                 contagens_vals = []
                 for i in range(max_locais_encontrados):
@@ -593,7 +606,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     
     story = []
     
-    story.append(Paragraph("⚡ GRUPO KMB // AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
+    story.append(Paragraph("⚡ GRUPO KMB // DOSSIÊ DE AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
     story.append(Paragraph("Relatório oficial consolidado contendo indicadores de impacto, análise de quebras, sobras e itens críticos.", estilo_texto))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3B82F6'), spaceBefore=8, spaceAfter=12))
     
@@ -734,7 +747,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM PADRÃO KMB IDÊNTICO
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM VALORES CALCULADOS NA TELA
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -837,7 +850,7 @@ def main():
                 with c1:
                     st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{resumo_unico['total_skus']:,}", f"Pré: {resumo_unico['qtd_antes']:,.0f} un | Pós: {resumo_unico['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{resumo_unico['skus_falta']:,} SKUs ({resumo_unico['perc_falta_itens']:.2f}%)", f"Vol: -{resumo_unico['vol_falta']:,.0f} un | R$ {resumo_unico['val_falta']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{resumo_unico['vol_div_total']:,.0f} unidades ({resumo_unico['perc_vol_div']:.2f}%)", f"R$ {resumo_unico['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Volume Físico Total Divergências (Sobra + Falta)", f"{resumo_unico['vol_div_total']:,.0f} unidades ({resumo_unico['perc_vol_div']:.2f}%)", f"R$ {resumo_unico['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                 with c2:
                     st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{resumo_unico['skus_sobra']:,} SKUs ({resumo_unico['perc_sobra_itens']:.2f}%)", f"Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{resumo_unico['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{resumo_unico['total_div']:,} SKUs ({resumo_unico['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
