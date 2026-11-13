@@ -181,7 +181,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA IDÊNTICA AO PADRÃO KMB & VALORES LIMPOS
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA IDÊNTICA AO PADRÃO KMB & LARGURA 3
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -287,13 +287,14 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
     
+    # Inserção correta da logo do Grupo KMB baseada no anexo atual
     caminho_logo = "logo_kmb.jpg" if os.path.exists("logo_kmb.jpg") else ("brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None)
     if caminho_logo:
         try:
             img = OpenpyxlImage(caminho_logo)
             img.width = 240
-            img.height = 40
-            ws_saldo.add_image(img, 'A1')
+            img.height = 38
+            ws_saldo.add_image(img, 'B1')
         except Exception:
             pass
 
@@ -393,7 +394,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                     if i < len(locs_prod):
                         val_num = locs_prod[i][1]
                         try:
-                            # Força estritamente conversão inteira limpa sem ponto decimal e formato numérico do excel
                             val_int = int(float(val_num))
                             contagens_vals.append(val_int)
                         except Exception:
@@ -414,7 +414,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         for cell in row:
             cell.font = fonte_padrao
             cell.border = borda_fina
-            # Garantir formato numérico inteiro nas células geradas para evitar float no Excel
             if cell.row >= 4 and cell.column >= 3:
                 if isinstance(cell.value, (int, float)):
                     cell.number_format = '0'
@@ -426,7 +425,21 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    for ws in [ws_loja, ws_comp, ws_saldo]:
+    # Ajuste preciso de largura de colunas: Código, Descrição, Estoque, Comptar, Divergência e Largura 3 para Contagens e Locais
+    for col in ws_saldo.columns:
+        col_idx = col[0].column
+        col_letter = get_column_letter(col_idx)
+        if col_idx == 1:
+            ws_saldo.column_dimensions[col_letter].width = 12
+        elif col_idx == 2:
+            ws_saldo.column_dimensions[col_letter].width = 38
+        elif col_idx in [3, 4, 5]:
+            ws_saldo.column_dimensions[col_letter].width = 12
+        else:
+            # Colunas de Contagem e Locais (a partir da coluna 6 em diante) definidas com largura exata 3 como no Excel
+            ws_saldo.column_dimensions[col_letter].width = 3.5
+
+    for ws in [ws_loja, ws_comp]:
         for col in ws.columns:
             max_len = 0
             col_letter = get_column_letter(col[0].column)
@@ -752,7 +765,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO FORMATADA LIMPA
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM LARGURA 3 E LOGO CORRETA
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -773,15 +786,14 @@ def main():
             if df_loc_temp is not None and df_est_temp is not None:
                 st.success("✅ Arquivos carregados e validados com sucesso!")
                 
-                # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA) - CONVERTENDO PARA INTEIRO LIMPO NA EXIBIÇÃO
+                # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA)
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
-                st.caption("Abaixo está a prévia interativa formatada sem pontos decimais para conferência:")
+                st.caption("Abaixo está a prévia interativa formatada com largura compacta para conferência:")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2).fillna("")
                 
-                # Tratamento de exibição para remover qualquer ponto decimal na pré-visualização do Streamlit
                 for col in df_preview_exibir.columns:
                     df_preview_exibir[col] = df_preview_exibir[col].apply(
                         lambda x: str(int(x)) if isinstance(x, float) and x.is_integer() else (str(x).replace('.0', '') if isinstance(x, float) else x)
@@ -791,7 +803,7 @@ def main():
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas automaticamente com A4 Paisagem, ajuste de colunas na largura e rodapé executivo (Data, Loja e Páginas).")
+                st.caption("Configuradas automaticamente com A4 Paisagem, largura otimizada e rodapé executivo.")
                 
                 c_imp1, c_imp2, c_imp3 = st.columns(3)
                 
@@ -933,7 +945,7 @@ def main():
                         df_risco = df_filtrado.copy()
                         col_val_aju_etapa4 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_risco.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
                         df_risco['Categoria_Prod'] = df_risco['Descrição do Produto'].astype(str).str.split().str[0]
-                        df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index().sort_values(by=col_val_aju_etapa4, ascending=True).head(15)
+                        df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index().sort_values(by=col_val_aju_etayo4 if 'col_val_aju_etayo4' in locals() else col_val_aju_etapa4, ascending=True).head(15)
                         fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
                         fig_risco.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=420)
                         st.plotly_chart(fig_risco, use_container_width=True)
