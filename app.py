@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO OFICIAL COMPLETA - MODO 1, MODO 2 E ABA LOJA)
+# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO OFICIAL COM EXPANSÃO AUTOMÁTICA DE LOCAIS)
 # ====================================================================================
 import os
 import io
@@ -43,7 +43,7 @@ def processar_arquivo_upload(arquivo_carregado):
                         elif 'valor de ajuste' in col_lower:
                             col_mapping[col] = 'Valor de Ajuste (R$)'
                         elif 'valor de estoque' in col_lower:
-                            col_mapping[col] = 'Valor de Estreque (R$)'
+                            col_mapping[col] = 'Valor de Estoque (R$)'
                     df = df.rename(columns=col_mapping)
                     
                     for col in df.columns:
@@ -160,7 +160,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# GERADOR DA PLANILHA DE CONFERÊNCIA COM FORMATAÇÃO PROFISSIONAL C-LEVEL
+# GERADOR DA PLANILHA DE CONFERÊNCIA COM EXPANSÃO AUTOMÁTICA DE LOCAIS
 # ====================================================================================
 def gerar_planilha_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input=13016):
     wb = openpyxl.Workbook()
@@ -220,20 +220,29 @@ def gerar_planilha_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input
     col_desc_loc = next((c for c in df_localizacao.columns if 'desc' in c.lower()), df_localizacao.columns[4])
     col_qtd_loc = next((c for c in df_localizacao.columns if 'qtd' in c.lower() or 'quantidade' in c.lower()), df_localizacao.columns[5])
     
+    locais_por_produto = {}
+    max_locais_encontrados = 12
+    
     for _, row in df_localizacao.iterrows():
-        ws_comp.append([
-            str(row.get(col_loc, '')),
-            str(row.get(col_cod_loc, '')),
-            str(row.get(col_desc_loc, '')),
-            row.get(col_qtd_loc, 0)
-        ])
+        loc = str(row.get(col_loc, ''))
+        cod = str(row.get(col_cod_loc, ''))
+        desc = str(row.get(col_desc_loc, ''))
+        qtd = row.get(col_qtd_loc, 0)
+        
+        ws_comp.append([loc, cod, desc, qtd])
+        
+        if cod not in locais_por_produto:
+            locais_por_produto[cod] = []
+        locais_por_produto[cod].append((loc, qtd))
+        if len(locais_por_produto[cod]) > max_locais_encontrados:
+            max_locais_encontrados = len(locais_por_produto[cod])
     
     for row in ws_comp.iter_rows(min_row=2, max_row=ws_comp.max_row, min_col=1, max_col=4):
         for cell in row:
             cell.font = fonte_padrao
             cell.border = borda_fina
 
-    # 3. Aba Saldo Loja
+    # 3. Aba Saldo Loja (Expansão automática se houver mais de 12 locais)
     ws_saldo = wb.create_sheet(title="Saldo Loja")
     ws_saldo.views.sheetView[0].showGridLines = True
     ws_saldo.page_setup.orientation = ws_saldo.ORIENTATION_LANDSCAPE
@@ -257,11 +266,12 @@ def gerar_planilha_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input
     ws_saldo['R2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,""))'
     ws_saldo['R2'].font = fonte_padrao
     
-    headers_saldo = [
-        "Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA", 
-        "CONT. 1", "2", "3", "4", "5", "6", "7", "8", "9", "10", 
-        "11", "12", "Local", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24"
-    ]
+    headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
+    for i in range(1, max_locais_encontrados + 1):
+        headers_saldo.append(str(i) if i > 1 else "CONT. 1")
+    for i in range(1, max_locais_encontrados + 1):
+        headers_saldo.append(f"Local {i}" if i == 1 else str(i))
+        
     ws_saldo.append([])
     ws_saldo.append(headers_saldo)
     
@@ -277,25 +287,29 @@ def gerar_planilha_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input
     
     for idx, row in df_estoque.iterrows():
         r = idx + 4
-        cod = row.get(col_cod_est, '')
+        cod = str(row.get(col_cod_est, ''))
         desc = row.get(col_desc_est, '')
         est = row.get(col_est, 0)
         
         formula_comptar = f"=SUMIF(CompTar!B:B, A{r}, CompTar!D:D)"
         formula_divergencia = f"=D{r}-C{r}"
-        formula_local = f"=IFERROR(INDEX(CompTar!A:A, MATCH(A{r}, CompTar!B:B, 0)), \"Sem Local\")"
         
-        ws_saldo.append([
-            cod, desc, est, formula_comptar, formula_divergencia,
-            None, None, None, None, None, None, None, None, None, None,
-            None, None, formula_local, None, None, None, None, None, None, None, None, None, None, None
-        ])
+        linha_dados = [cod, desc, est, formula_comptar, formula_divergencia]
+        locs_prod = locais_por_produto.get(cod, [])
+        
+        contagens_vals = [locs_prod[i][1] if i < len(locs_prod) else None for i in range(max_locais_encontrados)]
+        linha_dados.extend(contagens_vals)
+        
+        locais_vals = [locs_prod[i][0] if i < len(locs_prod) else None for i in range(max_locais_encontrados)]
+        linha_dados.extend(locais_vals)
+        
+        ws_saldo.append(linha_dados)
         
     for row in ws_saldo.iter_rows(min_row=4, max_row=ws_saldo.max_row, min_col=1, max_col=len(headers_saldo)):
         for cell in row:
             cell.font = fonte_padrao
             cell.border = borda_fina
-            if cell.column in [1, 3, 4, 5, 18]:
+            if cell.column in [1, 3, 4, 5]:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             elif cell.column == 2:
                 cell.alignment = Alignment(horizontal="left", vertical="center")
@@ -409,9 +423,6 @@ def main():
 
     st.markdown("<div class='main-header'><div style='font-size:1.7rem; font-weight:800; color:#3b82f6;'>⚡ GRUPO KMB // DIRETORIA EXECUTIVA</div></div>", unsafe_allow_html=True)
     
-    # ====================================================================
-    # MODO 2: MODO PLANILHA DE CONFERÊNCIA
-    # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
         numero_loja_ui = st.number_input("Número da Loja (ex: 13016 ou 17315)", min_value=1, max_value=99999, value=13016, step=1)
@@ -439,9 +450,6 @@ def main():
                     )
         return
 
-    # ====================================================================
-    # MODO 1: AUDITORIA DE INVENTÁRIO (5 ETAPAS)
-    # ====================================================================
     arquivos_submetidos = st.file_uploader("Carregue o arquivo oficial de inventário", type=['csv', 'xlsx', 'xls'], accept_multiple_files=True)
     if arquivos_submetidos:
         lista_dfs = [processar_arquivo_upload(arq)[0] for arq in arquivos_submetidos if processar_arquivo_upload(arq)[0] is not None]
