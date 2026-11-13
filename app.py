@@ -188,7 +188,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM LOGOTIPO OFICIAL E LARGURA BLINDADA
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM NOVO LOGOTIPO NO TOPO
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -337,8 +337,8 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
     
-    # Inserção do logotipo oficial (removendo brasão antigo)
-    caminho_logo = "1000352084.jpg" if os.path.exists("1000352084.jpg") else ("logo_kmb.jpg" if os.path.exists("logo_kmb.jpg") else ("brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None))
+    # Inserção do logotipo oficial (1000352084.jpg) no topo das planilhas geradas
+    caminho_logo = "1000352084.jpg" if os.path.exists("1000352084.jpg") else None
     if caminho_logo:
         try:
             img = OpenpyxlImage(caminho_logo)
@@ -443,7 +443,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Ajuste automático de largura blindado (evitando ocultação de conteúdo)
+    # Largura blindada contra ocultação de conteúdo
     for col in ws_saldo.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
@@ -713,6 +713,9 @@ def main():
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
         
+    # LOGOTIPO CLÁSSICO / BRASÃO NA TELA DE LOGIN E SIDEBAR
+    caminho_logo_tela = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
+
     if not st.session_state.autenticado:
         st.markdown("""
         <style>
@@ -724,11 +727,10 @@ def main():
         with col_l2:
             st.markdown("<br><br>", unsafe_allow_html=True)
             
-            caminho_logo_login = "1000352084.jpg" if os.path.exists("1000352084.jpg") else ("brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None)
-            if caminho_logo_login:
-                st.image(caminho_logo_login, use_container_width=True)
+            if caminho_logo_tela:
+                st.image(caminho_logo_tela, use_container_width=True)
             else:
-                st.warning("⚠️ Logotipo não encontrado na pasta.")
+                st.warning("⚠️ Brasão não encontrado na pasta.")
             
             st.markdown("## ⚡ TIME DE INVENTÁRIO // AUTENTICAÇÃO")
             st.markdown("Insira a senha de acesso executivo para desbloquear o sistema.")
@@ -756,9 +758,8 @@ def main():
     """, unsafe_allow_html=True)
     
     with st.sidebar:
-        caminho_logo_sidebar = "1000352084.jpg" if os.path.exists("1000352084.jpg") else ("brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None)
-        if caminho_logo_sidebar:
-            st.image(caminho_logo_sidebar, use_container_width=True)
+        if caminho_logo_tela:
+            st.image(caminho_logo_tela, use_container_width=True)
         st.markdown("### **GRUPO KMB**")
         st.markdown("*Exatidão • Controle • Eficiência*")
         st.markdown("---")
@@ -782,7 +783,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO LIMPA E LOGOTIPO
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO LIMPA E LOGOTIPO NO TOPO
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -803,7 +804,7 @@ def main():
             if df_loc_temp is not None and df_est_temp is not None:
                 st.success("✅ Arquivos carregados e validados com sucesso!")
                 
-                # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA) COM CABEÇALHOS LIMPOS
+                # PRÉ-VISUALIZAÇÃO NA TELA COM CABEÇALHOS 100% LIMPOS
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
                 st.caption("Abaixo está a prévia interativa com colunas limpas, sem pontos decimais nos cabeçalhos:")
@@ -811,7 +812,6 @@ def main():
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2).fillna("")
                 
-                # Limpeza rigorosa de pontos nos nomes das colunas da pré-visualização
                 novas_cols_preview = []
                 for col in df_preview_exibir.columns:
                     col_str = str(col).strip()
@@ -829,7 +829,7 @@ def main():
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas com A4 Paisagem, largura blindada contra corte de texto, novo logotipo oficial e rodapé corporativo.")
+                st.caption("Configuradas com A4 Paisagem, largura blindada, novo logotipo oficial no topo e rodapé corporativo.")
                 
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
@@ -982,7 +982,7 @@ def main():
                         df_risco = df_filtrado.copy()
                         col_val_aju_etapa4 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_risco.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
                         df_risco['Categoria_Prod'] = df_risco['Descrição do Produto'].astype(str).str.split().str[0]
-                        df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index().sort_values(by=col_val_aju_etape4, ascending=True).head(15)
+                        df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index().sort_values(by=col_val_aju_etapa4, ascending=True).head(15)
                         fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
                         fig_risco.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=420)
                         st.plotly_chart(fig_risco, use_container_width=True)
