@@ -376,7 +376,18 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             
             linha_dados = [cod, desc, est, formula_comptar, formula_divergencia]
             if tem_na_comptar:
-                contagens_vals = [locs_prod[i][1] if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
+                contagens_vals = []
+                for i in range(max_locais_encontrados):
+                    if i < len(locs_prod):
+                        val_num = locs_prod[i][1]
+                        try:
+                            val_int = int(float(val_num))
+                            contagens_vals.append(val_int)
+                        except Exception:
+                            contagens_vals.append(val_num)
+                    else:
+                        contagens_vals.append("")
+                        
                 locais_vals = [locs_prod[i][0] if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
             else:
                 contagens_vals = ["0 - Comptar"] + [""] * (max_locais_encontrados - 1)
@@ -582,7 +593,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     
     story = []
     
-    story.append(Paragraph("⚡ GRUPO KMB // AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
+    story.append(Paragraph("⚡ GRUPO KMB // DOSSIÊ DE AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
     story.append(Paragraph("Relatório oficial consolidado contendo indicadores de impacto, análise de quebras, sobras e itens críticos.", estilo_texto))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3B82F6'), spaceBefore=8, spaceAfter=12))
     
