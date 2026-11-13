@@ -180,7 +180,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM IMPRESSÃO CONFIGURADA & RODAPÉ
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM IMPRESSÃO, RODAPÉ E FILTROS CIRÚRGICOS
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -258,16 +258,18 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             cell.font = fonte_padrao
             cell.border = borda_fina
 
-    # 3. Aba Saldo Loja com Configuração de Impressão, Ajuste de Largura A4 e Rodapé Automático
+    # 3. Aba Saldo Loja com Impressão Configurada, Ajuste Largura A4 e Rodapé Automático
     ws_saldo = wb.create_sheet(title="Saldo Loja")
     ws_saldo.views.sheetView[0].showGridLines = True
     
+    # Configurações A4 Paisagem e Ajuste de Largura
     ws_saldo.page_setup.orientation = ws_saldo.ORIENTATION_LANDSCAPE
     ws_saldo.page_setup.paperSize = ws_saldo.PAPERSIZE_A4
     ws_saldo.sheet_properties.pageSetUpPr.fitToPage = True
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
+    # Configuração do Rodapé (Esquerda: Loja, Centro: Data atual, Direita: Página X de Y)
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input}"
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
@@ -377,7 +379,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# FUNÇÕES DE EXPORTAÇÃO ROBUSTAS (EXCEL, WORD, PDF E PPTX) DO MODO 1
+# FUNÇÕES DE EXPORTAÇÃO ROBUSTAS (EXCEL, WORD, PDF E PPTX)
 # ====================================================================================
 def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
@@ -483,7 +485,6 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
             )
         else:
             doc.add_paragraph("Coluna de ajuste não mapeada diretamente para listagem individual detalhada neste bloco.")
-            
     doc.add_heading("3. Validação e Assinatura C-Level", level=2)
     doc.add_paragraph("Declaro que os dados acima foram auditados eletronicamente através do Protocolo J.A.R.V.I.S. / Grupo KMB e refletem com fidelidade a apuração patrimonial realizada.\n\n\n")
     
@@ -686,7 +687,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO E OS 3 BOTÕES
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO E OS 3 BOTÕES DE IMPRESSÃO
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -712,7 +713,6 @@ def main():
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
                 st.caption("Abaixo está a prévia interativa de como os dados serão consolidados para conferência:")
                 
-                # Geramos um buffer temporário em memória para extrair a prévia com pandas
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2)
                 st.dataframe(df_preview_exibir, use_container_width=True, height=350)
@@ -890,7 +890,7 @@ def main():
                     with tab_e5_2:
                         df_scatter = df_causa[df_causa[col_ajuste_e5] != 0].copy()
                         df_scatter['Tamanho_Bolha'] = df_scatter[col_val_aju_etapa4].abs().clip(lower=1)
-                        fig_4d = px.scatter(df_scatter, x='Saldo em Estoque', y=col_val_aju_etapa4, size='Tamanho_Bolha', color='Perfil_Causa', hover_name='Descrição do Produto', template="plotly_dark", height=450)
+                        fig_4d = px.scatter(df_scatter, x='Saldo em Estoque', y=col_val_aju_e5, size='Tamanho_Bolha', color='Perfil_Causa', hover_name='Descrição do Produto', template="plotly_dark", height=450)
                         st.plotly_chart(fig_4d, use_container_width=True)
                     with tab_e5_3:
                         c_sim1, c_sim2 = st.columns(2)
@@ -898,12 +898,12 @@ def main():
                             st.metric("Acurácia Volumétrica Atual", f"{resumo_unico['acuracia_vol']:.2f}%")
                         with c_sim2:
                             perc_recup = st.slider("Simular % de Recuperação de Faltas", 0, 100, 30, 5, key="slider_meta_e5")
-                            quebras_totais = abs(df_causa[df_causa[col_ajuste_e5] < 0][col_val_aju_etapa4].sum())
+                            quebras_totais = abs(df_causa[df_causa[col_ajuste_e5] < 0][col_val_aju_e5].sum())
                             st.success(f"💰 Ganho de Caixa: R$ {quebras_totais * (perc_recup / 100.0):,.2f}")
                     with tab_e5_4:
-                        df_plano = df_causa[df_causa[col_ajuste_e5] < 0].sort_values(by=col_val_aju_etapa4, ascending=True).head(15).copy()
+                        df_plano = df_causa[df_causa[col_ajuste_e5] < 0].sort_values(by=col_val_aju_e5, ascending=True).head(15).copy()
                         if not df_plano.empty:
-                            st.dataframe(df_plano[['Código do Produto', 'Descrição do Produto', 'Saldo em Estoque', col_ajuste_e5, col_val_aju_etapa4, 'Perfil_Causa']].style.format({col_val_aju_etapa4: 'R$ {:,.2f}'}), use_container_width=True)
+                            st.dataframe(df_plano[['Código do Produto', 'Descrição do Produto', 'Saldo em Estoque', col_ajuste_e5, col_val_aju_e5, 'Perfil_Causa']].style.format({col_val_aju_e5: 'R$ {:,.2f}'}), use_container_width=True)
 
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO C-LEVEL")
@@ -918,7 +918,7 @@ def main():
                             st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{r['skus_falta']:,} SKUs ({r['perc_falta_itens']:.2f}%)", f"Vol: -{r['vol_falta']:,.0f} un | R$ {r['val_falta']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%)", f"Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{r['total_div']:,} SKUs ({r['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{r['vol_div_total']:,.0f} unidades ({r['perc_vol_div']:.2f}%)", f"R$ {r['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                            st.markdown(formatar_kpi_html("Volume Físico Total Divergências (Sobra + Falta)", f"{r['vol_div_total']:,.0f} unidades ({r['perc_vol_div']:.2f}%)", f"R$ {r['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {r['acuracia_vol']:.2f}% | Fin: {r['acuracia_fin']:.2f}%", "Meta Corporativa 97%", eh_negativo=(r['acuracia_vol'] < 97), eh_positivo=(r['acuracia_vol'] >= 97)), unsafe_allow_html=True)
                             
                             st.markdown("##### 💰 Balanço Patrimonial")
