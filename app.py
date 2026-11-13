@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.drawing.image import Image as OpenpyxlImage
 import docx
 from docx.shared import Inches, Pt, RGBColor
 from pptx import Presentation
@@ -180,7 +181,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM IMPRESSÃO, RODAPÉ E FILTROS CIRÚRGICOS
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA IDÊNTICA AO PADRÃO KMB & LOGO
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -192,6 +193,10 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     borda_fina = Border(
         left=Side(style='thin', color='D3D3D3'), right=Side(style='thin', color='D3D3D3'),
         top=Side(style='thin', color='D3D3D3'), bottom=Side(style='thin', color='D3D3D3')
+    )
+    borda_destaque = Border(
+        left=Side(style='medium', color='000000'), right=Side(style='medium', color='000000'),
+        top=Side(style='medium', color='000000'), bottom=Side(style='medium', color='000000')
     )
     
     # 1. Aba LOJA
@@ -258,36 +263,66 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             cell.font = fonte_padrao
             cell.border = borda_fina
 
-    # 3. Aba Saldo Loja com Impressão Configurada, Ajuste Largura A4 e Rodapé Automático
+    # 3. Aba Saldo Loja (Padrão visual idêntico ao plano de inventário KMB)
     ws_saldo = wb.create_sheet(title="Saldo Loja")
     ws_saldo.views.sheetView[0].showGridLines = True
     
-    # Configurações A4 Paisagem e Ajuste de Largura
     ws_saldo.page_setup.orientation = ws_saldo.ORIENTATION_LANDSCAPE
     ws_saldo.page_setup.paperSize = ws_saldo.PAPERSIZE_A4
     ws_saldo.sheet_properties.pageSetUpPr.fitToPage = True
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # Configuração do Rodapé (Esquerda: Loja, Centro: Data atual, Direita: Página X de Y)
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input}"
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
     
+    # Inserção da Logo KMB se disponível no diretório
+    caminho_logo = "logo_kmb.jpg" if os.path.exists("logo_kmb.jpg") else ("brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None)
+    if caminho_logo:
+        try:
+            img = OpenpyxlImage(caminho_logo)
+            img.width = 240
+            img.height = 40
+            ws_saldo.add_image(img, 'A1')
+        except Exception:
+            pass
+
+    # Cabeçalho Superior Estilizado KMB
     ws_saldo['D1'] = "DATA:"
     ws_saldo['D1'].font = fonte_negrito
+    ws_saldo['D1'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_saldo['D1'].border = borda_destaque
+    
     ws_saldo['E1'] = pd.Timestamp.now().strftime('%d/%m/%Y')
     ws_saldo['E1'].font = fonte_padrao
+    ws_saldo['E1'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_saldo['E1'].border = borda_destaque
+    
     ws_saldo['D2'] = "LOJA:"
     ws_saldo['D2'].font = fonte_negrito
+    ws_saldo['D2'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_saldo['D2'].border = borda_destaque
+    
     ws_saldo['E2'] = int(numero_loja_input)
-    ws_saldo['E2'].font = fonte_padrao
+    ws_saldo['E2'].font = fonte_negrito
+    ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_saldo['E2'].border = borda_destaque
+    
     ws_saldo['G2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!B:B,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!B:B,""))'
     ws_saldo['G2'].font = fonte_negrito
+    ws_saldo['G2'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_saldo['G2'].border = borda_destaque
+    
     ws_saldo['Q2'] = "CIDADE:"
     ws_saldo['Q2'].font = fonte_negrito
+    ws_saldo['Q2'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_saldo['Q2'].border = borda_destaque
+    
     ws_saldo['R2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,""))'
-    ws_saldo['R2'].font = fonte_padrao
+    ws_saldo['R2'].font = fonte_negrito
+    ws_saldo['R2'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_saldo['R2'].border = borda_destaque
     
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
@@ -295,15 +330,16 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     for i in range(1, max_locais_encontrados + 1):
         headers_saldo.append(f"Local {i}" if i == 1 else str(i))
         
-    ws_saldo.append([])
     ws_saldo.append(headers_saldo)
     ws_saldo.print_title_rows = '3:3'
+    ws_saldo.auto_filter.ref = f"A3:{get_column_letter(len(headers_saldo))}{ws_saldo.max_row}"
     
     for col_num in range(1, len(headers_saldo) + 1):
         cell = ws_saldo.cell(row=3, column=col_num)
         cell.font = fonte_cabecalho
         cell.fill = fill_cabecalho
         cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = borda_fina
         
     col_cod_est = next((c for c in df_estoque.columns if 'codigo' in c.lower()), 'Codigo')
     col_desc_est = next((c for c in df_estoque.columns if 'desc' in c.lower()), 'Descrição')
@@ -340,11 +376,11 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             
             linha_dados = [cod, desc, est, formula_comptar, formula_divergencia]
             if tem_na_comptar:
-                contagens_vals = [locs_prod[i][1] if i < len(locs_prod) else None for i in range(max_locais_encontrados)]
-                locais_vals = [locs_prod[i][0] if i < len(locs_prod) else None for i in range(max_locais_encontrados)]
+                contagens_vals = [locs_prod[i][1] if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
+                locais_vals = [locs_prod[i][0] if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
             else:
-                contagens_vals = ["0 - Comptar"] + [None] * (max_locais_encontrados - 1)
-                locais_vals = ["Sem local"] + [None] * (max_locais_encontrados - 1)
+                contagens_vals = ["0 - Comptar"] + [""] * (max_locais_encontrados - 1)
+                locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
                 
             linha_dados.extend(contagens_vals)
             linha_dados.extend(locais_vals)
@@ -687,7 +723,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO E OS 3 BOTÕES DE IMPRESSÃO
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM PADRÃO KMB IDÊNTICO
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -714,7 +750,7 @@ def main():
                 st.caption("Abaixo está a prévia interativa de como os dados serão consolidados para conferência:")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
-                df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2)
+                df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2).fillna("")
                 st.dataframe(df_preview_exibir, use_container_width=True, height=350)
                 
                 st.markdown("---")
