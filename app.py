@@ -181,7 +181,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM CÁLCULO ESTRITO DE LOCAIS REAIS
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM TRATAMENTO CIRÚRGICO DE LOCAIS
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -265,8 +265,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         locais_por_produto[cod].append((loc, qtd))
         soma_comptar_por_produto[cod] += qtd
         
-    # CÁLCULO ESTRITO: Considera APENAS o máximo de locais dos produtos que possuem contagem real (> 0).
-    # Se um produto não tiver contagem, ele não infla o número de colunas.
+    # Cálculo enxuto do máximo de locais com contagem real
     locais_com_contagem = [len(v) for v in locais_por_produto.values() if len(v) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
     
@@ -404,9 +403,9 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                         
                 locais_vals = [locs_prod[i][0] if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
             else:
-                # Se não tem contagem, deixa as colunas de locais/contagens vazias para não poluir
-                contagens_vals = [""] * max_locais_encontrados
-                locais_vals = [""] * max_locais_encontrados
+                # Mantém o padrão correto para itens sem contagem sem inflar colunas desnecessárias
+                contagens_vals = ["0 - Comptar"] + [""] * (max_locais_encontrados - 1)
+                locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
                 
             linha_dados.extend(contagens_vals)
             linha_dados.extend(locais_vals)
@@ -764,7 +763,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM CÁLCULO ESTRITO DE LOCAIS
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM TRATAMENTO CIRÚRGICO DE LOCAIS
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -788,7 +787,7 @@ def main():
                 # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA)
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
-                st.caption("Abaixo está a prévia interativa limpa, exibindo apenas as colunas de locais necessárias:")
+                st.caption("Abaixo está a prévia interativa com o retorno dos status '0 - CompTar' e 'Sem local' sem colunas vazias em excesso:")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2).fillna("")
@@ -802,7 +801,7 @@ def main():
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas automaticamente com A4 Paisagem, sem colunas vazias em excesso.")
+                st.caption("Configuradas automaticamente com A4 Paisagem e formatação perfeita.")
                 
                 c_imp1, c_imp2, c_imp3 = st.columns(3)
                 
