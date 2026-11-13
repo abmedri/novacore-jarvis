@@ -393,7 +393,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                     if i < len(locs_prod):
                         val_num = locs_prod[i][1]
                         try:
-                            # Força estritamente conversão inteira limpa sem ponto decimal
+                            # Força estritamente conversão inteira limpa sem ponto decimal e formato numérico do excel
                             val_int = int(float(val_num))
                             contagens_vals.append(val_int)
                         except Exception:
@@ -414,6 +414,11 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         for cell in row:
             cell.font = fonte_padrao
             cell.border = borda_fina
+            # Garantir formato numérico inteiro nas células geradas para evitar float no Excel
+            if cell.row >= 4 and cell.column >= 3:
+                if isinstance(cell.value, (int, float)):
+                    cell.number_format = '0'
+            
             if cell.column in [1, 3, 4, 5]:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             elif cell.column == 2:
@@ -747,7 +752,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM VALORES LIMPOS
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO FORMATADA LIMPA
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -768,13 +773,20 @@ def main():
             if df_loc_temp is not None and df_est_temp is not None:
                 st.success("✅ Arquivos carregados e validados com sucesso!")
                 
-                # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA)
+                # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA) - CONVERTENDO PARA INTEIRO LIMPO NA EXIBIÇÃO
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
-                st.caption("Abaixo está a prévia interativa de como os dados serão consolidados para conferência:")
+                st.caption("Abaixo está a prévia interativa formatada sem pontos decimais para conferência:")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2).fillna("")
+                
+                # Tratamento de exibição para remover qualquer ponto decimal na pré-visualização do Streamlit
+                for col in df_preview_exibir.columns:
+                    df_preview_exibir[col] = df_preview_exibir[col].apply(
+                        lambda x: str(int(x)) if isinstance(x, float) and x.is_integer() else (str(x).replace('.0', '') if isinstance(x, float) else x)
+                    )
+                
                 st.dataframe(df_preview_exibir, use_container_width=True, height=350)
                 
                 st.markdown("---")
