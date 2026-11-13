@@ -181,7 +181,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA IDÊNTICA AO PADRÃO KMB & VALORES CALCULADOS
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA IDÊNTICA AO PADRÃO KMB & VALORES LIMPOS
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -383,7 +383,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         if incluir:
             r = ws_saldo.max_row + 1
             
-            # Calculamos o valor e inserimos tanto a fórmula quanto o valor numérico calculado para aparecer na pré-visualização do Streamlit
             cel_comptar = soma_comptar_val if tem_na_comptar else 0
             cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
             
@@ -394,6 +393,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                     if i < len(locs_prod):
                         val_num = locs_prod[i][1]
                         try:
+                            # Força estritamente conversão inteira limpa sem ponto decimal
                             val_int = int(float(val_num))
                             contagens_vals.append(val_int)
                         except Exception:
@@ -747,7 +747,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM VALORES CALCULADOS NA TELA
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM VALORES LIMPOS
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -850,7 +850,7 @@ def main():
                 with c1:
                     st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{resumo_unico['total_skus']:,}", f"Pré: {resumo_unico['qtd_antes']:,.0f} un | Pós: {resumo_unico['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{resumo_unico['skus_falta']:,} SKUs ({resumo_unico['perc_falta_itens']:.2f}%)", f"Vol: -{resumo_unico['vol_falta']:,.0f} un | R$ {resumo_unico['val_falta']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Volume Físico Total Divergências (Sobra + Falta)", f"{resumo_unico['vol_div_total']:,.0f} unidades ({resumo_unico['perc_vol_div']:.2f}%)", f"R$ {resumo_unico['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
+                    st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{resumo_unico['vol_div_total']:,.0f} unidades ({resumo_unico['perc_vol_div']:.2f}%)", f"R$ {resumo_unico['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                 with c2:
                     st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{resumo_unico['skus_sobra']:,} SKUs ({resumo_unico['perc_sobra_itens']:.2f}%)", f"Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{resumo_unico['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{resumo_unico['total_div']:,} SKUs ({resumo_unico['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
@@ -945,11 +945,11 @@ def main():
                     df_causa['Perfil_Causa'] = df_causa.apply(classificar_causa, axis=1)
 
                     with tab_e5_1:
-                        resumo_causas = df_causa.groupby('Perfil_Causa').agg(SKUs=('Código do Produto', 'count'), Impacto_Financeiro=(col_val_aju_etapa4, 'sum')).reset_index()
+                        resumo_causas = df_causa.groupby('Perfil_Causa').agg(SKUs=('Código do Produto', 'count'), Impacto_Financeiro=(col_val_aju_e5, 'sum')).reset_index()
                         st.dataframe(resumo_causas.style.format({'SKUs': '{:,}', 'Impacto_Financeiro': 'R$ {:,.2f}'}), use_container_width=True)
                     with tab_e5_2:
                         df_scatter = df_causa[df_causa[col_ajuste_e5] != 0].copy()
-                        df_scatter['Tamanho_Bolha'] = df_scatter[col_val_aju_etapa4].abs().clip(lower=1)
+                        df_scatter['Tamanho_Bolha'] = df_scatter[col_val_aju_e5].abs().clip(lower=1)
                         fig_4d = px.scatter(df_scatter, x='Saldo em Estoque', y=col_val_aju_e5, size='Tamanho_Bolha', color='Perfil_Causa', hover_name='Descrição do Produto', template="plotly_dark", height=450)
                         st.plotly_chart(fig_4d, use_container_width=True)
                     with tab_e5_3:
