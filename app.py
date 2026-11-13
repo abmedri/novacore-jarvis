@@ -188,7 +188,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM SUPORTE A ITENS SEM SALDO E BRASÃO
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM AGRUPAMENTO HORIZONTAL E BRASÃO
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -253,6 +253,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     
     locais_por_produto = {}
     soma_comptar_por_produto = {}
+    descricoes_comptar = {}
     
     for _, row in df_localizacao.iterrows():
         loc = limpar_nome_local(row.get(col_loc, ''))
@@ -268,6 +269,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         if cod not in locais_por_produto:
             locais_por_produto[cod] = []
             soma_comptar_por_produto[cod] = 0
+            descricoes_comptar[cod] = desc
             
         locais_por_produto[cod].append((loc, qtd))
         soma_comptar_por_produto[cod] += qtd
@@ -281,13 +283,13 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     itens_filtrados_temp = []
     
     if tipo_filtro == "SEM_SALDO":
-        # Filtro exclusivo para itens contados na CompTar que NÃO estão no estoque da loja
+        # Filtro exclusivo para itens contados na CompTar que NÃO estão no estoque da loja (AGRUPADOS POR PRODUTO)
         for cod, locs in locais_por_produto.items():
             if cod not in codigos_estoque_set:
-                for loc, qtd in locs:
-                    # Buscamos a descrição na CompTar
-                    desc_item = next((r.get(col_desc_loc, '') for _, r in df_localizacao.iterrows() if str(r.get(col_cod_loc, '')).strip() == cod), "Item Avulso / Sem Cadastro")
-                    itens_filtrados_temp.append((cod, desc_item, 0, True, qtd, -qtd, [(loc, qtd)]))
+                desc_item = descricoes_comptar.get(cod, "Item Avulso / Sem Cadastro")
+                soma_comptar_val = soma_comptar_por_produto.get(cod, 0)
+                divergencia_val = soma_comptar_val - 0
+                itens_filtrados_temp.append((cod, desc_item, 0, True, soma_comptar_val, divergencia_val, locs))
     else:
         for idx, row in df_estoque.iterrows():
             cod = str(row.get(col_cod_est, '')).strip()
@@ -778,7 +780,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM NOVO BOTÃO DE ITENS SEM SALDO
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM ITENS SEM SALDO AGRUPADOS HORIZONTALMENTE
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -816,7 +818,7 @@ def main():
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas automaticamente com A4 Paisagem, locais limpos e brasão no rodapé.")
+                st.caption("Configuradas automaticamente com A4 Paisagem, locais limpos, brasão no rodapé e itens agrupados na mesma linha.")
                 
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
