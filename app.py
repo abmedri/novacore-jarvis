@@ -188,7 +188,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM NOVO LOGOTIPO NO TOPO
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM LOGOTIPO NO TOPO E BRASÃO NO RODAPÉ
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -337,14 +337,25 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
     
-    # Inserção do logotipo oficial (1000352084.jpg) no topo das planilhas geradas
-    caminho_logo = "1000352084.jpg" if os.path.exists("1000352084.jpg") else None
-    if caminho_logo:
+    # Inserção do logotipo oficial no topo (cabeçalho)
+    caminho_logo_topo = "1000352084.jpg" if os.path.exists("1000352084.jpg") else None
+    if caminho_logo_topo:
         try:
-            img = OpenpyxlImage(caminho_logo)
-            img.width = 240
-            img.height = 42
-            ws_saldo.add_image(img, 'B1')
+            img_topo = OpenpyxlImage(caminho_logo_topo)
+            img_topo.width = 240
+            img_topo.height = 42
+            ws_saldo.add_image(img_topo, 'B1')
+        except Exception:
+            pass
+
+    # Inserção do brasão clássico no rodapé do layout de impressão
+    caminho_brasao_rodape = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None
+    if caminho_brasao_rodape:
+        try:
+            img_rodape = OpenpyxlImage(caminho_brasao_rodape)
+            img_rodape.width = 120
+            img_rodape.height = 120
+            ws_saldo.add_image(img_rodape, f'B{ws_saldo.max_row + 5}')
         except Exception:
             pass
 
@@ -713,7 +724,6 @@ def main():
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
         
-    # LOGOTIPO CLÁSSICO / BRASÃO NA TELA DE LOGIN E SIDEBAR
     caminho_logo_tela = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
 
     if not st.session_state.autenticado:
@@ -783,7 +793,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO LIMPA E LOGOTIPO NO TOPO
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO LIMPA E LOGOTIPO/BRASÃO
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -829,7 +839,7 @@ def main():
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas com A4 Paisagem, largura blindada, novo logotipo oficial no topo e rodapé corporativo.")
+                st.caption("Configuradas com A4 Paisagem, largura blindada, novo logotipo no topo e brasão clássico no rodapé de impressão.")
                 
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
