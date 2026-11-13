@@ -333,12 +333,11 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # Configuração do rodapé de impressão com texto corporativo e indicação de página
+    # Rodapé de impressão
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
     
-    # Adição do brasão clássico no rodapé do layout de impressão via openpyxl if/footer image support
     caminho_brasao_rodape = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None
     if caminho_brasao_rodape:
         try:
@@ -346,7 +345,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         except Exception:
             pass
 
-    # Inserção do logotipo oficial no topo (cabeçalho da planilha)
+    # Logotipo no topo
     caminho_logo_topo = "1000352084.jpg" if os.path.exists("1000352084.jpg") else None
     if caminho_logo_topo:
         try:
@@ -377,16 +376,13 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
+    # Coluna G sem rótulo fixo (retirado o texto anterior)
     ws_saldo['G2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!B:B,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!B:B,""))'
     ws_saldo['G2'].font = fonte_negrito
     ws_saldo['G2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['G2'].border = borda_destaque
     
-    ws_saldo['Q2'] = "CIDADE:"
-    ws_saldo['Q2'].font = fonte_negrito
-    ws_saldo['Q2'].alignment = Alignment(horizontal="center", vertical="center")
-    ws_saldo['Q2'].border = borda_destaque
-    
+    # Colunas Q e R sem o nome "Cidade" (retirado o rótulo da célula Q2)
     ws_saldo['R2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,""))'
     ws_saldo['R2'].font = fonte_negrito
     ws_saldo['R2'].alignment = Alignment(horizontal="center", vertical="center")
