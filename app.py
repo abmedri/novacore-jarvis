@@ -593,7 +593,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     
     story = []
     
-    story.append(Paragraph("⚡ GRUPO KMB // DOSSIÊ DE AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
+    story.append(Paragraph("⚡ GRUPO KMB // AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
     story.append(Paragraph("Relatório oficial consolidado contendo indicadores de impacto, análise de quebras, sobras e itens críticos.", estilo_texto))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3B82F6'), spaceBefore=8, spaceAfter=12))
     
