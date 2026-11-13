@@ -188,7 +188,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM LIMPEZA DE LOCAIS SEM PONTO DESNECESSÁRIO
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM SUPORTE A ITENS SEM SALDO E BRASÃO
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -276,41 +276,54 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     col_desc_est = next((c for c in df_estoque.columns if 'desc' in c.lower()), 'Descrição')
     col_est = next((c for c in df_estoque.columns if 'estoque' in c.lower()), 'Estoque')
     
+    codigos_estoque_set = set(df_estoque[col_cod_est].astype(str).str.strip().values)
+    
     itens_filtrados_temp = []
-    for idx, row in df_estoque.iterrows():
-        cod = str(row.get(col_cod_est, '')).strip()
-        desc = row.get(col_desc_est, '')
-        try:
-            est = int(float(row.get(col_est, 0)))
-        except Exception:
-            est = 0
-        
-        locs_prod = locais_por_produto.get(cod, [])
-        tem_na_comptar = len(locs_prod) > 0
-        soma_comptar_val = soma_comptar_por_produto.get(cod, 0) if tem_na_comptar else 0
-        divergencia_val = soma_comptar_val - est
-        
-        incluir = False
-        if tipo_filtro == "TODOS":
-            incluir = True
-        elif tipo_filtro == "ZERADOS":
-            if not tem_na_comptar:
+    
+    if tipo_filtro == "SEM_SALDO":
+        # Filtro exclusivo para itens contados na CompTar que NÃO estão no estoque da loja
+        for cod, locs in locais_por_produto.items():
+            if cod not in codigos_estoque_set:
+                for loc, qtd in locs:
+                    # Buscamos a descrição na CompTar
+                    desc_item = next((r.get(col_desc_loc, '') for _, r in df_localizacao.iterrows() if str(r.get(col_cod_loc, '')).strip() == cod), "Item Avulso / Sem Cadastro")
+                    itens_filtrados_temp.append((cod, desc_item, 0, True, qtd, -qtd, [(loc, qtd)]))
+    else:
+        for idx, row in df_estoque.iterrows():
+            cod = str(row.get(col_cod_est, '')).strip()
+            desc = row.get(col_desc_est, '')
+            try:
+                est = int(float(row.get(col_est, 0)))
+            except Exception:
+                est = 0
+            
+            locs_prod = locais_por_produto.get(cod, [])
+            tem_na_comptar = len(locs_prod) > 0
+            soma_comptar_val = soma_comptar_por_produto.get(cod, 0) if tem_na_comptar else 0
+            divergencia_val = soma_comptar_val - est
+            
+            incluir = False
+            if tipo_filtro == "TODOS":
                 incluir = True
-        elif tipo_filtro == "FALTAS":
-            if tem_na_comptar and divergencia_val < 0:
-                incluir = True
-        elif tipo_filtro == "SOBRAS":
-            if tem_na_comptar and divergencia_val > 0:
-                incluir = True
-                
-        if incluir:
-            itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
+            elif tipo_filtro == "ZERADOS":
+                if not tem_na_comptar:
+                    incluir = True
+            elif tipo_filtro == "FALTAS":
+                if tem_na_comptar and divergencia_val < 0:
+                    incluir = True
+            elif tipo_filtro == "SOBRAS":
+                if tem_na_comptar and divergencia_val > 0:
+                    incluir = True
+                    
+            if incluir:
+                itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
 
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
 
-    # 3. Aba Saldo Loja
-    ws_saldo = wb.create_sheet(title="Saldo Loja")
+    # 3. Aba Saldo Loja (ou Itens Sem Saldo)
+    nome_aba = "Itens Sem Saldo" if tipo_filtro == "SEM_SALDO" else "Saldo Loja"
+    ws_saldo = wb.create_sheet(title=nome_aba)
     ws_saldo.views.sheetView[0].showGridLines = True
     
     ws_saldo.page_setup.orientation = ws_saldo.ORIENTATION_LANDSCAPE
@@ -319,7 +332,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input}"
+    ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
     
@@ -327,8 +340,8 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     if caminho_logo:
         try:
             img = OpenpyxlImage(caminho_logo)
-            img.width = 240
-            img.height = 38
+            img.width = 220
+            img.height = 35
             ws_saldo.add_image(img, 'B1')
         except Exception:
             pass
@@ -428,7 +441,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Ajuste automático de largura (AutoFit) para todas as colunas
+    # Ajuste automático de largura (AutoFit)
     for col in ws_saldo.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
@@ -765,7 +778,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM LIMPEZA DE LOCAIS
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM NOVO BOTÃO DE ITENS SEM SALDO
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -803,15 +816,15 @@ def main():
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas automaticamente com A4 Paisagem e locais limpos.")
+                st.caption("Configuradas automaticamente com A4 Paisagem, locais limpos e brasão no rodapé.")
                 
-                c_imp1, c_imp2, c_imp3 = st.columns(3)
+                c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
                 with c_imp1:
-                    st.markdown("##### 1️⃣ Itens Zerados / Não Localizados")
+                    st.markdown("##### 1️⃣ Zerados")
                     buf_zerados = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "ZERADOS")
                     st.download_button(
-                        label="📥 Baixar Planilha (Zerados)",
+                        label="📥 Baixar (Zerados)",
                         data=buf_zerados,
                         file_name=f"Impressao_Zerados_Loja_{numero_loja_ui}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -819,10 +832,10 @@ def main():
                     )
                     
                 with c_imp2:
-                    st.markdown("##### 2️⃣ Faltas / Quebras Críticas")
+                    st.markdown("##### 2️⃣ Faltas")
                     buf_faltas = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "FALTAS")
                     st.download_button(
-                        label="📥 Baixar Planilha (Faltas)",
+                        label="📥 Baixar (Faltas)",
                         data=buf_faltas,
                         file_name=f"Impressao_Faltas_Loja_{numero_loja_ui}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -830,12 +843,23 @@ def main():
                     )
                     
                 with c_imp3:
-                    st.markdown("##### 3️⃣ Sobras / Excedentes")
+                    st.markdown("##### 3️⃣ Sobras")
                     buf_sobras = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SOBRAS")
                     st.download_button(
-                        label="📥 Baixar Planilha (Sobras)",
+                        label="📥 Baixar (Sobras)",
                         data=buf_sobras,
                         file_name=f"Impressao_Sobras_Loja_{numero_loja_ui}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+
+                with c_imp4:
+                    st.markdown("##### 4️⃣ Sem Saldo")
+                    buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SEM_SALDO")
+                    st.download_button(
+                        label="📥 Baixar (Sem Saldo)",
+                        data=buf_sem_saldo,
+                        file_name=f"Impressao_ItensContadosSemSaldo_Loja_{numero_loja_ui}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True
                     )
