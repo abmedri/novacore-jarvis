@@ -188,7 +188,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM LOGOTIPO NO TOPO E BRASÃO NO RODAPÉ
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM LOGOTIPO NO TOPO E RODAPÉ DE IMPRESSÃO
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -333,11 +333,20 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
+    # Configuração do rodapé de impressão com texto corporativo e indicação de página
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
     
-    # Inserção do logotipo oficial no topo (cabeçalho)
+    # Adição do brasão clássico no rodapé do layout de impressão via openpyxl if/footer image support
+    caminho_brasao_rodape = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None
+    if caminho_brasao_rodape:
+        try:
+            ws_saldo.oddFooter.right.picture = caminho_brasao_rodape
+        except Exception:
+            pass
+
+    # Inserção do logotipo oficial no topo (cabeçalho da planilha)
     caminho_logo_topo = "1000352084.jpg" if os.path.exists("1000352084.jpg") else None
     if caminho_logo_topo:
         try:
@@ -345,17 +354,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             img_topo.width = 240
             img_topo.height = 42
             ws_saldo.add_image(img_topo, 'B1')
-        except Exception:
-            pass
-
-    # Inserção do brasão clássico no rodapé do layout de impressão
-    caminho_brasao_rodape = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None
-    if caminho_brasao_rodape:
-        try:
-            img_rodape = OpenpyxlImage(caminho_brasao_rodape)
-            img_rodape.width = 120
-            img_rodape.height = 120
-            ws_saldo.add_image(img_rodape, f'B{ws_saldo.max_row + 5}')
         except Exception:
             pass
 
@@ -793,7 +791,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO LIMPA E LOGOTIPO/BRASÃO
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO LIMPA E RODAPÉ DE IMPRESSÃO
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
