@@ -181,7 +181,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM LIMPEZA E CONTROLE DE LOCAIS ÚNICOS
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM AUTO-EXPANSÃO TOTAL DE LOCAIS
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -262,16 +262,11 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             locais_por_produto[cod] = []
             soma_comptar_por_produto[cod] = 0
             
-        # Evitar locais duplicados exatos para o mesmo produto no mapeamento
-        if (loc, qtd) not in locais_por_produto[cod]:
-            locais_por_produto[cod].append((loc, qtd))
-            soma_comptar_por_produto[cod] += qtd
-        else:
-            soma_comptar_por_produto[cod] += qtd
-            
-    # Determina o número máximo real de locais por produto, limitando a um teto razoável (ex: max 6 a 8 colunas reais) para evitar expansões indesejadas
+        locais_por_produto[cod].append((loc, qtd))
+        soma_comptar_por_produto[cod] += qtd
+        
+    # Auto expansão SEM LIMITE: captura exatamente o máximo de locais reais encontrados para qualquer produto
     max_locais_encontrados = max([len(v) for v in locais_por_produto.values()]) if locais_por_produto else 1
-    max_locais_encontrados = max(1, min(max_locais_encontrados, 8))
     
     for row in ws_comp.iter_rows(min_row=2, max_row=ws_comp.max_row, min_col=1, max_col=4):
         for cell in row:
@@ -429,7 +424,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Ajuste automático de largura para todas as colunas (AutoFit)
+    # Ajuste automático de largura (AutoFit) para todas as colunas
     for col in ws_saldo.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
@@ -766,7 +761,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM CONTROLE E OTIMIZAÇÃO DE COLUNAS
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM AUTO-EXPANSÃO TOTAL E PRÉ-VISUALIZAÇÃO AMPLIADA
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -790,7 +785,7 @@ def main():
                 # PRÉ-VISUALIZAÇÃO NA TELA (SALDO LOJA)
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
-                st.caption("Abaixo está a prévia interativa formatada com colunas limpas e sem excessos:")
+                st.caption("Abaixo está a prévia interativa com auto expansão completa para todos os locais encontrados:")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=2).fillna("")
@@ -800,11 +795,12 @@ def main():
                         lambda x: str(int(x)) if isinstance(x, float) and x.is_integer() else (str(x).replace('.0', '') if isinstance(x, float) else x)
                     )
                 
-                st.dataframe(df_preview_exibir, use_container_width=True, height=350)
+                # Exibição com largura total e rolagem otimizada para abranger todas as colunas de locais
+                st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
                 st.markdown("---")
                 st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas automaticamente com A4 Paisagem, AutoFit e colunas otimizadas.")
+                st.caption("Configuradas automaticamente com A4 Paisagem, auto expansão ilimitada de locais e rodapé executivo.")
                 
                 c_imp1, c_imp2, c_imp3 = st.columns(3)
                 
