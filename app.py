@@ -333,12 +333,12 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # Rodapé de impressão
+    # Rodapé de impressão unificado com texto e imagem inseridos de forma robusta
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
     ws_saldo.oddFooter.center.text = "Data: &D"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
     
-    caminho_brasao_rodape = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else None
+    caminho_brasao_rodape = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
     if caminho_brasao_rodape:
         try:
             ws_saldo.oddFooter.right.picture = caminho_brasao_rodape
@@ -350,12 +350,13 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     if caminho_logo_topo:
         try:
             img_topo = OpenpyxlImage(caminho_logo_topo)
-            img_topo.width = 240
-            img_topo.height = 42
+            img_topo.width = 200
+            img_topo.height = 35
             ws_saldo.add_image(img_topo, 'B1')
         except Exception:
             pass
 
+    # Posicionamento rigoroso das células de cabeçalho (D1:E2) para evitar vazamento para colunas distantes
     ws_saldo['D1'] = "DATA:"
     ws_saldo['D1'].font = fonte_negrito
     ws_saldo['D1'].alignment = Alignment(horizontal="center", vertical="center")
@@ -376,17 +377,9 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
-    # Nome da Loja na coluna G
-    ws_saldo['G2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!B:B,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!B:B,""))'
-    ws_saldo['G2'].font = fonte_negrito
-    ws_saldo['G2'].alignment = Alignment(horizontal="center", vertical="center")
-    ws_saldo['G2'].border = borda_destaque
-    
-    # Colunas Q e R totalmente limpas
+    # Limpeza absoluta das células Q2 e R2 (para evitar qualquer texto ou número flutuando na impressão)
     ws_saldo['Q2'] = ""
-    ws_saldo['Q2'].border = borda_fina
     ws_saldo['R2'] = ""
-    ws_saldo['R2'].border = borda_fina
     
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
@@ -448,18 +441,16 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Ajuste dinâmico otimizado para ajustar perfeitamente à largura do conteúdo (sem sobras exageradas)
+    # Ajuste dinâmico e enxuto das larguras de coluna para evitar espaços vazios
     for col in ws_saldo.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
         for cell in col:
-            # Ignoramos a linha 1 e 2 do topo para não distorcer o cálculo com o logo
             if cell.row >= 3 and cell.value is not None:
                 val_str = str(cell.value)
                 if not val_str.startswith("="):
                     max_len = max(max_len, len(val_str))
-        # Marg estreita e justa para otimizar o espaço horizontal da folha de contagem
-        ws_saldo.column_dimensions[col_letter].width = max(max_len + 2, 8)
+        ws_saldo.column_dimensions[col_letter].width = max(max_len + 2, 7)
 
     for ws in [ws_loja, ws_comp]:
         for col in ws.columns:
