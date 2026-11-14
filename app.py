@@ -191,7 +191,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO EXCEL DE CONFERÊNCIA
+# GERADOR DO EXCEL DE CONFERÊNCIA (ORDENADO ALFABETICAMENTE PELA DESCRIÇÃO)
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -317,6 +317,9 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                     
             if incluir:
                 itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
+
+    # Ordenação alfabética pela descrição (x[1])
+    itens_filtrados_temp.sort(key=lambda x: str(x[1]).strip().upper())
 
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
@@ -446,7 +449,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (CABEÇALHO PROTEGIDO CONTRA QUEBRAS)
+# GERADOR DE PDF DE CONFERÊNCIA (ORDENADO ALFABETICAMENTE PELA DESCRIÇÃO)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -560,6 +563,9 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
             if incluir:
                 itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
 
+    # Ordenação alfabética pela descrição (x[1])
+    itens_filtrados_temp.sort(key=lambda x: str(x[1]).strip().upper())
+
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
 
@@ -577,7 +583,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    # Cabeçalho protegido com <nobr> para impedir qualquer quebra de texto nos títulos das colunas
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.5, leading=7, textColor=colors.white, alignment=1)
     estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
@@ -593,7 +598,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     for i in range(1, max_locais_encontrados + 1):
         headers_pdf.append(f"Local {i}" if i == 1 else str(i))
         
-    # Envolve cada título de cabeçalho com <nobr> para garantir que o texto não quebre de linha
     dados_tabela = [[Paragraph(f"<nobr>{str(h).strip().replace(' ', '&nbsp;')}</nobr>", estilo_th) for h in headers_pdf]]
     
     for cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod in itens_filtrados_temp:
@@ -906,7 +910,7 @@ def main():
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
-        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas com todas as colunas preservadas em linha única:")
+        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas com todas as colunas preservadas em linha única (ordem alfabética pela descrição):")
         
         numero_loja_ui = st.number_input("Número da Loja (ex: 13016 ou 17315)", min_value=1, max_value=99999, value=13016, step=1)
         
@@ -945,7 +949,7 @@ def main():
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
                 st.markdown("---")
-                st.markdown("### 📥 1. Listas de Conferência em Excel")
+                st.markdown("### 📥 1. Listas de Conferência em Excel (Ordem Alfabética)")
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
                 with c_imp1:
@@ -963,7 +967,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Cabeçalho sem Quebra + Fonte 8 pt + Brasão)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Ordem Alfabética + Brasão)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
