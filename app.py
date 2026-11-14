@@ -191,7 +191,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO EXCEL DE CONFERÊNCIA (COLUNA DIVERGÊNCIA COM FUNDO CINZA CLARO)
+# GERADOR DO EXCEL DE CONFERÊNCIA
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -200,8 +200,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     fonte_negrito = Font(name="Arial", size=10, bold=True)
     fonte_cabecalho = Font(name="Arial", size=10, bold=True, color="FFFFFF")
     fill_cabecalho = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-    
-    # Preenchimento cinza claro para a coluna Divergência
     fill_cinza_claro = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
     
     borda_fina = Border(
@@ -373,9 +371,9 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
-        headers_saldo.append(str(i) if i > 1 else "CONT. 1")
+        headers_saldo.append(str(int(i)) if i > 1 else "CONT. 1")
     for i in range(1, max_locais_encontrados + 1):
-        headers_saldo.append(f"Local {i}" if i == 1 else str(i))
+        headers_saldo.append(f"Local {int(i)}" if i == 1 else str(int(i)))
         
     ws_saldo.row_dimensions[1].height = 24
     ws_saldo.row_dimensions[2].height = 20
@@ -383,7 +381,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     
     ws_saldo.row_dimensions[4].height = 22
     for col_idx, h_text in enumerate(headers_saldo, start=1):
-        cell = ws_saldo.cell(row=4, column=col_idx, value=h_text)
+        cell = ws_saldo.cell(row=4, column=col_idx, value=str(h_text).replace('.0', ''))
         cell.font = fonte_cabecalho
         cell.fill = fill_cabecalho
         cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -428,7 +426,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 if isinstance(cell.value, (int, float)):
                     cell.number_format = '0'
             
-            # Aplica fundo cinza claro especificamente na coluna 5 (DIVERGÊNCIA)
             if cell.column == 5:
                 cell.fill = fill_cinza_claro
                 cell.font = Font(name="Arial", size=10, bold=True)
@@ -601,11 +598,11 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     
     headers_pdf = ["Código", "Descrição", "EST.", "COMP.", "DIVERG."]
     for i in range(1, max_locais_encontrados + 1):
-        headers_pdf.append(str(i) if i > 1 else "C.1")
+        headers_pdf.append(str(int(i)) if i > 1 else "C.1")
     for i in range(1, max_locais_encontrados + 1):
-        headers_pdf.append(f"Loc.{i}" if i == 1 else str(i))
+        headers_pdf.append(f"Loc.{int(i)}" if i == 1 else str(int(i)))
         
-    dados_tabela = [[Paragraph(f"<nobr>{str(h).strip().replace(' ', '&nbsp;')}</nobr>", estilo_th) for h in headers_pdf]]
+    dados_tabela = [[Paragraph(f"<nobr>{str(h).strip().replace('.0', '').replace(' ', '&nbsp;')}</nobr>", estilo_th) for h in headers_pdf]]
     
     for cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod in itens_filtrados_temp:
         cel_comptar = soma_comptar_val if tem_na_comptar else 0
