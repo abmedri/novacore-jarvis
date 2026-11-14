@@ -369,7 +369,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
-    # ── CONSTRUÇÃO DOS CABEÇALHOS COM NÚMEROS INTEIROS PUROS ──
+    # ── CONSTRUÇÃO DOS CABEÇALHOS NO EXCEL ──
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
         if i == 1:
@@ -951,23 +951,31 @@ def main():
                 # Lê como texto (dtype=str) para impedir que o Pandas adicione .000000 nas células
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3, dtype=str).fillna("")
                 
-                # Remove o sufixo .1 / .2 gerado pelo Pandas em colunas repetidas
-                colunas_limpas_tela = []
+                # ── TRATATIVA BLINDADA DE COLUNAS DUPLICADAS PARA A TELA ──
+                # Adiciona sufixos numéricos únicos em colunas duplicadas para evitar erro no Arrow/Streamlit
+                cols_vistas = {}
+                novas_colunas = []
                 for c in df_preview_exibir.columns:
                     c_str = str(c).strip()
                     if '.' in c_str and c_str.split('.')[0].isdigit():
                         c_str = c_str.split('.')[0]
-                    colunas_limpas_tela.append(c_str)
-                df_preview_exibir.columns = colunas_limpas_tela
+                    
+                    if c_str in cols_vistas:
+                        cols_vistas[c_str] += 1
+                        novas_colunas.append(f"{c_str}_{cols_vistas[c_str]}")
+                    else:
+                        cols_vistas[c_str] = 0
+                        novas_colunas.append(c_str)
+                df_preview_exibir.columns = novas_colunas
                 
                 # Garante que nenhuma célula numérica exiba ".0" residual
                 for col in df_preview_exibir.columns:
-                    if col != "Descrição":
+                    if "Descrição" not in col:
                         df_preview_exibir[col] = df_preview_exibir[col].apply(
                             lambda x: x[:-2] if isinstance(x, str) and x.endswith('.0') else x
                         )
                 
-                # Exibição limpa e segura do DataFrame sem estilização complexa propensa a KeyError
+                # Exibição 100% segura e limpa do DataFrame
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
                 st.markdown("---")
