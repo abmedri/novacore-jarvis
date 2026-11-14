@@ -191,7 +191,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO EXCEL DE CONFERÊNCIA (APENAS BRASÃO NO TOPO)
+# GERADOR DO EXCEL DE CONFERÊNCIA
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -260,7 +260,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         loc = limpar_nome_local(row.get(col_loc, ''))
         cod = str(row.get(col_cod_loc, '')).strip()
         desc = str(row.get(col_desc_loc, '')).strip()
-        
         try:
             qtd = int(float(row.get(col_qtd_loc, 0)))
         except Exception:
@@ -458,7 +457,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA COM NUMERED CANVAS (BRASÃO E RODAPÉ EM TODAS AS PÁGINAS)
+# GERADOR DE PDF DE CONFERÊNCIA COM COLUNAS DINÂMICAS DE CONTAGEM E LOCAIS
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -482,38 +481,29 @@ class NumberedCanvas(canvas.Canvas):
         self.setFont("Helvetica", 8)
         self.setFillColor(colors.HexColor('#64748b'))
         
-        # Rodapé corporativo em todas as páginas do PDF
         largura_pagina, altura_pagina = self._pagesize
-        margem = 36
+        margem = 30
         
-        # Linha fina divisória de rodapé
         self.setStrokeColor(colors.HexColor('#cbd5e1'))
         self.setLineWidth(0.75)
-        self.line(margem, 35, largura_pagina - margem, 35)
+        self.line(margem, 32, largura_pagina - margem, 32)
         
-        # Desenha o brasão gráfico no rodapé esquerdo se existir arquivo
         caminho_brasao = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
         if caminho_brasao:
             try:
-                self.drawImage(caminho_brasao, margem, 12, width=65, height=20, preserveAspectRatio=True, mask='auto')
+                self.drawImage(caminho_brasao, margem, 10, width=60, height=18, preserveAspectRatio=True, mask='auto')
             except Exception:
                 pass
                 
         texto_esquerda = "GRUPO KMB // Auditoria Patrimonial • Exatidão • Controle • Eficiência"
-        self.drawString(margem + 75, 18, texto_esquerda)
+        self.drawString(margem + 68, 15, texto_esquerda)
         
         texto_pagina = f"Página {self._pageNumber} de {page_count}"
-        self.drawRightString(largura_pagina - margem, 18, texto_pagina)
+        self.drawRightString(largura_pagina - margem, 15, texto_pagina)
         self.restoreState()
 
 
 def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
-    # Reutiliza a lógica de filtragem da planilha
-    wb_temp = openpyxl.Workbook()
-    # Simula a extração dos dados filtrados chamando a lógica de itens
-    ws_dummy = wb_temp.active
-    
-    # Processa os mesmos dados para o ReportLab
     col_loc = next((c for c in df_localizacao.columns if 'local' in c.lower()), df_localizacao.columns[2])
     col_cod_loc = next((c for c in df_localizacao.columns if 'codigo' in c.lower() or 'cod' in c.lower()), df_localizacao.columns[3])
     col_desc_loc = next((c for c in df_localizacao.columns if 'desc' in c.lower()), df_localizacao.columns[4])
@@ -550,7 +540,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
             if cod not in codigos_estoque_set:
                 desc_item = descricoes_comptar.get(cod, "Item Avulso / Sem Cadastro")
                 soma_comptar_val = soma_comptar_por_produto.get(cod, 0)
-                itens_filtrados_temp.append([cod, desc_item, "0", str(soma_comptar_val), str(soma_comptar_val)])
+                itens_filtrados_temp.append((cod, desc_item, 0, True, soma_comptar_val, soma_comptar_val, locs))
     else:
         for idx, row in df_estoque.iterrows():
             cod = str(row.get(col_cod_est, '')).strip()
@@ -579,46 +569,75 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
                     incluir = True
                     
             if incluir:
-                itens_filtrados_temp.append([cod, desc[:35], str(est), str(soma_comptar_val), str(divergencia_val)])
+                itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
+
+    locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
+    max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(letter),
-        rightMargin=30,
-        leftMargin=30,
-        topMargin=35,
-        bottomMargin=45
+        rightMargin=25,
+        leftMargin=25,
+        topMargin=30,
+        bottomMargin=40
     )
     
     styles = getSampleStyleSheet()
-    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#1F4E78'))
-    estilo_celula = ParagraphStyle('CelulaPDF', parent=styles['Normal'], fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#0F172A'))
-    estilo_cab_tabela = ParagraphStyle('CabPDF', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.white)
-
+    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=11, textColor=colors.HexColor('#1F4E78'))
+    
     story = []
-    
-    # Cabeçalho do relatório PDF
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
-    story.append(Spacer(1, 8))
+    story.append(Spacer(1, 6))
     
-    dados_tabela = [["Código", "Descrição do Produto", "Estoque", "COMPTAR", "DIVERGÊNCIA", "Contagem 1", "Local"]]
-    for item in itens_filtrados_temp:
-        dados_tabela.append([item[0], item[1], item[2], item[3], item[4], "", ""])
+    # Cabeçalho dinâmico idêntico ao Excel
+    headers_pdf = ["Código", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
+    for i in range(1, max_locais_encontrados + 1):
+        headers_pdf.append(str(i) if i > 1 else "CONT. 1")
+    for i in range(1, max_locais_encontrados + 1):
+        headers_pdf.append(f"Local {i}" if i == 1 else str(i))
         
-    tabela_pdf = Table(dados_tabela, colWidths=[70, 260, 60, 60, 75, 75, 80], repeatRows=1)
+    dados_tabela = [headers_pdf]
+    
+    for cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod in itens_filtrados_temp:
+        cel_comptar = soma_comptar_val if tem_na_comptar else 0
+        cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
+        
+        linha = [str(cod), str(desc)[:30], str(est), str(cel_comptar), str(cel_divergencia)]
+        
+        if tem_na_comptar:
+            contagens_vals = []
+            for i in range(max_locais_encontrados):
+                if i < len(locs_prod):
+                    contagens_vals.append(str(int(float(locs_prod[i][1]))))
+                else:
+                    contagens_vals.append("")
+            locais_vals = [limpar_nome_local(locs_prod[i][0]) if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
+        else:
+            contagens_vals = ["0"] + [""] * (max_locais_encontrados - 1)
+            locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
+            
+        linha.extend(contagens_vals)
+        linha.extend(locais_vals)
+        dados_tabela.append(linha)
+        
+    # Larguras dinâmicas proporcionais para a folha paisagem A4
+    col_widths = [55, 200, 45, 50, 60] + [40] * max_locais_encontrados + [55] * max_locais_encontrados
+    
+    tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
     tabela_pdf.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('ALIGN', (1, 1), (1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
-        ('TOPPADDING', (0, 0), (-1, 0), 5),
+        ('FONTSIZE', (0, 0), (-1, 0), 7.5),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 4),
+        ('TOPPADDING', (0, 0), (-1, 0), 4),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('FONTSIZE', (0, 1), (-1, -1), 7.5),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
@@ -876,11 +895,11 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA (EXCEL + PDF COM BRASÃO NO RODAPÉ)
+    # MODO 2: PLANILHA DE CONFERÊNCIA
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
-        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas em Excel e em PDF com brasão no rodapé:")
+        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas com contagens, locais e brasão no rodapé:")
         
         numero_loja_ui = st.number_input("Número da Loja (ex: 13016 ou 17315)", min_value=1, max_value=99999, value=13016, step=1)
         
@@ -897,7 +916,6 @@ def main():
             if df_loc_temp is not None and df_est_temp is not None:
                 st.success("✅ Arquivos carregados e validados com sucesso!")
                 
-                # PRÉ-VISUALIZAÇÃO NA TELA
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
                 
@@ -919,9 +937,8 @@ def main():
                 
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
-                # BOTÕES DE EXCEL
                 st.markdown("---")
-                st.markdown("### 📥 1. Listas de Conferência em Excel (Timbre com Brasão no Topo)")
+                st.markdown("### 📥 1. Listas de Conferência em Excel")
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
                 with c_imp1:
@@ -937,10 +954,9 @@ def main():
                     buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SEM_SALDO")
                     st.download_button("📥 Baixar Excel (Sem Saldo)", data=buf_sem_saldo, file_name=f"Excel_SemSaldo_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-                # BOTÕES DE PDF COM BRASÃO NO RODAPÉ (OS 4 NOVOS BOTÕES)
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Brasão e Rodapé Gráfico em Cada Página)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Com Contagens, Locais e Brasão no Rodapé)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
