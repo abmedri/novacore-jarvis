@@ -446,7 +446,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (LARGURA FIXA NO CÓDIGO E CABEÇALHO REDUZIDO)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (FONTE 8 PT NOS DADOS)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -577,11 +577,11 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    # Cabeçalho compactado e sem quebra no código do produto
+    # Cabeçalho compactado e fonte dos dados alterada exatamente para 8 pt
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.5, leading=7, textColor=colors.white, alignment=1)
-    estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=0)
+    estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
+    estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
+    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=0)
     
     story = []
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
@@ -625,12 +625,10 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         linha_celulas.extend(locais_vals)
         dados_tabela.append(linha_celulas)
         
-    # Largura útil total da página Letter em paisagem (792 pt largura total menos 44 pt de margens = 748 pt úteis)
     largura_util = 792 - 44
     
-    # Definindo tamanhos fixos sem autoajuste agressivo para o código e descrição, dividindo o restante proporcionalmente
-    largura_codigo = 52
-    largura_desc = 150
+    largura_codigo = 55
+    largura_desc = 160
     largura_fixa_inicial = largura_codigo + largura_desc
     
     num_colunas = len(headers_pdf)
@@ -964,7 +962,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Largura Fixa Código + Cabeçalho Reduzido + Brasão)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Fonte 8 pt + Código Fixo + Brasão)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
