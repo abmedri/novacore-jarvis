@@ -949,20 +949,20 @@ def main():
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3).fillna("")
                 
-                # Conversão blindada para garantir que nenhum cabeçalho tenha ponto decimal
-                colunas_limpas = []
-                for c in df_preview_exibir.columns:
-                    c_str = str(c).strip()
-                    if c_str.endswith('.0'):
-                        c_str = c_str[:-2]
+                # Conversão robusta para garantir que os títulos das colunas fiquem limpos na pré-visualização
+                novas_colunas = []
+                for col in df_preview_exibir.columns:
+                    col_str = str(col).strip()
+                    if col_str.endswith('.0'):
+                        col_str = col_str[:-2]
                     try:
-                        c_val = float(c_str)
-                        if c_val.is_integer():
-                            c_str = str(int(c_val))
-                    except Exception:
+                        val_float = float(col_str)
+                        if val_float.is_integer():
+                            col_str = str(int(val_float))
+                    except ValueError:
                         pass
-                    colunas_limpas.append(c_str)
-                df_preview_exibir.columns = colunas_limpas
+                    novas_colunas.append(col_str)
+                df_preview_exibir.columns = novas_colunas
                 
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
