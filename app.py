@@ -947,31 +947,28 @@ def main():
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
-                df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3).fillna("")
                 
-                # ── LIMPEZA RADICAL DOS TÍTULOS NA TELA ──
+                # Lê como texto (dtype=str) para impedir que o Pandas adicione .000000 nas células
+                df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3, dtype=str).fillna("")
+                
+                # Remove o sufixo .1 / .2 gerado pelo Pandas em colunas repetidas
                 colunas_limpas_tela = []
-                for idx, c in enumerate(df_preview_exibir.columns):
+                for c in df_preview_exibir.columns:
                     c_str = str(c).strip()
-                    if c_str.endswith('.0'):
-                        c_str = c_str[:-2]
-                    
-                    try:
-                        val_f = float(c_str)
-                        if val_f.is_integer():
-                            c_str = str(int(val_f))
-                    except ValueError:
-                        pass
+                    if '.' in c_str and c_str.split('.')[0].isdigit():
+                        c_str = c_str.split('.')[0]
                     colunas_limpas_tela.append(c_str)
                 df_preview_exibir.columns = colunas_limpas_tela
                 
-                # ── APLICA NEGRITO APENAS NOS CONTEÚDOS DAS COLUNAS ESPECIFICADAS ──
-                colunas_alvo_negrito = [
-                    c for c in df_preview_exibir.columns 
-                    if any(termo in str(c).lower() for termo in ['codigo', 'código', 'estoque', 'comptar', 'divergência', 'divergencia']) 
-                    or str(c).isdigit() 
-                    or 'local' in str(c).lower()
-                ]
+                # Garante que nenhuma célula numérica exiba ".0" residual
+                for col in df_preview_exibir.columns:
+                    if col != "Descrição":
+                        df_preview_exibir[col] = df_preview_exibir[col].apply(
+                            lambda x: x[:-2] if isinstance(x, str) and x.endswith('.0') else x
+                        )
+                
+                # Aplica negrito APENAS nos conteúdos (células) das colunas especificadas (exceto Descrição)
+                colunas_alvo_negrito = [c for c in df_preview_exibir.columns if c != "Descrição"]
 
                 def aplicar_negrito_conteudo(s):
                     if s.name in colunas_alvo_negrito:
