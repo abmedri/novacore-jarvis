@@ -413,7 +413,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     buffer.seek(0)
     return buffer
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (EXPANSÃO DINÂMICA DE COLUNAS)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (EXPANSÃO DINÂMICA + ANTI-QUEBRA DE LOCAIS)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -576,7 +576,15 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
                     contagens_vals.append(Paragraph(f"<nobr>{int(float(locs_prod[i][1]))}</nobr>", estilo_td_centro))
                 else:
                     contagens_vals.append(Paragraph("", estilo_td_centro))
-            locais_vals = [Paragraph(f"<nobr>{str(limpar_nome_local(locs_prod[i][0])).replace(' ', '&nbsp;')}</nobr>", estilo_td_centro) if i < len(locs_prod) else Paragraph("", estilo_td_centro) for i in range(max_locais_encontrados)]
+            
+            # 🛡️ Tratamento blindado: Substitui pontos e espaços por &nbsp; dentro de <nobr> para impedir quebras em locais como "29.5"
+            locais_vals = []
+            for i in range(max_locais_encontrados):
+                if i < len(locs_prod):
+                    nome_loc_limpo = str(limpar_nome_local(locs_prod[i][0])).replace('.', '&nbsp;').replace(' ', '&nbsp;')
+                    locais_vals.append(Paragraph(f"<nobr>{nome_loc_limpo}</nobr>", estilo_td_centro))
+                else:
+                    locais_vals.append(Paragraph("", estilo_td_centro))
         else:
             contagens_vals = [Paragraph("<nobr>0</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
             locais_vals = [Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
@@ -588,7 +596,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     # 📐 Cálculo dinâmico e proporcional de larguras das colunas do PDF (Expandindo automaticamente os locais)
     largura_util = 792 - 44  # 748 pt de largura útil em paisagem
     largura_codigo = 48
-    largura_desc = 135
+    largura_desc = 130
     largura_est = 26
     largura_comp = 28
     largura_div = 32
@@ -596,7 +604,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     
     num_colunas = len(headers_pdf)
     colunas_restantes = num_colunas - 5
-    largura_outras = (largura_util - largura_fixa_inicial) / colunas_restantes if colunas_restantes > 0 else 24
+    largura_outras = max((largura_util - largura_fixa_inicial) / colunas_restantes, 30) if colunas_restantes > 0 else 24
     
     col_widths = [largura_codigo, largura_desc, largura_est, largura_comp, largura_div] + [largura_outras] * colunas_restantes
     
