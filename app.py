@@ -140,7 +140,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
         perc_divergencia = (total_div / total_skus * 100) if total_skus > 0 else 0
         
         vol_falta = abs(df_falta[col_ajuste].sum()) if col_ajuste and not df_falta.empty else 0
-        vol_sobra = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobra.empty else 0 # CORRIGIDO AQUI (df_sobras -> df_sobra)
+        vol_sobra = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobra.empty else 0
         vol_div_total = vol_falta + vol_sobra
         perc_vol_div = (vol_div_total / qtd_antes * 100) if qtd_antes > 0 else 0
         
@@ -457,7 +457,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA ULTRA-COMPACTO (TODAS AS COLUNAS, FONTE 5PT, LINHA ÚNICA)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (FONTE 7 PT, COLUNAS ENXUTAS, LINHA ÚNICA)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -621,13 +621,14 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         linha.extend(locais_vals)
         dados_tabela.append(linha)
         
+    # Redistribuição otimizada: larguras fixas enxutas e otimizadas para dar mais espaço à descrição e contagens com fonte 7 pt
     largura_util = 842 - 20
-    largura_fixa = 45 + 175 + 32 + 38 + 42
+    largura_fixa = 40 + 150 + 28 + 32 + 35 # Código + Descrição + Estoque + Comptar + Divergencia = 285 pt
     largura_restante = largura_util - largura_fixa
     num_colunas_dinamicas = max_locais_encontrados * 2
-    largura_col_dinamica = max(20, largura_restante / num_colunas_dinamicas) if num_colunas_dinamicas > 0 else 22
+    largura_col_dinamica = max(18, largura_restante / num_colunas_dinamicas) if num_colunas_dinamicas > 0 else 20
     
-    col_widths = [45, 175, 32, 38, 42] + [largura_col_dinamica] * num_colunas_dinamicas
+    col_widths = [40, 150, 28, 32, 35] + [largura_col_dinamica] * num_colunas_dinamicas
     
     tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
     tabela_pdf.setStyle(TableStyle([
@@ -636,12 +637,12 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('ALIGN', (1, 1), (1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
-        ('TOPPADDING', (0, 0), (-1, -1), 1.5),
+        ('FONTSIZE', (0, 0), (-1, 0), 7), # FONTE 7 PT AUMENTADA E LEGÍVEL
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.0),
+        ('TOPPADDING', (0, 0), (-1, -1), 2.0),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 5),
+        ('FONTSIZE', (0, 1), (-1, -1), 7), # FONTE 7 PT AUMENTADA E LEGÍVEL
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
@@ -903,7 +904,7 @@ def main():
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
-        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas com todas las colunas preservadas em linha única:")
+        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas com todas as colunas preservadas em linha única:")
         
         numero_loja_ui = st.number_input("Número da Loja (ex: 13016 ou 17315)", min_value=1, max_value=99999, value=13016, step=1)
         
@@ -960,7 +961,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Todas as Colunas em Linha Única + Brasão no Rodapé)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Todas as Colunas em Linha Única + Fonte 7 pt + Brasão)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
@@ -1040,7 +1041,7 @@ def main():
                             filtro_classe_abc = st.selectbox("Filtro Curva ABC:", options=["Todas as Classes (Geral)", "Classe A (80%)", "Classe B (95%)", "Classe C (100%)"], index=0, key="abc_filtro_classe")
                         
                         df_abc = df_filtrado.sort_values(by=eixo_y_escolhido, ascending=False).copy()
-                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolh_id := eixo_y_escolhido].cumsum() if False else df_abc[eixo_y_escolhido].cumsum()
+                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolhido].cumsum()
                         soma_total = df_abc[eixo_y_escolhido].sum()
                         
                         if soma_total > 0:
