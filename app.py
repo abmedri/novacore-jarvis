@@ -448,7 +448,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (FONTE DO CABEÇALHO REDUZIDA PARA 5 PT)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (TÍTULOS OTIMIZADOS E LARGURAS AMPLIADAS)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -581,7 +581,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    # Fonte do cabeçalho reduzida para 5 pt com espaçamento compacto (leading 6) e proteção absoluta <nobr>
+    # Cabeçalho compactado e otimizado com tamanho de fonte ideal para caber perfeitamente na horizontal
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.0, leading=6, textColor=colors.white, alignment=1)
     estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
@@ -591,11 +591,12 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
     story.append(Spacer(1, 3))
     
-    headers_pdf = ["Código", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
+    # Títulos abreviados e otimizados sem perder o significado para garantir que fiquem 100% em uma linha
+    headers_pdf = ["Código", "Descrição", "EST.", "COMP.", "DIVERG."]
     for i in range(1, max_locais_encontrados + 1):
-        headers_pdf.append(str(i) if i > 1 else "CONT. 1")
+        headers_pdf.append(str(i) if i > 1 else "C.1")
     for i in range(1, max_locais_encontrados + 1):
-        headers_pdf.append(f"Local {i}" if i == 1 else str(i))
+        headers_pdf.append(f"Loc.{i}" if i == 1 else str(i))
         
     dados_tabela = [[Paragraph(f"<nobr>{str(h).strip().replace(' ', '&nbsp;')}</nobr>", estilo_th) for h in headers_pdf]]
     
@@ -631,15 +632,19 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         
     largura_util = 792 - 44
     
-    largura_codigo = 55
-    largura_desc = 160
-    largura_fixa_inicial = largura_codigo + largura_desc
+    # Redimensionamento de larguras: mais espaço para as colunas EST, COMP e DIVERG
+    largura_codigo = 52
+    largura_desc = 150
+    largura_est = 26
+    largura_comp = 28
+    largura_div = 32
+    largura_fixa_inicial = largura_codigo + largura_desc + largura_est + largura_comp + largura_div
     
     num_colunas = len(headers_pdf)
-    colunas_restantes = num_colunas - 2
-    largura_outras = (largura_util - largura_fixa_inicial) / colunas_restantes if colunas_restantes > 0 else 25
+    colunas_restantes = num_colunas - 5
+    largura_outras = (largura_util - largura_fixa_inicial) / colunas_restantes if colunas_restantes > 0 else 22
     
-    col_widths = [largura_codigo, largura_desc] + [largura_outras] * colunas_restantes
+    col_widths = [largura_codigo, largura_desc, largura_est, largura_comp, largura_div] + [largura_outras] * colunas_restantes
     
     tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
     tabela_pdf.setStyle(TableStyle([
@@ -966,7 +971,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Cabeçalho Compactado sem Quebra + Brasão)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Títulos Otimizados sem Quebras + Brasão)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
