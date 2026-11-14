@@ -413,7 +413,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     buffer.seek(0)
     return buffer
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (EXPANSÃO DINÂMICA DE COLUNAS)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -538,10 +538,10 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.0, leading=6, textColor=colors.white, alignment=1)
+    estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=6.0, leading=7, textColor=colors.white, alignment=1)
     estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=9, leading=11, textColor=colors.HexColor('#111827'), alignment=0)
+    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=8.5, leading=11, textColor=colors.HexColor('#111827'), alignment=0)
     
     story = []
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
@@ -564,31 +564,31 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         linha_celulas = [
             Paragraph(f"<nobr>{cod_formatado}</nobr>", estilo_td_codigo),
             Paragraph(str(desc), estilo_td_esq),
-            Paragraph(str(est), estilo_td_centro),
-            Paragraph(str(cel_comptar), estilo_td_centro),
-            Paragraph(str(cel_divergencia), estilo_td_centro)
+            Paragraph(f"<nobr>{est}</nobr>", estilo_td_centro),
+            Paragraph(f"<nobr>{cel_comptar}</nobr>", estilo_td_centro),
+            Paragraph(f"<nobr>{cel_divergencia}</nobr>", estilo_td_centro)
         ]
         
         if tem_na_comptar:
             contagens_vals = []
             for i in range(max_locais_encontrados):
                 if i < len(locs_prod):
-                    contagens_vals.append(Paragraph(str(int(float(locs_prod[i][1]))), estilo_td_centro))
+                    contagens_vals.append(Paragraph(f"<nobr>{int(float(locs_prod[i][1]))}</nobr>", estilo_td_centro))
                 else:
                     contagens_vals.append(Paragraph("", estilo_td_centro))
             locais_vals = [Paragraph(f"<nobr>{str(limpar_nome_local(locs_prod[i][0])).replace(' ', '&nbsp;')}</nobr>", estilo_td_centro) if i < len(locs_prod) else Paragraph("", estilo_td_centro) for i in range(max_locais_encontrados)]
         else:
-            contagens_vals = [Paragraph("0", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
+            contagens_vals = [Paragraph("<nobr>0</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
             locais_vals = [Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
             
         linha_celulas.extend(contagens_vals)
         linha_celulas.extend(locais_vals)
         dados_tabela.append(linha_celulas)
         
-    largura_util = 792 - 44
-    
-    largura_codigo = 52
-    largura_desc = 150
+    # 📐 Cálculo dinâmico e proporcional de larguras das colunas do PDF (Expandindo automaticamente os locais)
+    largura_util = 792 - 44  # 748 pt de largura útil em paisagem
+    largura_codigo = 48
+    largura_desc = 135
     largura_est = 26
     largura_comp = 28
     largura_div = 32
@@ -596,7 +596,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     
     num_colunas = len(headers_pdf)
     colunas_restantes = num_colunas - 5
-    largura_outras = (largura_util - largura_fixa_inicial) / colunas_restantes if colunas_restantes > 0 else 22
+    largura_outras = (largura_util - largura_fixa_inicial) / colunas_restantes if colunas_restantes > 0 else 24
     
     col_widths = [largura_codigo, largura_desc, largura_est, largura_comp, largura_div] + [largura_outras] * colunas_restantes
     
