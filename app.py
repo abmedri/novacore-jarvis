@@ -140,7 +140,7 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
         perc_divergencia = (total_div / total_skus * 100) if total_skus > 0 else 0
         
         vol_falta = abs(df_falta[col_ajuste].sum()) if col_ajuste and not df_falta.empty else 0
-        vol_sobra = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobras.empty else 0
+        vol_sobra = df_sobra[col_ajuste].sum() if col_ajuste and not df_sobra.empty else 0 # CORRIGIDO AQUI (df_sobras -> df_sobra)
         vol_div_total = vol_falta + vol_sobra
         perc_vol_div = (vol_div_total / qtd_antes * 100) if qtd_antes > 0 else 0
         
@@ -591,7 +591,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
     story.append(Spacer(1, 3))
     
-    # Mantém absolutamente todas as colunas originais
     headers_pdf = ["Código", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
         headers_pdf.append(str(i) if i > 1 else "CONT. 1")
@@ -904,7 +903,7 @@ def main():
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
-        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas com todas as colunas preservadas em linha única:")
+        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas com todas las colunas preservadas em linha única:")
         
         numero_loja_ui = st.number_input("Número da Loja (ex: 13016 ou 17315)", min_value=1, max_value=99999, value=13016, step=1)
         
@@ -1041,7 +1040,7 @@ def main():
                             filtro_classe_abc = st.selectbox("Filtro Curva ABC:", options=["Todas as Classes (Geral)", "Classe A (80%)", "Classe B (95%)", "Classe C (100%)"], index=0, key="abc_filtro_classe")
                         
                         df_abc = df_filtrado.sort_values(by=eixo_y_escolhido, ascending=False).copy()
-                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolhido].cumsum()
+                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolh_id := eixo_y_escolhido].cumsum() if False else df_abc[eixo_y_escolhido].cumsum()
                         soma_total = df_abc[eixo_y_escolhido].sum()
                         
                         if soma_total > 0:
