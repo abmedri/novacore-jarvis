@@ -18,7 +18,7 @@ from docx.shared import Inches, Pt, RGBColor
 from pptx import Presentation
 from pptx.util import Inches as PptxInches
 
-# ReportLab para PDFs profissionais com rodapé gráfico personalizado
+# ReportLab para PDFs profissionais com rodapé gráfico personalizado e quebra automática
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -457,7 +457,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA COM COLUNAS DINÂMICAS DE CONTAGEM E LOCAIS
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM TODAS AS COLUNAS E AJUSTE DE LARGURA)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -478,28 +478,28 @@ class NumberedCanvas(canvas.Canvas):
 
     def draw_page_decorations(self, page_count):
         self.saveState()
-        self.setFont("Helvetica", 8)
+        self.setFont("Helvetica", 7)
         self.setFillColor(colors.HexColor('#64748b'))
         
         largura_pagina, altura_pagina = self._pagesize
-        margem = 30
+        margem = 15
         
         self.setStrokeColor(colors.HexColor('#cbd5e1'))
-        self.setLineWidth(0.75)
-        self.line(margem, 32, largura_pagina - margem, 32)
+        self.setLineWidth(0.5)
+        self.line(margem, 25, largura_pagina - margem, 25)
         
         caminho_brasao = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
         if caminho_brasao:
             try:
-                self.drawImage(caminho_brasao, margem, 10, width=60, height=18, preserveAspectRatio=True, mask='auto')
+                self.drawImage(caminho_brasao, margem, 8, width=50, height=15, preserveAspectRatio=True, mask='auto')
             except Exception:
                 pass
                 
         texto_esquerda = "GRUPO KMB // Auditoria Patrimonial • Exatidão • Controle • Eficiência"
-        self.drawString(margem + 68, 15, texto_esquerda)
+        self.drawString(margem + 55, 12, texto_esquerda)
         
         texto_pagina = f"Página {self._pageNumber} de {page_count}"
-        self.drawRightString(largura_pagina - margem, 15, texto_pagina)
+        self.drawRightString(largura_pagina - margem, 12, texto_pagina)
         self.restoreState()
 
 
@@ -578,67 +578,77 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(letter),
-        rightMargin=25,
-        leftMargin=25,
-        topMargin=30,
-        bottomMargin=40
+        rightMargin=15,
+        leftMargin=15,
+        topMargin=25,
+        bottomMargin=35
     )
     
     styles = getSampleStyleSheet()
-    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=11, textColor=colors.HexColor('#1F4E78'))
-    
+    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#1F4E78'))
+    estilo_celula = ParagraphStyle('CelulaPDF', parent=styles['Normal'], fontName='Helvetica', fontSize=6.5, leading=8, textColor=colors.HexColor('#0F172A'))
+    estilo_celula_centro = ParagraphStyle('CelulaCentroPDF', parent=styles['Normal'], fontName='Helvetica', fontSize=6.5, leading=8, alignment=1, textColor=colors.HexColor('#0F172A'))
+    estilo_cabec = ParagraphStyle('CabecPDF', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=6.5, leading=8, alignment=1, textColor=colors.white)
+
     story = []
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 4))
     
-    # Cabeçalho dinâmico idêntico ao Excel
+    # Mantém absolutamente todas as colunas: Código, Descrição, Estoque, Comptar, Divergência + Contagens + Locais
     headers_pdf = ["Código", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
         headers_pdf.append(str(i) if i > 1 else "CONT. 1")
     for i in range(1, max_locais_encontrados + 1):
         headers_pdf.append(f"Local {i}" if i == 1 else str(i))
         
-    dados_tabela = [headers_pdf]
+    headers_formatados = [Paragraph(h, estilo_cabec) for h in headers_pdf]
+    dados_tabela = [headers_formatados]
     
     for cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod in itens_filtrados_temp:
         cel_comptar = soma_comptar_val if tem_na_comptar else 0
         cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
         
-        linha = [str(cod), str(desc)[:30], str(est), str(cel_comptar), str(cel_divergencia)]
+        linha = [
+            Paragraph(str(cod), estilo_celula_centro),
+            Paragraph(str(desc), estilo_celula),
+            Paragraph(str(est), estilo_celula_centro),
+            Paragraph(str(cel_comptar), estilo_celula_centro),
+            Paragraph(str(cel_divergencia), estilo_celula_centro)
+        ]
         
         if tem_na_comptar:
             contagens_vals = []
             for i in range(max_locais_encontrados):
                 if i < len(locs_prod):
-                    contagens_vals.append(str(int(float(locs_prod[i][1]))))
+                    contagens_vals.append(Paragraph(str(int(float(locs_prod[i][1]))), estilo_celula_centro))
                 else:
-                    contagens_vals.append("")
-            locais_vals = [limpar_nome_local(locs_prod[i][0]) if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
+                    contagens_vals.append(Paragraph("", estilo_celula_centro))
+            locais_vals = [Paragraph(limpar_nome_local(locs_prod[i][0]), estilo_celula_centro) if i < len(locs_prod) else Paragraph("", estilo_celula_centro) for i in range(max_locais_encontrados)]
         else:
-            contagens_vals = ["0"] + [""] * (max_locais_encontrados - 1)
-            locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
+            contagens_vals = [Paragraph("0", estilo_celula_centro)] + [Paragraph("", estilo_celula_centro)] * (max_locais_encontrados - 1)
+            locais_vals = [Paragraph("Sem local", estilo_celula_centro)] + [Paragraph("", estilo_celula_centro)] * (max_locais_encontrados - 1)
             
         linha.extend(contagens_vals)
         linha.extend(locais_vals)
         dados_tabela.append(linha)
         
-    # Larguras dinâmicas proporcionais para a folha paisagem A4
-    col_widths = [55, 200, 45, 50, 60] + [40] * max_locais_encontrados + [55] * max_locais_encontrados
+    # Distribuição proporcional de largura para caber tudo na folha paisagem sem cortes
+    largura_util = 842 - 30 # A4 Paisagem width = 842 pt menos margens
+    largura_fixa = 50 + 195 + 40 + 45 + 50 # Código + Descrição + Estoque + Comptar + Divergencia = 380 pt
+    largura_restante = largura_util - largura_fixa
+    num_colunas_dinamicas = max_locais_encontrados * 2
+    largura_col_dinamica = max(26, largura_restante / num_colunas_dinamicas) if num_colunas_dinamicas > 0 else 28
+    
+    col_widths = [50, 195, 40, 45, 50] + [largura_col_dinamica] * num_colunas_dinamicas
     
     tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
     tabela_pdf.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ALIGN', (1, 1), (1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 7.5),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 4),
-        ('TOPPADDING', (0, 0), (-1, 0), 4),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 7.5),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
     ]))
     
     story.append(tabela_pdf)
@@ -899,7 +909,7 @@ def main():
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
-        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas com contagens, locais e brasão no rodapé:")
+        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas com todas as colunas preservadas e ajustadas para impressão:")
         
         numero_loja_ui = st.number_input("Número da Loja (ex: 13016 ou 17315)", min_value=1, max_value=99999, value=13016, step=1)
         
@@ -956,7 +966,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Com Contagens, Locais e Brasão no Rodapé)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Todas as Colunas + Brasão no Rodapé)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
