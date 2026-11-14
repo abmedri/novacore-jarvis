@@ -446,7 +446,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM ÁREA DE IMPRESSÃO E AUTOAJUSTE)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (SEM QUEBRA NO CÓDIGO E CABEÇALHO REDUZIDO)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -565,7 +565,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
 
     buffer = io.BytesIO()
     
-    # Configuração rígida de margens estreitas (22pt ~ 7.7mm) para maximizar a área útil de impressão em paisagem
+    # Margens estreitas (22pt) para maximizar a área útil de impressão em paisagem
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(letter),
@@ -578,8 +578,12 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    # Estilos fluidos de parágrafo compactos (6.5 pt) para evitar estouro nas laterais
-    estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=6.5, leading=8, textColor=colors.white, alignment=1)
+    # Cabeçalho com fonte menor (5.5 pt) e sem quebra no código do produto (usando non-breaking spaces se necessário)
+    estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.5, leading=7, textColor=colors.white, alignment=1)
+    
+    # Código sem quebra de linha (whiteSpace="nowrap")
+    estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1, wordWrap='CJK')
+    
     estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=0)
     
@@ -599,8 +603,11 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         cel_comptar = soma_comptar_val if tem_na_comptar else 0
         cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
         
+        # Substitui espaços por espaços sem quebra (&nbsp;) para garantir que o código não quebre de linha
+        cod_formatado = str(cod).strip().replace(" ", "&nbsp;")
+        
         linha_celulas = [
-            Paragraph(str(cod), estilo_td_centro),
+            Paragraph(f"<nobr>{cod_formatado}</nobr>", estilo_td_codigo),
             Paragraph(str(desc), estilo_td_esq),
             Paragraph(str(est), estilo_td_centro),
             Paragraph(str(cel_comptar), estilo_td_centro),
@@ -627,7 +634,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     largura_util = 792 - 44
     num_colunas = len(headers_pdf)
     
-    # Distribuição proporcional: Descrição recebe tamanho ideal estático (150 pt) e o restante divide-se proporcionalmente
+    # Descrição recebe tamanho ideal estático (150 pt) e o restante divide-se proporcionalmente
     largura_desc = 150
     largura_restante = largura_util - largura_desc
     largura_outras = largura_restante / (num_colunas - 1) if num_colunas > 1 else 25
@@ -959,7 +966,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Área de Impressão Ajustada + Fonte Compacta + Brasão)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Código Sem Quebra + Cabeçalho Reduzido + Brasão)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
