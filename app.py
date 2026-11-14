@@ -183,7 +183,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     wb = openpyxl.Workbook()
     
     fonte_padrao = Font(name="Arial", size=10)
-    fonte_descricao_excel = Font(name="Arial", size=9) # Fonte tamanho 9 para a descrição no Excel
+    fonte_descricao_excel = Font(name="Arial", size=9)
     fonte_negrito = Font(name="Arial", size=10, bold=True)
     fonte_cabecalho = Font(name="Arial", size=10, bold=True, color="FFFFFF")
     fill_cabecalho = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
@@ -281,7 +281,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # 📐 Definição de Margens Mínimas (Estreitas) para Ganho de Visão
     ws_saldo.page_margins.left = 0.2
     ws_saldo.page_margins.right = 0.2
     ws_saldo.page_margins.top = 0.3
@@ -321,7 +320,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
-    # ── CONSTRUÇÃO DOS CABEÇALHOS NO EXCEL ──
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
         if i == 1:
@@ -577,7 +575,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
                 else:
                     contagens_vals.append(Paragraph("", estilo_td_centro))
             
-            # 🛡️ Mantém os pontos originais (ex: 29.5) mas usa entidades HTML (&#46; e &nbsp;) para impedir quebras visuais de linha
             locais_vals = []
             for i in range(max_locais_encontrados):
                 if i < len(locs_prod):
@@ -594,8 +591,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         linha_celulas.extend(locais_vals)
         dados_tabela.append(linha_celulas)
         
-    # 📐 Larguras otimizadas em paisagem
-    largura_util = 792 - 44  # 748 pt de largura útil em paisagem
+    largura_util = 792 - 44
     largura_codigo = 58
     largura_desc = 120
     largura_est = 24
@@ -854,7 +850,7 @@ def main():
     st.markdown("""
     <style>
     .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
-    .main-header { padding: 20px 0; border-bottom: 1px solid #1f293d; margin-bottom: 20px; }
+    .main-header { padding: 0px 0; border-bottom: 1px solid #1f293d; margin-bottom: 20px; }
     .jarvis-title {
         font-size: 1.7rem; font-weight: 800; letter-spacing: 1.5px;
         background: linear-gradient(90deg, #00f2fe 0%, #3b82f6 100%);
@@ -887,9 +883,6 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA
-    # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
         st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas com todas as colunas preservadas em linha única (ordem alfabética pela descrição):")
@@ -914,10 +907,8 @@ def main():
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 
-                # Lê como texto (dtype=str) para impedir que o Pandas adicione .000000 nas células
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name=0, skiprows=3, dtype=str).fillna("")
                 
-                # Tratativa blindada de colunas duplicadas para a tela
                 cols_vistas = {}
                 novas_colunas = []
                 for c in df_preview_exibir.columns:
@@ -933,17 +924,14 @@ def main():
                         novas_colunas.append(c_str)
                 df_preview_exibir.columns = novas_colunas
                 
-                # Garante que nenhuma célula numérica exiba ".0" residual
                 for col in df_preview_exibir.columns:
                     if "Descrição" not in col:
                         df_preview_exibir[col] = df_preview_exibir[col].apply(
                             lambda x: x[:-2] if isinstance(x, str) and x.endswith('.0') else x
                         )
                 
-                # Exibição 100% segura e limpa do DataFrame
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
-                # Botão para baixar a pré-visualização em formato Excel (.xlsx) profissional
                 st.download_button(
                     label="📥 Baixar Pré-visualização em Excel (.xlsx)",
                     data=buf_preview,
@@ -988,9 +976,7 @@ def main():
             else:
                 st.error("❌ Erro ao processar os arquivos.")
         return
-    # ====================================================================
-    # MODO 1: NOVA CORE ORIGINAL (5 ETAPAS COMPLETA)
-    # ====================================================================
+    
     arquivos_submetidos = st.file_uploader("Carregue o arquivo oficial de inventário (ex: 13372.07.11.2026.csv) ou múltiplos arquivos", type=['csv', 'xlsx', 'xls'], accept_multiple_files=True)
     
     if arquivos_submetidos:
@@ -1011,7 +997,6 @@ def main():
                 
                 resumo_unico = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)[0]
                 
-                # ETAPA 1
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
                 st.markdown("<br>", unsafe_allow_html=True)
                 
@@ -1036,7 +1021,6 @@ def main():
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {resumo_unico['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(resumo_unico['val_ajuste_liquido'] < 0), eh_positivo=(resumo_unico['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
                 st.markdown("---")
                 
-                # ETAPA 2
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
                     if len(num_cols) >= 1 and len(all_cols) > 0:
                         col_sel1, col_sel2, col_sel3 = st.columns(3)
@@ -1068,7 +1052,7 @@ def main():
                                 fig_abc.add_trace(go.Scatter(x=df_plot[coluna_categoria_escolhida], y=df_plot['%_Acumulado'], name="% Acumulado (Pareto)", mode='lines+markers', yaxis='y2', line=dict(color='#f59e0b', width=3)))
                                 fig_abc.update_layout(template="plotly_dark", paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=480, yaxis=dict(title=eixo_y_escolhido), yaxis2=dict(title="% Acumulado", overlaying='y', side='right', range=[0, 105], showgrid=False))
                                 st.plotly_chart(fig_abc, use_container_width=True)
-                # ETAPA 3
+                
                 with st.expander("🚨 ETAPA 3: Matriz de Criticidade & Discrepância Financeira", expanded=False):
                     if len(num_cols) >= 2:
                         col_nome_prod = 'Descrição do Produto' if 'Descrição do Produto' in df_filtrado.columns else all_cols[0]
@@ -1082,7 +1066,7 @@ def main():
                             fig_critico = px.bar(df_critico, x=col_nome_prod, y=col_val_div, title="Top 50 Maiores Desvios Financeiros (R$)", template="plotly_dark", color=col_val_div, color_continuous_scale=['#ef4444', '#f59e0b', '#3b82f6'])
                             fig_critico.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=480)
                             st.plotly_chart(fig_critico, use_container_width=True)
-                # ETAPA 4
+                
                 with st.expander("🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto", expanded=False):
                     if len(num_cols) >= 2 and len(all_cols) > 0:
                         df_risco = df_filtrado.copy()
@@ -1092,7 +1076,7 @@ def main():
                         fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
                         fig_risco.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=420)
                         st.plotly_chart(fig_risco, use_container_width=True)
-                # ETAPA 5
+                
                 with st.expander("⚡ ETAPA 5: CENTRO DE COMANDO C-LEVEL (PRESCRITIVO & OPERACIONAL)", expanded=True):
                     tab_e5_1, tab_e5_2, tab_e5_3, tab_e5_4 = st.tabs(["🔍 1. Matriz Causa Raiz", "📈 2. Quadrante 4D", "🎯 3. Simulador Meta 97%", "📋 4. Plano de Ação Prioritário"])
                     col_val_aju_e5 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_filtrado.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
@@ -1173,7 +1157,7 @@ def main():
                 with gc2:
                     fig_aj = px.bar(df_resumo_geral, x="Ficheiro", y="Impacto Geral (%)", template="plotly_dark", title="Impacto Geral em Percentual")
                     st.plotly_chart(fig_aj, use_container_width=True)
-            # Central de Relatórios
+            
             st.markdown("---")
             st.subheader("📥 Central de Relatórios Executivos C-Level")
             col_e1, col_e2, col_e3, col_e4 = st.columns(4)
