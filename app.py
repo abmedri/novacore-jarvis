@@ -382,7 +382,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['G2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['G2'].border = borda_destaque
     
-    # Colunas Q e R totalmente limpas (removida qualquer fórmula residual das colunas)
+    # Colunas Q e R totalmente limpas
     ws_saldo['Q2'] = ""
     ws_saldo['Q2'].border = borda_fina
     ws_saldo['R2'] = ""
@@ -448,16 +448,18 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Largura blindada contra ocultação de conteúdo
+    # Ajuste dinâmico otimizado para ajustar perfeitamente à largura do conteúdo (sem sobras exageradas)
     for col in ws_saldo.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
         for cell in col:
+            # Ignoramos a linha 1 e 2 do topo para não distorcer o cálculo com o logo
             if cell.row >= 3 and cell.value is not None:
                 val_str = str(cell.value)
                 if not val_str.startswith("="):
                     max_len = max(max_len, len(val_str))
-        ws_saldo.column_dimensions[col_letter].width = max(max_len + 4, 10)
+        # Marg estreita e justa para otimizar o espaço horizontal da folha de contagem
+        ws_saldo.column_dimensions[col_letter].width = max(max_len + 2, 8)
 
     for ws in [ws_loja, ws_comp]:
         for col in ws.columns:
@@ -468,7 +470,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                     val_str = str(cell.value)
                     if not val_str.startswith("="):
                         max_len = max(max_len, len(val_str))
-            ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 10)
 
     buffer = io.BytesIO()
     wb.save(buffer)
