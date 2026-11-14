@@ -949,6 +949,9 @@ def main():
                     novas_cols_preview.append(col_str)
                 df_preview_exibir.columns = novas_cols_preview
                 
+                # Limpa ponto decimal em qualquer coluna ou cabeçalho na pré-visualização
+                df_preview_exibir.columns = [str(c).replace('.0', '') for c in df_preview_exibir.columns]
+                
                 for col in df_preview_exibir.columns:
                     df_preview_exibir[col] = df_preview_exibir[col].apply(
                         lambda x: str(int(x)) if isinstance(x, float) and x.is_integer() else (str(x).replace('.0', '') if isinstance(x, float) else x)
