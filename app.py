@@ -191,13 +191,13 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO EXCEL DE CONFERÊNCIA
+# GERADOR DO EXCEL DE CONFERÊNCIA (APENAS ABA PRINCIPAL)
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
     
     fonte_padrao = Font(name="Arial", size=10)
-    fonte_descricao_excel = Font(name="Arial", size=9) # Fonte tamanho 9 específica para a descrição no Excel
+    fonte_descricao_excel = Font(name="Arial", size=9) # Fonte tamanho 9 para a descrição no Excel
     fonte_negrito = Font(name="Arial", size=10, bold=True)
     fonte_cabecalho = Font(name="Arial", size=10, bold=True, color="FFFFFF")
     fill_cabecalho = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
@@ -212,44 +212,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         top=Side(style='medium', color='000000'), bottom=Side(style='medium', color='000000')
     )
     
-    ws_loja = wb.active
-    ws_loja.title = "LOJA"
-    ws_loja.views.sheetView[0].showGridLines = True
-    
-    tabela_lojas = [
-        [4684, 'MINAS', 'CATANDUVA'], [4685, 'MIRASSOL', 'MIRASSOL'], [4701, 'FARIA', 'RIO PRETO'],
-        [4794, 'GARDEN', 'CATANDUVA'], [5036, 'GENERAL', 'RIO PRETO'], [5037, 'ATA CENTRO', 'ARAÇATUBA'],
-        [5783, 'TANABI', 'TANABI'], [6119, 'PRAÇA', 'RIO PRETO'], [11021, 'ELDORADO', 'RIO PRETO'],
-        [12524, 'FERNANDÓPOLIS QUIOSQUE', 'FERNANDÓPOLIS'], [12760, 'MUFFATO', 'RIO PRETO'], [12853, 'CARREFOUR', 'RIO PRETO'],
-        [12901, 'PLAZA', 'RIO PRETO'], [13015, 'RONDON', 'ARAÇATUBA'], [13016, 'POTIRENDABA', 'POTIRENDABA'],
-        [13017, 'NOVA GRANADA', 'NOVA GRANADA'], [13018, 'JALES', 'JALES'], [13019, 'FERNANDÓPOLIS', 'FERNANDÓPOLIS'],
-        [13123, 'TABAPUÃ', 'TABAPUÃ'], [13372, 'VD RIO PRETO', 'RIO PRETO'], [13904, 'PROENÇA', 'CATANDUVA'],
-        [13922, 'CIDADE NORTE', 'RIO PRETO'], [14252, 'AMIGÃO', 'ARAÇATUBA'], [14268, 'ATACADÃO', 'CATANDUVA'],
-        [14378, 'GUAPIAÇU', 'GUAPIAÇU'], [14736, 'MUFFATO ARAÇATUBA', 'ARAÇATUBA'], [17315, 'IGUATEMI', 'RIO PRETO'],
-        [17612, 'DAMHA', 'RIO PRETO'], [18591, 'PRAÇA NOVA', 'ARAÇATUBA'], [20385, 'CONTAINER VETORASSO', 'RIO PRETO'],
-        [22373, 'SAUDADES', 'BIRIGUI'], [22374, 'GUARARAPES', 'GUARARAPES'], [22375, 'AMIGÃO MIRAGAIA', 'BIRIGUI'],
-        [22401, 'ANDRADINA SHOPPING', 'ANDRADINA'], [22402, 'CASTILHO', 'CASTILHO'], [22403, 'BANDEIRANTE', 'BIRIGUI'],
-        [22404, 'BARÃO', 'BIRIGUI'], [22405, 'ANDRADINA CENTRO', 'ANDRADINA'], [22406, 'MIRANDÓPOLIS', 'MIRANDÓPOLIS'],
-        [22491, 'VD ARAÇATUBA', 'ARAÇATUBA'], [22511, 'VD CATANDUVA', 'CATANDUVA'], [22512, 'VD JALES', 'JALES'],
-        [23015, 'VD BIRIGUI', 'BIRIGUI'], [23505, 'SANTA FÉ DO SUL', 'SANTA FÉ DO SUL'], [23514, 'PEREIRA BARRETO', 'PEREIRA BARRETO'],
-        [23515, 'GENERAL SALGADO', 'GENERAL SALGADO'], [23518, 'ILHA SOLTEIRA', 'ILHA SOLTEIRA'], [23525, 'AURIFLAMA', 'AURIFLAMA'],
-        [23526, "PALMEIRA D'OESTE", "PALMEIRA D'OESTE"], [23527, 'ILHA SOLTEIRA QUIOSQUE', 'ILHA SOLTEIRA'],
-        [23528, 'VD FERNANDÓPOLIS', 'FERNANDÓPOLIS'], [23529, 'SANTA FÉ DO SUL QUIOSQUE', 'SANTA FÉ DO SUL'],
-        [23530, 'PEREIRA BARRETO QUIOSQUE', 'PEREIRA BARRETO'], [24756, 'BADY BASSITT', 'BADY BASSITT']
-    ]
-    for r_loja in tabela_lojas:
-        ws_loja.append(r_loja)
-
-    ws_comp = wb.create_sheet(title="CompTar")
-    ws_comp.views.sheetView[0].showGridLines = True
-    headers_comp = ["Local", "Codigo", "Descricao", "Qtd"]
-    ws_comp.append(headers_comp)
-    for col_num in range(1, 5):
-        cell = ws_comp.cell(row=1, column=col_num)
-        cell.font = fonte_cabecalho
-        cell.fill = fill_cabecalho
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        
     col_loc = next((c for c in df_localizacao.columns if 'local' in c.lower()), df_localizacao.columns[2])
     col_cod_loc = next((c for c in df_localizacao.columns if 'codigo' in c.lower() or 'cod' in c.lower()), df_localizacao.columns[3])
     col_desc_loc = next((c for c in df_localizacao.columns if 'desc' in c.lower()), df_localizacao.columns[4])
@@ -268,7 +230,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         except Exception:
             qtd = 0
             
-        ws_comp.append([loc, cod, desc, qtd])
         if cod not in locais_por_produto:
             locais_por_produto[cod] = []
             soma_comptar_por_produto[cod] = 0
@@ -327,7 +288,8 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
 
     nome_aba = "Itens Sem Saldo" if tipo_filtro == "SEM_SALDO" else "Saldo Loja"
-    ws_saldo = wb.create_sheet(title=nome_aba)
+    ws_saldo = wb.active
+    ws_saldo.title = nome_aba
     ws_saldo.views.sheetView[0].showGridLines = True
     
     ws_saldo.page_setup.orientation = ws_saldo.ORIENTATION_LANDSCAPE
@@ -955,7 +917,7 @@ def main():
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 
                 # Lê como texto (dtype=str) para impedir que o Pandas adicione .000000 nas células
-                df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3, dtype=str).fillna("")
+                df_preview_exibir = pd.read_excel(buf_preview, sheet_name=0, skiprows=3, dtype=str).fillna("")
                 
                 # Tratativa blindada de colunas duplicadas para a tela
                 cols_vistas = {}
