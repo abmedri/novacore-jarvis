@@ -446,7 +446,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM AUTOAJUSTE FLUIDO E FONTE 7 PT)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM ÁREA DE IMPRESSÃO E AUTOAJUSTE)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -564,11 +564,13 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
 
     buffer = io.BytesIO()
+    
+    # Configuração rígida de margens estreitas (22pt ~ 7.7mm) para maximizar a área útil de impressão em paisagem
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(letter),
-        rightMargin=10,
-        leftMargin=10,
+        rightMargin=22,
+        leftMargin=22,
         topMargin=20,
         bottomMargin=30
     )
@@ -576,10 +578,10 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    # Estilos fluidos de parágrafo com tamanho 7 pt para autoajuste correto
-    estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=7, leading=9, textColor=colors.white, alignment=1)
-    estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=7, leading=9, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=7, leading=9, textColor=colors.HexColor('#111827'), alignment=0)
+    # Estilos fluidos de parágrafo compactos (6.5 pt) para evitar estouro nas laterais
+    estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=6.5, leading=8, textColor=colors.white, alignment=1)
+    estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1)
+    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=0)
     
     story = []
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
@@ -621,12 +623,14 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         linha_celulas.extend(locais_vals)
         dados_tabela.append(linha_celulas)
         
-    # Distribuição proporcional inteligente preenchendo a largura útil (~822 pt) e dando destaque de largura para a Descrição
-    largura_util = 842 - 20
+    # Cálculo rigoroso da largura útil considerando a folha Letter em paisagem (792 pt largura total, menos margens de 44 pt = 748 pt úteis)
+    largura_util = 792 - 44
     num_colunas = len(headers_pdf)
-    largura_desc = 190
+    
+    # Distribuição proporcional: Descrição recebe tamanho ideal estático (150 pt) e o restante divide-se proporcionalmente
+    largura_desc = 150
     largura_restante = largura_util - largura_desc
-    largura_outras = largura_restante / (num_colunas - 1) if num_colunas > 1 else 30
+    largura_outras = largura_restante / (num_colunas - 1) if num_colunas > 1 else 25
     
     col_widths = [largura_outras, largura_desc] + [largura_outras] * (num_colunas - 2)
     
@@ -635,8 +639,8 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
-        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.0),
+        ('TOPPADDING', (0, 0), (-1, -1), 2.0),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
     ]))
     
@@ -955,7 +959,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Autoajuste Dinâmico + Fonte 7 pt + Brasão)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Área de Impressão Ajustada + Fonte Compacta + Brasão)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
