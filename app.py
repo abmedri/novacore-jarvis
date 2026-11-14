@@ -369,7 +369,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
-    # Cabeçalhos limpos estritamente inteiros sequenciais (Cont. 1, 2, 3... e Local 1, 2, 3...)
+    # ── CONSTRUÇÃO DOS CABEÇALHOS COM NÚMEROS INTEIROS PUROS ──
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
         if i == 1:
@@ -949,20 +949,22 @@ def main():
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3).fillna("")
                 
-                # Conversão robusta para garantir que os títulos das colunas fiquem limpos na pré-visualização
-                novas_colunas = []
-                for col in df_preview_exibir.columns:
-                    col_str = str(col).strip()
-                    if col_str.endswith('.0'):
-                        col_str = col_str[:-2]
+                # ── LIMPEZA RADICAL DOS TÍTULOS NA TELA ──
+                colunas_limpas_tela = []
+                for idx, c in enumerate(df_preview_exibir.columns):
+                    c_str = str(c).strip()
+                    if c_str.endswith('.0'):
+                        c_str = c_str[:-2]
+                    
+                    # Força números inteiros sequenciais limpos a partir da coluna de locais se necessário
                     try:
-                        val_float = float(col_str)
-                        if val_float.is_integer():
-                            col_str = str(int(val_float))
+                        val_f = float(c_str)
+                        if val_f.is_integer():
+                            c_str = str(int(val_f))
                     except ValueError:
                         pass
-                    novas_colunas.append(col_str)
-                df_preview_exibir.columns = novas_colunas
+                    colunas_limpas_tela.append(c_str)
+                df_preview_exibir.columns = colunas_limpas_tela
                 
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
