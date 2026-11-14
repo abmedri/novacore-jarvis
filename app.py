@@ -446,7 +446,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (AUTO-EXPANSÃO DE COLUNAS, FONTE 7 PT)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM AUTOAJUSTE FLUIDO E FONTE 7 PT)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -576,6 +576,11 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
+    # Estilos fluidos de parágrafo com tamanho 7 pt para autoajuste correto
+    estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=7, leading=9, textColor=colors.white, alignment=1)
+    estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=7, leading=9, textColor=colors.HexColor('#111827'), alignment=1)
+    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=7, leading=9, textColor=colors.HexColor('#111827'), alignment=0)
+    
     story = []
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
     story.append(Spacer(1, 3))
@@ -586,45 +591,53 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     for i in range(1, max_locais_encontrados + 1):
         headers_pdf.append(f"Local {i}" if i == 1 else str(i))
         
-    dados_tabela = [headers_pdf]
+    dados_tabela = [[Paragraph(h, estilo_th) for h in headers_pdf]]
     
     for cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod in itens_filtrados_temp:
         cel_comptar = soma_comptar_val if tem_na_comptar else 0
         cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
         
-        linha = [str(cod), str(desc), str(est), str(cel_comptar), str(cel_divergencia)]
+        linha_celulas = [
+            Paragraph(str(cod), estilo_td_centro),
+            Paragraph(str(desc), estilo_td_esq),
+            Paragraph(str(est), estilo_td_centro),
+            Paragraph(str(cel_comptar), estilo_td_centro),
+            Paragraph(str(cel_divergencia), estilo_td_centro)
+        ]
         
         if tem_na_comptar:
             contagens_vals = []
             for i in range(max_locais_encontrados):
                 if i < len(locs_prod):
-                    contagens_vals.append(str(int(float(locs_prod[i][1]))))
+                    contagens_vals.append(Paragraph(str(int(float(locs_prod[i][1]))), estilo_td_centro))
                 else:
-                    contagens_vals.append("")
-            locais_vals = [limpar_nome_local(locs_prod[i][0]) if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
+                    contagens_vals.append(Paragraph("", estilo_td_centro))
+            locais_vals = [Paragraph(limpar_nome_local(locs_prod[i][0]), estilo_td_centro) if i < len(locs_prod) else Paragraph("", estilo_td_centro) for i in range(max_locais_encontrados)]
         else:
-            contagens_vals = ["0"] + [""] * (max_locais_encontrados - 1)
-            locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
+            contagens_vals = [Paragraph("0", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
+            locais_vals = [Paragraph("Sem local", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
             
-        linha.extend(contagens_vals)
-        linha.extend(locais_vals)
-        dados_tabela.append(linha)
+        linha_celulas.extend(contagens_vals)
+        linha_celulas.extend(locais_vals)
+        dados_tabela.append(linha_celulas)
         
-    # Auto-expansão dinâmica: Removemos larguras rígidas para que o ReportLab ajuste as colunas com base no conteúdo disponível
-    tabela_pdf = Table(dados_tabela, repeatRows=1)
+    # Distribuição proporcional inteligente preenchendo a largura útil (~822 pt) e dando destaque de largura para a Descrição
+    largura_util = 842 - 20
+    num_colunas = len(headers_pdf)
+    largura_desc = 190
+    largura_restante = largura_util - largura_desc
+    largura_outras = largura_restante / (num_colunas - 1) if num_colunas > 1 else 30
+    
+    col_widths = [largura_outras, largura_desc] + [largura_outras] * (num_colunas - 2)
+    
+    tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
     tabela_pdf.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ALIGN', (1, 1), (1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 7),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.0),
-        ('TOPPADDING', (0, 0), (-1, -1), 2.0),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 7),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
     ]))
     
     story.append(tabela_pdf)
@@ -942,7 +955,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Auto-expansão de Colunas + Fonte 7 pt + Brasão)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Autoajuste Dinâmico + Fonte 7 pt + Brasão)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
