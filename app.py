@@ -413,7 +413,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     buffer.seek(0)
     return buffer
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (CÓDIGO AMPLIADO + FONTES COMPACTAS NOS LOCAIS)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (TEXTO IDÊNTICO + ANTI-QUEBRA DE LINHA)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -577,12 +577,13 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
                 else:
                     contagens_vals.append(Paragraph("", estilo_td_centro))
             
-            # 🛡️ Tratamento blindado: Substitui pontos e espaços por &nbsp; dentro de <nobr> para impedir quebras em locais como "29.5"
+            # 🛡️ Mantém os pontos originais (ex: 29.5) mas usa entidades HTML (&#46; e &nbsp;) para impedir quebras visuais de linha
             locais_vals = []
             for i in range(max_locais_encontrados):
                 if i < len(locs_prod):
-                    nome_loc_limpo = str(limpar_nome_local(locs_prod[i][0])).replace('.', '&nbsp;').replace(' ', '&nbsp;')
-                    locais_vals.append(Paragraph(f"<nobr>{nome_loc_limpo}</nobr>", estilo_td_centro))
+                    nome_loc_original = str(limpar_nome_local(locs_prod[i][0]))
+                    nome_loc_seguro = nome_loc_original.replace('.', '&#46;').replace(' ', '&nbsp;')
+                    locais_vals.append(Paragraph(f"<nobr>{nome_loc_seguro}</nobr>", estilo_td_centro))
                 else:
                     locais_vals.append(Paragraph("", estilo_td_centro))
         else:
@@ -593,7 +594,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         linha_celulas.extend(locais_vals)
         dados_tabela.append(linha_celulas)
         
-    # 📐 Larguras recalculadas: Código ampliado (58pt), Descrição otimizada (120pt) e colunas de contagem/locais compactadas e uniformes
+    # 📐 Larguras otimizadas em paisagem
     largura_util = 792 - 44  # 748 pt de largura útil em paisagem
     largura_codigo = 58
     largura_desc = 120
