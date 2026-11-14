@@ -333,7 +333,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # Rodapé de impressão: Centro limpo (sem data) e Brasão miniaturizado alocado na direita via tag &G
+    # Configuração rígida do rodapé: Esquerda = Info da Loja | Centro = Vazio | Direita = Paginação + Imagem (&G)
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
     ws_saldo.oddFooter.center.text = ""
     ws_saldo.oddFooter.right.text = "Página &P de &N  &G"
@@ -377,7 +377,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
-    # Limpeza absoluta das células Q2 e R2 (evitando vazamento de células na impressão)
+    # Limpeza absoluta das células Q2 e R2 (evitando qualquer texto residual nas pontas)
     ws_saldo['Q2'] = ""
     ws_saldo['R2'] = ""
     
