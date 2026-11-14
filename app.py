@@ -188,7 +188,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM LOGOTIPO NO TOPO E RODAPÉ DE IMPRESSÃO
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM LOGOTIPO NO TOPO E BRASÃO NO RODAPÉ
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -322,7 +322,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
 
-    # 3. Aba Saldo Loja (ou Itens Sem Saldo)
+    # 3. Aba Saldo Loja (ou Itens Sem Saldo) para qualquer um dos 4 botões
     nome_aba = "Itens Sem Saldo" if tipo_filtro == "SEM_SALDO" else "Saldo Loja"
     ws_saldo = wb.create_sheet(title=nome_aba)
     ws_saldo.views.sheetView[0].showGridLines = True
@@ -333,19 +333,19 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # Configuração rígida do rodapé: Esquerda = Info da Loja | Centro = Vazio | Direita = Paginação + Imagem (&G)
+    # RODAPÉ DE IMPRESSÃO UNIFICADO COM O BRASÃO EM MINIATURA EM TODOS OS 4 BOTÕES
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
     ws_saldo.oddFooter.center.text = ""
     ws_saldo.oddFooter.right.text = "Página &P de &N  &G"
     
-    caminho_brasao_rodape = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
-    if caminho_brasao_rodape:
+    caminho_brasao = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
+    if caminho_brasao:
         try:
-            ws_saldo.oddFooter.right.picture = caminho_brasao_rodape
+            ws_saldo.oddFooter.right.picture = caminho_brasao
         except Exception:
             pass
 
-    # Logotipo no topo
+    # Logotipo oficial no topo (cabeçalho da planilha)
     caminho_logo_topo = "1000352084.jpg" if os.path.exists("1000352084.jpg") else None
     if caminho_logo_topo:
         try:
@@ -377,7 +377,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
-    # Limpeza absoluta das células Q2 e R2 (evitando qualquer texto residual nas pontas)
+    # Limpeza absoluta das células Q2 e R2 (evitando resíduos nas pontas)
     ws_saldo['Q2'] = ""
     ws_saldo['R2'] = ""
     
@@ -825,8 +825,8 @@ def main():
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
                 st.markdown("---")
-                st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
-                st.caption("Configuradas com A4 Paisagem, largura blindada, novo logotipo no topo e brasão clássico no rodapé de impressão.")
+                st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica (Com Brasão no Rodapé)")
+                st.caption("Configuradas com A4 Paisagem, largura blindada, logotipo no topo e brasão exclusivo no rodapé de impressão para todos os 4 botões.")
                 
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
