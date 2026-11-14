@@ -7,7 +7,6 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-
 # Dependências para relatórios executivos avançados C-Level e Planilhas de Conferência
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -17,15 +16,12 @@ import docx
 from docx.shared import Inches, Pt, RGBColor
 from pptx import Presentation
 from pptx.util import Inches as PptxInches
-
 # ReportLab para PDFs profissionais com rodapé gráfico personalizado
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
-
-
 def processar_arquivo_upload(arquivo_carregado):
     nome = arquivo_carregado.name.lower()
     try:
@@ -69,16 +65,12 @@ def processar_arquivo_upload(arquivo_carregado):
             return None, "Formato não suportado."
     except Exception as e:
         return None, "Erro ao processar ficheiro: " + str(e)
-
-
 def identificar_coluna_ideal(colunas_numericas, palavras_alvo):
     for palavra in palavras_alvo:
         for idx, col in enumerate(colunas_numericas):
             if palavra in col.lower() and 'codigo' not in col.lower() and 'código' not in col.lower():
                 return idx
     return 0
-
-
 def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=False):
     cor_delta = "#9ca3af"
     sinal = ""
@@ -97,8 +89,6 @@ def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=
         <div style="color: {cor_delta}; font-size: 0.8rem; font-weight: 600; margin-top: 4px;">{sinal}{delta_texto}</div>
     </div>
     """
-
-
 def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
     resumo_ficheiros = []
     for idx, df in enumerate(lista_dfs):
@@ -181,17 +171,13 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
             "df": df
         })
     return resumo_ficheiros
-
-
 def limpar_nome_local(val):
     s = str(val).strip()
     if s.endswith('.0'):
         s = s[:-2]
     return s
-
-
 # ====================================================================================
-# GERADOR DO EXCEL DE CONFERÊNCIA (APENAS ABA PRINCIPAL)
+# GERADOR DO EXCEL DE CONFERÊNCIA (APENAS ABA PRINCIPAL COM MARGENS MÍNIMAS)
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -281,12 +267,9 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                     
             if incluir:
                 itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
-
     itens_filtrados_temp.sort(key=lambda x: str(x[1]).strip().upper())
-
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
-
     nome_aba = "Itens Sem Saldo" if tipo_filtro == "SEM_SALDO" else "Saldo Loja"
     ws_saldo = wb.active
     ws_saldo.title = nome_aba
@@ -298,10 +281,17 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
+    # 📐 Definição de Margens Mínimas (Estreitas) para Ganho de Visão
+    ws_saldo.page_margins.left = 0.2
+    ws_saldo.page_margins.right = 0.2
+    ws_saldo.page_margins.top = 0.3
+    ws_saldo.page_margins.bottom = 0.3
+    ws_saldo.page_margins.header = 0.1
+    ws_saldo.page_margins.footer = 0.1
+    
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
     ws_saldo.oddFooter.center.text = "Exatidão • Controle • Eficiência"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
-
     caminho_brasao_timbre = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
     if caminho_brasao_timbre:
         try:
@@ -311,7 +301,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             ws_saldo.add_image(img_timbre, 'A1')
         except Exception:
             pass
-
     ws_saldo['D1'] = "DATA:"
     ws_saldo['D1'].font = fonte_negrito
     ws_saldo['D1'].alignment = Alignment(horizontal="center", vertical="center")
@@ -357,7 +346,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         cell.fill = fill_cabecalho
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = borda_fina
-
     ws_saldo.print_title_rows = '4:4'
     ws_saldo.auto_filter.ref = f"A4:{get_column_letter(len(headers_saldo))}{ws_saldo.max_row}"
         
@@ -411,7 +399,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 cell.alignment = Alignment(horizontal="left", vertical="center")
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-
     for col in ws_saldo.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
@@ -421,13 +408,10 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 if not val_str.startswith("="):
                     max_len = max(max_len, len(val_str))
         ws_saldo.column_dimensions[col_letter].width = max(max_len + 2, 7)
-
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
     return buffer
-
-
 # ====================================================================================
 # GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO
 # ====================================================================================
@@ -435,11 +419,9 @@ class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
-
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
         self._startPage()
-
     def save(self):
         num_pages = len(self._saved_page_states)
         for state in self._saved_page_states:
@@ -447,7 +429,6 @@ class NumberedCanvas(canvas.Canvas):
             self.draw_page_decorations(num_pages)
             super().showPage()
         super().save()
-
     def draw_page_decorations(self, page_count):
         self.saveState()
         self.setFont("Helvetica", 7)
@@ -473,8 +454,6 @@ class NumberedCanvas(canvas.Canvas):
         texto_pagina = f"Página {self._pageNumber} de {page_count}"
         self.drawRightString(largura_pagina - margem, 10, texto_pagina)
         self.restoreState()
-
-
 def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     col_loc = next((c for c in df_localizacao.columns if 'local' in c.lower()), df_localizacao.columns[2])
     col_cod_loc = next((c for c in df_localizacao.columns if 'codigo' in c.lower() or 'cod' in c.lower()), df_localizacao.columns[3])
@@ -542,12 +521,9 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
                     
             if incluir:
                 itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
-
     itens_filtrados_temp.sort(key=lambda x: str(x[1]).strip().upper())
-
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
-
     buffer = io.BytesIO()
     
     doc = SimpleDocTemplate(
@@ -639,8 +615,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     doc.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer
-
-
 # ====================================================================================
 # FUNÇÕES DE EXPORTAÇÃO C-LEVEL
 # ====================================================================================
@@ -710,8 +684,6 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     wb.save(buffer)
     buffer.seek(0)
     return buffer
-
-
 def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
     doc = docx.Document()
@@ -752,15 +724,13 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
     doc.add_paragraph("Declaro que os dados acima foram auditados eletronicamente através do Protocolo J.A.R.V.I.S. / Grupo KMB e refletem com fidelidade a apuração patrimonial realizada.\n\n\n")
     
     p_assinatura = doc.add_paragraph()
-    p_assinatura.add_run("_____________________________________________________\n").bold = True
+    p_assinatura.add_run("____________________________________________________\n").bold = True
     p_assinatura.add_run("Time de Inventário & Loss Prevention / Auditoria C-Level\n")
     p_assinatura.add_run("Grupo KMB - Exatidão • Controle • Eficiência")
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
-
-
 def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
     buffer = io.BytesIO()
@@ -802,8 +772,6 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     doc_pdf.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer
-
-
 def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     prs = Presentation()
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -813,8 +781,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     prs.save(buffer)
     buffer.seek(0)
     return buffer
-
-
 def main():
     st.set_page_config(page_title="GRUPO KMB // TIME DE INVENTÁRIO", page_icon="⚡", layout="wide")
     
@@ -823,7 +789,6 @@ def main():
         st.session_state.autenticado = False
         
     caminho_logo_tela = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
-
     if not st.session_state.autenticado:
         st.markdown("""
         <style>
@@ -850,7 +815,6 @@ def main():
                 else:
                     st.error("❌ Senha incorreta. Acesso negado.")
         return
-
     st.markdown("""
     <style>
     .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
@@ -880,7 +844,6 @@ def main():
         if st.button("🔒 Encerrar Sessão (Sair)", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-
     st.markdown("""
     <div class="main-header">
         <div class="jarvis-title">⚡ GRUPO KMB // DIRETORIA EXECUTIVA</div>
@@ -969,7 +932,6 @@ def main():
                 with c_imp4:
                     buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SEM_SALDO")
                     st.download_button("📥 Baixar Excel (Sem Saldo)", data=buf_sem_saldo, file_name=f"Excel_SemSaldo_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
                 st.markdown("### 📄 2. Listas de Conferência em PDF (Títulos Otimizados sem Quebras + Brasão)")
@@ -990,7 +952,6 @@ def main():
             else:
                 st.error("❌ Erro ao processar os arquivos.")
         return
-
     # ====================================================================
     # MODO 1: NOVA CORE ORIGINAL (5 ETAPAS COMPLETA)
     # ====================================================================
@@ -1071,7 +1032,6 @@ def main():
                                 fig_abc.add_trace(go.Scatter(x=df_plot[coluna_categoria_escolhida], y=df_plot['%_Acumulado'], name="% Acumulado (Pareto)", mode='lines+markers', yaxis='y2', line=dict(color='#f59e0b', width=3)))
                                 fig_abc.update_layout(template="plotly_dark", paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=480, yaxis=dict(title=eixo_y_escolhido), yaxis2=dict(title="% Acumulado", overlaying='y', side='right', range=[0, 105], showgrid=False))
                                 st.plotly_chart(fig_abc, use_container_width=True)
-
                 # ETAPA 3
                 with st.expander("🚨 ETAPA 3: Matriz de Criticidade & Discrepância Financeira", expanded=False):
                     if len(num_cols) >= 2:
@@ -1086,7 +1046,6 @@ def main():
                             fig_critico = px.bar(df_critico, x=col_nome_prod, y=col_val_div, title="Top 50 Maiores Desvios Financeiros (R$)", template="plotly_dark", color=col_val_div, color_continuous_scale=['#ef4444', '#f59e0b', '#3b82f6'])
                             fig_critico.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=480)
                             st.plotly_chart(fig_critico, use_container_width=True)
-
                 # ETAPA 4
                 with st.expander("🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto", expanded=False):
                     if len(num_cols) >= 2 and len(all_cols) > 0:
@@ -1097,7 +1056,6 @@ def main():
                         fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
                         fig_risco.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=420)
                         st.plotly_chart(fig_risco, use_container_width=True)
-
                 # ETAPA 5
                 with st.expander("⚡ ETAPA 5: CENTRO DE COMANDO C-LEVEL (PRESCRITIVO & OPERACIONAL)", expanded=True):
                     tab_e5_1, tab_e5_2, tab_e5_3, tab_e5_4 = st.tabs(["🔍 1. Matriz Causa Raiz", "📈 2. Quadrante 4D", "🎯 3. Simulador Meta 97%", "📋 4. Plano de Ação Prioritário"])
@@ -1115,7 +1073,6 @@ def main():
                         elif aj != 0: return "🔄 Divergência Operacional / Quebra Padrão"
                         else: return "✅ Conforme"
                     df_causa['Perfil_Causa'] = df_causa.apply(classificar_causa, axis=1)
-
                     with tab_e5_1:
                         resumo_causas = df_causa.groupby('Perfil_Causa').agg(SKUs=('Código do Produto', 'count'), Impacto_Financeiro=(col_val_aju_e5, 'sum')).reset_index()
                         st.dataframe(resumo_causas.style.format({'SKUs': '{:,}', 'Impacto_Financeiro': 'R$ {:,.2f}'}), use_container_width=True)
@@ -1136,7 +1093,6 @@ def main():
                         df_plano = df_causa[df_causa[col_ajuste_e5] < 0].sort_values(by=col_val_aju_e5, ascending=True).head(15).copy()
                         if not df_plano.empty:
                             st.dataframe(df_plano[['Código do Produto', 'Descrição do Produto', 'Saldo em Estoque', col_ajuste_e5, col_val_aju_e5, 'Perfil_Causa']].style.format({col_val_aju_e5: 'R$ {:,.2f}'}), use_container_width=True)
-
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO C-LEVEL")
                 resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
@@ -1181,7 +1137,6 @@ def main():
                 with gc2:
                     fig_aj = px.bar(df_resumo_geral, x="Ficheiro", y="Impacto Geral (%)", template="plotly_dark", title="Impacto Geral em Percentual")
                     st.plotly_chart(fig_aj, use_container_width=True)
-
             # Central de Relatórios
             st.markdown("---")
             st.subheader("📥 Central de Relatórios Executivos C-Level")
@@ -1190,7 +1145,5 @@ def main():
             with col_e2: st.download_button("📄 Word Gerencial", data=gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             with col_e3: st.download_button("📑 PDF Gerencial", data=gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.pdf", mime="application/pdf")
             with col_e4: st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_GrupoKMB.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
-
-
 if __name__ == "__main__":
     main()
