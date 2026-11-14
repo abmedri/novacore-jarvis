@@ -391,7 +391,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         
     for row in ws_saldo.iter_rows(min_row=5, max_row=ws_saldo.max_row, min_col=1, max_col=len(headers_saldo)):
         for cell in row:
-            # Aplica fonte tamanho 9 especificamente na coluna 2 (Descrição)
             if cell.column == 2:
                 cell.font = fonte_descricao_excel
             else:
@@ -566,7 +565,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.0, leading=6, textColor=colors.white, alignment=1)
     estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=9, leading=11, textColor=colors.HexColor('#111827'), alignment=0) # Fonte tamanho 9 para a descrição no PDF
+    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=9, leading=11, textColor=colors.HexColor('#111827'), alignment=0)
     
     story = []
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
@@ -944,6 +943,15 @@ def main():
                 
                 # Exibição 100% segura e limpa do DataFrame
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
+                
+                # Botão para baixar a pré-visualização em formato Excel (.xlsx) profissional
+                st.download_button(
+                    label="📥 Baixar Pré-visualização em Excel (.xlsx)",
+                    data=buf_preview,
+                    file_name=f"Preview_SaldoLoja_Loja_{numero_loja_ui}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
                 
                 st.markdown("---")
                 st.markdown("### 📥 1. Listas de Conferência em Excel (Ordem Alfabética)")
