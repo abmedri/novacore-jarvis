@@ -413,7 +413,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     buffer.seek(0)
     return buffer
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (EXPANSÃO DINÂMICA + ANTI-QUEBRA DE LOCAIS)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (CÓDIGO AMPLIADO + FONTES COMPACTAS NOS LOCAIS)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -539,9 +539,9 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=6.0, leading=7, textColor=colors.white, alignment=1)
-    estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=8.5, leading=11, textColor=colors.HexColor('#111827'), alignment=0)
+    estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=7.5, leading=9, textColor=colors.HexColor('#111827'), alignment=1)
+    estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=7.5, leading=9, textColor=colors.HexColor('#111827'), alignment=1)
+    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=8.0, leading=10, textColor=colors.HexColor('#111827'), alignment=0)
     
     story = []
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
@@ -593,18 +593,18 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         linha_celulas.extend(locais_vals)
         dados_tabela.append(linha_celulas)
         
-    # 📐 Cálculo dinâmico e proporcional de larguras das colunas do PDF (Expandindo automaticamente os locais)
+    # 📐 Larguras recalculadas: Código ampliado (58pt), Descrição otimizada (120pt) e colunas de contagem/locais compactadas e uniformes
     largura_util = 792 - 44  # 748 pt de largura útil em paisagem
-    largura_codigo = 48
-    largura_desc = 130
-    largura_est = 26
-    largura_comp = 28
-    largura_div = 32
+    largura_codigo = 58
+    largura_desc = 120
+    largura_est = 24
+    largura_comp = 24
+    largura_div = 28
     largura_fixa_inicial = largura_codigo + largura_desc + largura_est + largura_comp + largura_div
     
     num_colunas = len(headers_pdf)
     colunas_restantes = num_colunas - 5
-    largura_outras = max((largura_util - largura_fixa_inicial) / colunas_restantes, 30) if colunas_restantes > 0 else 24
+    largura_outras = max((largura_util - largura_fixa_inicial) / colunas_restantes, 24) if colunas_restantes > 0 else 22
     
     col_widths = [largura_codigo, largura_desc, largura_est, largura_comp, largura_div] + [largura_outras] * colunas_restantes
     
@@ -614,8 +614,8 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         ('BACKGROUND', (4, 1), (4, -1), colors.HexColor('#D9D9D9')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.0),
-        ('TOPPADDING', (0, 0), (-1, -1), 2.0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
+        ('TOPPADDING', (0, 0), (-1, -1), 1.5),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
     ]))
     
