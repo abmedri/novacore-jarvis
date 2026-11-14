@@ -446,7 +446,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (FONTE 8 PT NOS DADOS)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (CABEÇALHO PROTEGIDO CONTRA QUEBRAS)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -577,7 +577,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    # Cabeçalho compactado e fonte dos dados alterada exatamente para 8 pt
+    # Cabeçalho protegido com <nobr> para impedir qualquer quebra de texto nos títulos das colunas
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.5, leading=7, textColor=colors.white, alignment=1)
     estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
@@ -593,7 +593,8 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     for i in range(1, max_locais_encontrados + 1):
         headers_pdf.append(f"Local {i}" if i == 1 else str(i))
         
-    dados_tabela = [[Paragraph(h, estilo_th) for h in headers_pdf]]
+    # Envolve cada título de cabeçalho com <nobr> para garantir que o texto não quebre de linha
+    dados_tabela = [[Paragraph(f"<nobr>{str(h).strip().replace(' ', '&nbsp;')}</nobr>", estilo_th) for h in headers_pdf]]
     
     for cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod in itens_filtrados_temp:
         cel_comptar = soma_comptar_val if tem_na_comptar else 0
@@ -616,10 +617,10 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
                     contagens_vals.append(Paragraph(str(int(float(locs_prod[i][1]))), estilo_td_centro))
                 else:
                     contagens_vals.append(Paragraph("", estilo_td_centro))
-            locais_vals = [Paragraph(limpar_nome_local(locs_prod[i][0]), estilo_td_centro) if i < len(locs_prod) else Paragraph("", estilo_td_centro) for i in range(max_locais_encontrados)]
+            locais_vals = [Paragraph(f"<nobr>{str(limpar_nome_local(locs_prod[i][0])).replace(' ', '&nbsp;')}</nobr>", estilo_td_centro) if i < len(locs_prod) else Paragraph("", estilo_td_centro) for i in range(max_locais_encontrados)]
         else:
             contagens_vals = [Paragraph("0", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
-            locais_vals = [Paragraph("Sem local", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
+            locais_vals = [Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
             
         linha_celulas.extend(contagens_vals)
         linha_celulas.extend(locais_vals)
@@ -962,7 +963,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Fonte 8 pt + Código Fixo + Brasão)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Cabeçalho sem Quebra + Fonte 8 pt + Brasão)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
