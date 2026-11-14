@@ -967,16 +967,8 @@ def main():
                             lambda x: x[:-2] if isinstance(x, str) and x.endswith('.0') else x
                         )
                 
-                # Aplica negrito em todas as colunas de dados EXCETO na Descrição com segurança total (.map)
-                def aplicar_negrito_seguro(val):
-                    return 'font-weight: bold'
-
-                colunas_para_negrito = [c for c in df_preview_exibir.columns if c != "Descrição"]
-                st.dataframe(
-                    df_preview_exibir.style.map(aplicar_negrito_seguro, subset=colunas_para_negrito), 
-                    use_container_width=True, 
-                    height=420
-                )
+                # Exibição limpa e segura do DataFrame sem estilização complexa propensa a KeyError
+                st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
                 st.markdown("---")
                 st.markdown("### 📥 1. Listas de Conferência em Excel (Ordem Alfabética)")
