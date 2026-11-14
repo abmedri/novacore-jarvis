@@ -197,6 +197,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     wb = openpyxl.Workbook()
     
     fonte_padrao = Font(name="Arial", size=10)
+    fonte_descricao_excel = Font(name="Arial", size=9) # Fonte tamanho 9 específica para a descrição no Excel
     fonte_negrito = Font(name="Arial", size=10, bold=True)
     fonte_cabecalho = Font(name="Arial", size=10, bold=True, color="FFFFFF")
     fill_cabecalho = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
@@ -428,7 +429,12 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         
     for row in ws_saldo.iter_rows(min_row=5, max_row=ws_saldo.max_row, min_col=1, max_col=len(headers_saldo)):
         for cell in row:
-            cell.font = fonte_padrao
+            # Aplica fonte tamanho 9 especificamente na coluna 2 (Descrição)
+            if cell.column == 2:
+                cell.font = fonte_descricao_excel
+            else:
+                cell.font = fonte_padrao
+                
             cell.border = borda_fina
             if cell.row >= 5 and cell.column >= 3:
                 if isinstance(cell.value, (int, float)):
@@ -598,7 +604,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.0, leading=6, textColor=colors.white, alignment=1)
     estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=0)
+    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=9, leading=11, textColor=colors.HexColor('#111827'), alignment=0) # Fonte tamanho 9 para a descrição no PDF
     
     story = []
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
@@ -951,8 +957,7 @@ def main():
                 # Lê como texto (dtype=str) para impedir que o Pandas adicione .000000 nas células
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3, dtype=str).fillna("")
                 
-                # ── TRATATIVA BLINDADA DE COLUNAS DUPLICADAS PARA A TELA ──
-                # Adiciona sufixos numéricos únicos em colunas duplicadas para evitar erro no Arrow/Streamlit
+                # Tratativa blindada de colunas duplicadas para a tela
                 cols_vistas = {}
                 novas_colunas = []
                 for c in df_preview_exibir.columns:
