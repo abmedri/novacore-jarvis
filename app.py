@@ -188,7 +188,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM SELO DE RODAPÉ INTEGRADO
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM CABEÇALHO LIMPO E LOGOTIPO NO TOPO
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -333,7 +333,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # Rodapé textual simples para controle de página
+    # Rodapé padrão limpo
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
     ws_saldo.oddFooter.center.text = "Exatidão • Controle • Eficiência"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
@@ -433,27 +433,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 cell.alignment = Alignment(horizontal="left", vertical="center")
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    # ====================================================================================
-    # SELO DE RODAPÉ INTEGRADO (GARANTIDO NA FOLHA IMPRESSA EM TODOS OS 4 BOTÕES)
-    # ====================================================================================
-    caminho_brasao = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
-    if caminho_brasao:
-        try:
-            linha_base = ws_saldo.max_row + 2
-            
-            # Posiciona o brasão gráfico centralizado na parte inferior da tabela
-            img_selo = OpenpyxlImage(caminho_brasao)
-            img_selo.width = 110
-            img_selo.height = 40
-            ws_saldo.add_image(img_selo, f"B{linha_base}")
-            
-            # Texto institucional de validação ao lado do selo
-            ws_saldo[f"D{linha_base}"] = "GRUPO KMB // DOCUMENTO OFICIAL DE AUDITORIA PATRIMONIAL"
-            ws_saldo[f"D{linha_base}"].font = fonte_negrito
-            ws_saldo[f"D{linha_base}"].alignment = Alignment(horizontal="left", vertical="center")
-        except Exception:
-            pass
 
     # Ajuste dinâmico e enxuto das larguras de coluna
     for col in ws_saldo.columns:
@@ -794,7 +773,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO LIMPA E SELO DE RODAPÉ
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO LIMPA E RODAPÉ PADRÃO
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -839,8 +818,8 @@ def main():
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
                 st.markdown("---")
-                st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica (Selo Oficial no Rodapé)")
-                st.caption("Configuradas com A4 Paisagem, largura blindada, logotipo no topo e carimbo/selo corporativo oficial integrado no rodapé da folha para todos os 4 botões.")
+                st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica")
+                st.caption("Configuradas com A4 Paisagem, largura blindada e logotipo oficial no topo para todos os 4 botões.")
                 
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
