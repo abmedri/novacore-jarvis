@@ -369,7 +369,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
-    # Cabeçalhos limpos estritamente inteiros (Cont. 1, Cont. 2, Cont. 3... e Local 1, Local 2, Local 3...)
+    # Cabeçalhos limpos estritamente inteiros sequenciais (Cont. 1, 2, 3... e Local 1, 2, 3...)
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
         if i == 1:
@@ -949,19 +949,12 @@ def main():
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3).fillna("")
                 
-                # Tratamento rigoroso para remover qualquer ponto decimal dos nomes das colunas e dados
-                novas_cols_preview = []
-                for col in df_preview_exibir.columns:
-                    col_str = str(col).strip()
-                    if col_str.endswith('.0'):
-                        col_str = col_str[:-2]
-                    novas_cols_preview.append(col_str)
-                df_preview_exibir.columns = novas_cols_preview
-                
-                # Converte cabeçalhos para inteiros limpos se forem numéricos
+                # Conversão blindada para garantir que nenhum cabeçalho tenha ponto decimal
                 colunas_limpas = []
                 for c in df_preview_exibir.columns:
-                    c_str = str(c).replace('.0', '').strip()
+                    c_str = str(c).strip()
+                    if c_str.endswith('.0'):
+                        c_str = c_str[:-2]
                     try:
                         c_val = float(c_str)
                         if c_val.is_integer():
