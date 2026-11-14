@@ -446,7 +446,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (SEM QUEBRA NO CÓDIGO E CABEÇALHO REDUZIDO)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (LARGURA FIXA NO CÓDIGO E CABEÇALHO REDUZIDO)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -565,7 +565,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
 
     buffer = io.BytesIO()
     
-    # Margens estreitas (22pt) para maximizar a área útil de impressão em paisagem
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(letter),
@@ -578,12 +577,9 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    # Cabeçalho com fonte menor (5.5 pt) e sem quebra no código do produto (usando non-breaking spaces se necessário)
+    # Cabeçalho compactado e sem quebra no código do produto
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.5, leading=7, textColor=colors.white, alignment=1)
-    
-    # Código sem quebra de linha (whiteSpace="nowrap")
-    estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1, wordWrap='CJK')
-    
+    estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=0)
     
@@ -603,7 +599,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         cel_comptar = soma_comptar_val if tem_na_comptar else 0
         cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
         
-        # Substitui espaços por espaços sem quebra (&nbsp;) para garantir que o código não quebre de linha
         cod_formatado = str(cod).strip().replace(" ", "&nbsp;")
         
         linha_celulas = [
@@ -630,16 +625,19 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         linha_celulas.extend(locais_vals)
         dados_tabela.append(linha_celulas)
         
-    # Cálculo rigoroso da largura útil considerando a folha Letter em paisagem (792 pt largura total, menos margens de 44 pt = 748 pt úteis)
+    # Largura útil total da página Letter em paisagem (792 pt largura total menos 44 pt de margens = 748 pt úteis)
     largura_util = 792 - 44
-    num_colunas = len(headers_pdf)
     
-    # Descrição recebe tamanho ideal estático (150 pt) e o restante divide-se proporcionalmente
+    # Definindo tamanhos fixos sem autoajuste agressivo para o código e descrição, dividindo o restante proporcionalmente
+    largura_codigo = 52
     largura_desc = 150
-    largura_restante = largura_util - largura_desc
-    largura_outras = largura_restante / (num_colunas - 1) if num_colunas > 1 else 25
+    largura_fixa_inicial = largura_codigo + largura_desc
     
-    col_widths = [largura_outras, largura_desc] + [largura_outras] * (num_colunas - 2)
+    num_colunas = len(headers_pdf)
+    colunas_restantes = num_colunas - 2
+    largura_outras = (largura_util - largura_fixa_inicial) / colunas_restantes if colunas_restantes > 0 else 25
+    
+    col_widths = [largura_codigo, largura_desc] + [largura_outras] * colunas_restantes
     
     tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
     tabela_pdf.setStyle(TableStyle([
@@ -966,7 +964,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Código Sem Quebra + Cabeçalho Reduzido + Brasão)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Largura Fixa Código + Cabeçalho Reduzido + Brasão)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
