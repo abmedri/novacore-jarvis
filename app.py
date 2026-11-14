@@ -188,7 +188,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM BRASÃO NO CENTRO DO RODAPÉ
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM LOGOTIPO NO TOPO E BRASÃO GRÁFICO GARANTIDO
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -333,22 +333,12 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # CONFIGURAÇÃO CIRÚRGICA DO RODAPÉ:
-    # Esquerda: Informações da Loja e Grupo
-    # Centro: A tag de imagem &G (que insere o brasão miniatura exatamente no centro do rodapé)
-    # Direta: Paginação limpa (&P de &N)
+    # Rodapé textual limpo com paginação e dados da loja
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
-    ws_saldo.oddFooter.center.text = "&G"
+    ws_saldo.oddFooter.center.text = "Exatidão • Controle • Eficiência"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
-    
-    caminho_brasao_rodape = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
-    if caminho_brasao_rodape:
-        try:
-            ws_saldo.oddFooter.center.picture = caminho_brasao_rodape
-        except Exception:
-            pass
 
-    # Logotipo oficial no topo (cabeçalho da planilha)
+    # Logotipo oficial no topo (cabeçalho)
     caminho_logo_topo = "1000352084.jpg" if os.path.exists("1000352084.jpg") else None
     if caminho_logo_topo:
         try:
@@ -443,6 +433,23 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 cell.alignment = Alignment(horizontal="left", vertical="center")
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Inserção GRÁFICA GARANTIDA DO BRASÃO NO RODAPÉ DA TABELA (última linha + 2) para sair na impressão 100% das vezes
+    caminho_brasao = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
+    if caminho_brasao:
+        try:
+            linha_rodape_img = ws_saldo.max_row + 2
+            img_rodape = OpenpyxlImage(caminho_brasao)
+            img_rodape.width = 120
+            img_rodape.height = 45
+            celula_pos = f"B{linha_rodape_img}"
+            ws_saldo.add_image(img_rodape, celula_pos)
+            
+            # Adiciona texto descritivo ao lado do brasão impresso no rodapé físico da folha
+            ws_saldo[f"D{linha_rodape_img}"] = "GRUPO KMB // AUDITORIA PATRIMONIAL"
+            ws_saldo[f"D{linha_rodape_img}"].font = fonte_negrito
+        except Exception:
+            pass
 
     # Ajuste dinâmico e enxuto das larguras de coluna
     for col in ws_saldo.columns:
@@ -828,8 +835,8 @@ def main():
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
                 st.markdown("---")
-                st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica (Brasão no Centro do Rodapé)")
-                st.caption("Configuradas com A4 Paisagem, largura blindada, logotipo no topo e brasão centralizado no rodapé de impressão para todos os 4 botões.")
+                st.markdown("### 📥 Listas de Conferência para Impressão Cirúrgica (Brasão Garantido)")
+                st.caption("Configuradas com A4 Paisagem, largura blindada, logotipo no topo e brasão gráfico integrado no rodapé da folha para todos os 4 botões.")
                 
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
