@@ -439,17 +439,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                     max_len = max(max_len, len(val_str))
         ws_saldo.column_dimensions[col_letter].width = max(max_len + 2, 7)
 
-    for ws in [ws_loja, ws_comp]:
-        for col in ws.columns:
-            max_len = 0
-            col_letter = get_column_letter(col[0].column)
-            for cell in col:
-                if cell.value is not None:
-                    val_str = str(cell.value)
-                    if not val_str.startswith("="):
-                        max_len = max(max_len, len(val_str))
-            ws.column_dimensions[col_letter].width = max(max_len + 3, 10)
-
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
@@ -457,7 +446,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (FONTE 7 PT, COLUNAS ENXUTAS, LINHA ÚNICA)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (AUTO-EXPANSÃO DE COLUNAS, FONTE 7 PT)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -621,28 +610,20 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         linha.extend(locais_vals)
         dados_tabela.append(linha)
         
-    # Redistribuição otimizada: larguras fixas enxutas e otimizadas para dar mais espaço à descrição e contagens com fonte 7 pt
-    largura_util = 842 - 20
-    largura_fixa = 40 + 150 + 28 + 32 + 35 # Código + Descrição + Estoque + Comptar + Divergencia = 285 pt
-    largura_restante = largura_util - largura_fixa
-    num_colunas_dinamicas = max_locais_encontrados * 2
-    largura_col_dinamica = max(18, largura_restante / num_colunas_dinamicas) if num_colunas_dinamicas > 0 else 20
-    
-    col_widths = [40, 150, 28, 32, 35] + [largura_col_dinamica] * num_colunas_dinamicas
-    
-    tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
+    # Auto-expansão dinâmica: Removemos larguras rígidas para que o ReportLab ajuste as colunas com base no conteúdo disponível
+    tabela_pdf = Table(dados_tabela, repeatRows=1)
     tabela_pdf.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('ALIGN', (1, 1), (1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 7), # FONTE 7 PT AUMENTADA E LEGÍVEL
+        ('FONTSIZE', (0, 0), (-1, 0), 7),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 2.0),
         ('TOPPADDING', (0, 0), (-1, -1), 2.0),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 7), # FONTE 7 PT AUMENTADA E LEGÍVEL
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
@@ -961,7 +942,7 @@ def main():
 
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
-                st.markdown("### 📄 2. Listas de Conferência em PDF (Todas as Colunas em Linha Única + Fonte 7 pt + Brasão)")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Auto-expansão de Colunas + Fonte 7 pt + Brasão)")
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
