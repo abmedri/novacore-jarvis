@@ -17,10 +17,13 @@ import docx
 from docx.shared import Inches, Pt, RGBColor
 from pptx import Presentation
 from pptx.util import Inches as PptxInches
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+
+# ReportLab para PDFs profissionais com rodapé gráfico personalizado
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
+from reportlab.pdfgen import canvas
 
 
 def processar_arquivo_upload(arquivo_carregado):
@@ -188,7 +191,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM APENAS O BRASÃO NO TOPO
+# GERADOR DO EXCEL DE CONFERÊNCIA (APENAS BRASÃO NO TOPO)
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -206,7 +209,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         top=Side(style='medium', color='000000'), bottom=Side(style='medium', color='000000')
     )
     
-    # 1. Aba LOJA
     ws_loja = wb.active
     ws_loja.title = "LOJA"
     ws_loja.views.sheetView[0].showGridLines = True
@@ -235,7 +237,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     for r_loja in tabela_lojas:
         ws_loja.append(r_loja)
 
-    # 2. Aba CompTar
     ws_comp = wb.create_sheet(title="CompTar")
     ws_comp.views.sheetView[0].showGridLines = True
     headers_comp = ["Local", "Codigo", "Descricao", "Qtd"]
@@ -279,7 +280,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     col_est = next((c for c in df_estoque.columns if 'estoque' in c.lower()), 'Estoque')
     
     codigos_estoque_set = set(df_estoque[col_cod_est].astype(str).str.strip().values)
-    
     itens_filtrados_temp = []
     
     if tipo_filtro == "SEM_SALDO":
@@ -322,7 +322,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
 
-    # 3. Aba Saldo Loja (ou Itens Sem Saldo)
     nome_aba = "Itens Sem Saldo" if tipo_filtro == "SEM_SALDO" else "Saldo Loja"
     ws_saldo = wb.create_sheet(title=nome_aba)
     ws_saldo.views.sheetView[0].showGridLines = True
@@ -333,26 +332,20 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # Rodapé limpo padrão
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
     ws_saldo.oddFooter.center.text = "Exatidão • Controle • Eficiência"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
 
-    # ====================================================================================
-    # APENAS O BRASÃO OFICIAL NO TOPO DA FOLHA (SEM TEXTOS ADICIONAIS)
-    # ====================================================================================
     caminho_brasao_timbre = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
     if caminho_brasao_timbre:
         try:
             img_timbre = OpenpyxlImage(caminho_brasao_timbre)
             img_timbre.width = 110
             img_timbre.height = 42
-            # Posiciona o brasão de forma limpa na célula A1
             ws_saldo.add_image(img_timbre, 'A1')
         except Exception:
             pass
 
-    # Posicionamento rigoroso e limpo dos dados do topo (Data e Loja) nas colunas D e E
     ws_saldo['D1'] = "DATA:"
     ws_saldo['D1'].font = fonte_negrito
     ws_saldo['D1'].alignment = Alignment(horizontal="center", vertical="center")
@@ -379,7 +372,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     for i in range(1, max_locais_encontrados + 1):
         headers_saldo.append(f"Local {i}" if i == 1 else str(i))
         
-    # Deixa as linhas superiores ajustadas e inicia a tabela na linha 4
     ws_saldo.row_dimensions[1].height = 24
     ws_saldo.row_dimensions[2].height = 20
     ws_saldo.row_dimensions[3].height = 10
@@ -438,7 +430,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Ajuste dinâmico e enxuto das larguras de coluna
     for col in ws_saldo.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
@@ -467,7 +458,178 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# FUNÇÕES DE EXPORTAÇÃO ROBUSTAS (EXCEL, WORD, PDF E PPTX)
+# GERADOR DE PDF DE CONFERÊNCIA COM NUMERED CANVAS (BRASÃO E RODAPÉ EM TODAS AS PÁGINAS)
+# ====================================================================================
+class NumberedCanvas(canvas.Canvas):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_decorations(num_pages)
+            super().showPage()
+        super().save()
+
+    def draw_page_decorations(self, page_count):
+        self.saveState()
+        self.setFont("Helvetica", 8)
+        self.setFillColor(colors.HexColor('#64748b'))
+        
+        # Rodapé corporativo em todas as páginas do PDF
+        largura_pagina, altura_pagina = self._pagesize
+        margem = 36
+        
+        # Linha fina divisória de rodapé
+        self.setStrokeColor(colors.HexColor('#cbd5e1'))
+        self.setLineWidth(0.75)
+        self.line(margem, 35, largura_pagina - margem, 35)
+        
+        # Desenha o brasão gráfico no rodapé esquerdo se existir arquivo
+        caminho_brasao = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
+        if caminho_brasao:
+            try:
+                self.drawImage(caminho_brasao, margem, 12, width=65, height=20, preserveAspectRatio=True, mask='auto')
+            except Exception:
+                pass
+                
+        texto_esquerda = "GRUPO KMB // Auditoria Patrimonial • Exatidão • Controle • Eficiência"
+        self.drawString(margem + 75, 18, texto_esquerda)
+        
+        texto_pagina = f"Página {self._pageNumber} de {page_count}"
+        self.drawRightString(largura_pagina - margem, 18, texto_pagina)
+        self.restoreState()
+
+
+def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
+    # Reutiliza a lógica de filtragem da planilha
+    wb_temp = openpyxl.Workbook()
+    # Simula a extração dos dados filtrados chamando a lógica de itens
+    ws_dummy = wb_temp.active
+    
+    # Processa os mesmos dados para o ReportLab
+    col_loc = next((c for c in df_localizacao.columns if 'local' in c.lower()), df_localizacao.columns[2])
+    col_cod_loc = next((c for c in df_localizacao.columns if 'codigo' in c.lower() or 'cod' in c.lower()), df_localizacao.columns[3])
+    col_desc_loc = next((c for c in df_localizacao.columns if 'desc' in c.lower()), df_localizacao.columns[4])
+    col_qtd_loc = next((c for c in df_localizacao.columns if 'qtd' in c.lower() or 'quantidade' in c.lower()), df_localizacao.columns[5])
+    
+    locais_por_produto = {}
+    soma_comptar_por_produto = {}
+    descricoes_comptar = {}
+    
+    for _, row in df_localizacao.iterrows():
+        loc = limpar_nome_local(row.get(col_loc, ''))
+        cod = str(row.get(col_cod_loc, '')).strip()
+        desc = str(row.get(col_desc_loc, '')).strip()
+        try:
+            qtd = int(float(row.get(col_qtd_loc, 0)))
+        except Exception:
+            qtd = 0
+            
+        if cod not in locais_por_produto:
+            locais_por_produto[cod] = []
+            soma_comptar_por_produto[cod] = 0
+            descricoes_comptar[cod] = desc
+        locais_por_produto[cod].append((loc, qtd))
+        soma_comptar_por_produto[cod] += qtd
+        
+    col_cod_est = next((c for c in df_estoque.columns if 'codigo' in c.lower()), 'Codigo')
+    col_desc_est = next((c for c in df_estoque.columns if 'desc' in c.lower()), 'Descrição')
+    col_est = next((c for c in df_estoque.columns if 'estoque' in c.lower()), 'Estoque')
+    codigos_estoque_set = set(df_estoque[col_cod_est].astype(str).str.strip().values)
+    
+    itens_filtrados_temp = []
+    if tipo_filtro == "SEM_SALDO":
+        for cod, locs in locais_por_produto.items():
+            if cod not in codigos_estoque_set:
+                desc_item = descricoes_comptar.get(cod, "Item Avulso / Sem Cadastro")
+                soma_comptar_val = soma_comptar_por_produto.get(cod, 0)
+                itens_filtrados_temp.append([cod, desc_item, "0", str(soma_comptar_val), str(soma_comptar_val)])
+    else:
+        for idx, row in df_estoque.iterrows():
+            cod = str(row.get(col_cod_est, '')).strip()
+            desc = str(row.get(col_desc_est, ''))
+            try:
+                est = int(float(row.get(col_est, 0)))
+            except Exception:
+                est = 0
+            
+            locs_prod = locais_por_produto.get(cod, [])
+            tem_na_comptar = len(locs_prod) > 0
+            soma_comptar_val = soma_comptar_por_produto.get(cod, 0) if tem_na_comptar else 0
+            divergencia_val = soma_comptar_val - est
+            
+            incluir = False
+            if tipo_filtro == "TODOS":
+                incluir = True
+            elif tipo_filtro == "ZERADOS":
+                if not tem_na_comptar:
+                    incluir = True
+            elif tipo_filtro == "FALTAS":
+                if tem_na_comptar and divergencia_val < 0:
+                    incluir = True
+            elif tipo_filtro == "SOBRAS":
+                if tem_na_comptar and divergencia_val > 0:
+                    incluir = True
+                    
+            if incluir:
+                itens_filtrados_temp.append([cod, desc[:35], str(est), str(soma_comptar_val), str(divergencia_val)])
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(letter),
+        rightMargin=30,
+        leftMargin=30,
+        topMargin=35,
+        bottomMargin=45
+    )
+    
+    styles = getSampleStyleSheet()
+    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#1F4E78'))
+    estilo_celula = ParagraphStyle('CelulaPDF', parent=styles['Normal'], fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#0F172A'))
+    estilo_cab_tabela = ParagraphStyle('CabPDF', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.white)
+
+    story = []
+    
+    # Cabeçalho do relatório PDF
+    story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
+    story.append(Spacer(1, 8))
+    
+    dados_tabela = [["Código", "Descrição do Produto", "Estoque", "COMPTAR", "DIVERGÊNCIA", "Contagem 1", "Local"]]
+    for item in itens_filtrados_temp:
+        dados_tabela.append([item[0], item[1], item[2], item[3], item[4], "", ""])
+        
+    tabela_pdf = Table(dados_tabela, colWidths=[70, 260, 60, 60, 75, 75, 80], repeatRows=1)
+    tabela_pdf.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
+        ('TOPPADDING', (0, 0), (-1, 0), 5),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    
+    story.append(tabela_pdf)
+    doc.build(story, canvasmaker=NumberedCanvas)
+    buffer.seek(0)
+    return buffer
+
+
+# ====================================================================================
+# FUNÇÕES DE EXPORTAÇÃO C-LEVEL
 # ====================================================================================
 def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
@@ -557,7 +719,7 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
         p.add_run(f"  - Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f} (Impacto Geral: {r['impacto_sobre_antes_pct']:.2f}%)\n")
         p.add_run(f"  - Acurácia Volumétrica: {r['acuracia_vol']:.2f}% | Acurácia Financeira: {r['acuracia_fin']:.2f}%\n")
     
-    doc.add_heading("2. Detalhamento de Divergências Críticas (Faltas, Sobras e Zerados)", level=2)
+    doc.add_heading("2. Detalhamento de Divergências Críticas", level=2)
     for idx, df in enumerate(lista_dfs):
         doc.add_paragraph(f"Análise detalhada da base: {nomes_arquivos[idx]}")
         col_ajuste = 'Ajuste' if 'Ajuste' in df.columns else None
@@ -600,40 +762,11 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     )
     
     styles = getSampleStyleSheet()
-    
-    estilo_titulo = ParagraphStyle(
-        'TituloExecutivo',
-        parent=styles['Heading1'],
-        fontName='Helvetica-Bold',
-        fontSize=16,
-        leading=20,
-        textColor=colors.HexColor('#1F4E78'),
-        spaceAfter=10
-    )
-    
-    estilo_sub = ParagraphStyle(
-        'SubExecutivo',
-        parent=styles['Heading2'],
-        fontName='Helvetica-Bold',
-        fontSize=12,
-        leading=16,
-        textColor=colors.HexColor('#0F172A'),
-        spaceBefore=12,
-        spaceAfter=6
-    )
-    
-    estilo_texto = ParagraphStyle(
-        'TextoExecutivo',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=9,
-        leading=13,
-        textColor=colors.HexColor('#334155'),
-        spaceAfter=4
-    )
+    estilo_titulo = ParagraphStyle('TituloExecutivo', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=16, leading=20, textColor=colors.HexColor('#1F4E78'), spaceAfter=10)
+    estilo_sub = ParagraphStyle('SubExecutivo', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor('#0F172A'), spaceBefore=12, spaceAfter=6)
+    estilo_texto = ParagraphStyle('TextoExecutivo', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=13, textColor=colors.HexColor('#334155'), spaceAfter=4)
     
     story = []
-    
     story.append(Paragraph("⚡ GRUPO KMB // DOSSIÊ DE AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
     story.append(Paragraph("Relatório oficial consolidado contendo indicadores de impacto, análise de quebras, sobras e itens críticos.", estilo_texto))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3B82F6'), spaceBefore=8, spaceAfter=12))
@@ -652,40 +785,8 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
         """
         story.append(Paragraph(texto_unidade, estilo_texto))
         story.append(Spacer(1, 4))
-    
-    story.append(Paragraph("2. Resumo de Divergências Críticas", estilo_sub))
-    for idx, df in enumerate(lista_dfs):
-        nome_arq = nomes_arquivos[idx]
-        col_ajuste = 'Ajuste' if 'Ajuste' in df.columns else None
         
-        if col_ajuste and col_ajuste in df.columns:
-            total_faltas = len(df[df[col_ajuste] < 0])
-            total_sobras = len(df[df[col_ajuste] > 0])
-            total_zerados = len(df[(df[col_ajuste] == 0) & (df.get('Saldo em Estoque', 1) == 0)]) if 'Saldo em Estoque' in df.columns else len(df[df[col_ajuste] == 0])
-            
-            texto_div = f"""
-            <b>• Base: {nome_arq}</b><br/>
-            - Itens em Falta (Quebras): {total_faltas:,}<br/>
-            - Itens em Sobra: {total_sobras:,}<br/>
-            - Itens com Estoque Congelado Zero: {total_zerados:,}
-            """
-            story.append(Paragraph(texto_div, estilo_texto))
-        else:
-            story.append(Paragraph(f"• Base: {nome_arq} - Coluna de ajuste não mapeada para contagem detalhada.", estilo_texto))
-            
-    story.append(Spacer(1, 10))
-    story.append(Paragraph("3. Validação e Assinatura C-Level", estilo_sub))
-    story.append(Paragraph("Declaro que os dados acima foram auditados eletronicamente através do Protocolo J.A.R.V.I.S. / Grupo KMB e refletem com fidelidade a apuração patrimonial realizada.", estilo_texto))
-    story.append(Spacer(1, 20))
-    
-    texto_assinatura = """
-    <b>_____________________________________________________</b><br/>
-    <b>Time de Inventário & Loss Prevention / Auditoria C-Level</b><br/>
-    Grupo KMB - Exatidão • Controle • Eficiência
-    """
-    story.append(Paragraph(texto_assinatura, estilo_texto))
-    
-    doc_pdf.build(story)
+    doc_pdf.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer
 
@@ -720,7 +821,6 @@ def main():
         col_l1, col_l2, col_l3 = st.columns([1, 1.5, 1])
         with col_l2:
             st.markdown("<br><br>", unsafe_allow_html=True)
-            
             if caminho_logo_tela:
                 st.image(caminho_logo_tela, use_container_width=True)
             else:
@@ -730,7 +830,6 @@ def main():
             st.markdown("Insira a senha de acesso executivo para desbloquear o sistema.")
             
             senha_digitada = st.text_input("Senha de Acesso", type="password", key="input_senha")
-            
             if st.button("🔓 Entrar no Sistema", use_container_width=True):
                 if senha_digitada == SENHA_MESTRE:
                     st.session_state.autenticado = True
@@ -777,11 +876,11 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO E APENAS O BRASÃO NO TOPO
+    # MODO 2: PLANILHA DE CONFERÊNCIA (EXCEL + PDF COM BRASÃO NO RODAPÉ)
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
-        st.markdown("Insira o número da loja e carregue os arquivos abaixo para visualizar e gerar o plano de inventário unificado:")
+        st.markdown("Insira o número da loja e carregue os arquivos abaixo para gerar as listas em Excel e em PDF com brasão no rodapé:")
         
         numero_loja_ui = st.number_input("Número da Loja (ex: 13016 ou 17315)", min_value=1, max_value=99999, value=13016, step=1)
         
@@ -798,10 +897,9 @@ def main():
             if df_loc_temp is not None and df_est_temp is not None:
                 st.success("✅ Arquivos carregados e validados com sucesso!")
                 
-                # PRÉ-VISUALIZAÇÃO NA TELA COM CABEÇALHOS 100% LIMPOS
+                # PRÉ-VISUALIZAÇÃO NA TELA
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
-                st.caption("Abaixo está a prévia interativa com colunas limpas, sem pontos decimais nos cabeçalhos:")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3).fillna("")
@@ -821,57 +919,44 @@ def main():
                 
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
+                # BOTÕES DE EXCEL
                 st.markdown("---")
-                st.markdown("### 📥 Listas de Conferência para Impressão com Apenas o Brasão no Topo")
-                st.caption("Configuradas com A4 Paisagem, largura blindada e brasão oficial isolado no topo para todos os 4 botões.")
-                
+                st.markdown("### 📥 1. Listas de Conferência em Excel (Timbre com Brasão no Topo)")
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
                 with c_imp1:
-                    st.markdown("##### 1️⃣ Zerados")
                     buf_zerados = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "ZERADOS")
-                    st.download_button(
-                        label="📥 Baixar (Zerados)",
-                        data=buf_zerados,
-                        file_name=f"Impressao_Zerados_Loja_{numero_loja_ui}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
-                    
+                    st.download_button("📥 Baixar Excel (Zerados)", data=buf_zerados, file_name=f"Excel_Zerados_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp2:
-                    st.markdown("##### 2️⃣ Faltas")
                     buf_faltas = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "FALTAS")
-                    st.download_button(
-                        label="📥 Baixar (Faltas)",
-                        data=buf_faltas,
-                        file_name=f"Impressao_Faltas_Loja_{numero_loja_ui}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
-                    
+                    st.download_button("📥 Baixar Excel (Faltas)", data=buf_faltas, file_name=f"Excel_Faltas_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp3:
-                    st.markdown("##### 3️⃣ Sobras")
                     buf_sobras = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SOBRAS")
-                    st.download_button(
-                        label="📥 Baixar (Sobras)",
-                        data=buf_sobras,
-                        file_name=f"Impressao_Sobras_Loja_{numero_loja_ui}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
-
+                    st.download_button("📥 Baixar Excel (Sobras)", data=buf_sobras, file_name=f"Excel_Sobras_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp4:
-                    st.markdown("##### 4️⃣ Sem Saldo")
                     buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SEM_SALDO")
-                    st.download_button(
-                        label="📥 Baixar (Sem Saldo)",
-                        data=buf_sem_saldo,
-                        file_name=f"Impressao_ItensContadosSemSaldo_Loja_{numero_loja_ui}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
+                    st.download_button("📥 Baixar Excel (Sem Saldo)", data=buf_sem_saldo, file_name=f"Excel_SemSaldo_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+                # BOTÕES DE PDF COM BRASÃO NO RODAPÉ (OS 4 NOVOS BOTÕES)
+                data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
+                st.markdown("---")
+                st.markdown("### 📄 2. Listas de Conferência em PDF (Brasão e Rodapé Gráfico em Cada Página)")
+                c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
+                
+                with c_pdf1:
+                    pdf_zerados = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "ZERADOS")
+                    st.download_button("📑 Baixar PDF (Zerados)", data=pdf_zerados, file_name=f"{numero_loja_ui}.{data_atual_str}.zerados.pdf", mime="application/pdf", use_container_width=True)
+                with c_pdf2:
+                    pdf_faltas = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "FALTAS")
+                    st.download_button("📑 Baixar PDF (Faltas)", data=pdf_faltas, file_name=f"{numero_loja_ui}.{data_atual_str}.faltas.pdf", mime="application/pdf", use_container_width=True)
+                with c_pdf3:
+                    pdf_sobras = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SOBRAS")
+                    st.download_button("📑 Baixar PDF (Sobras)", data=pdf_sobras, file_name=f"{numero_loja_ui}.{data_atual_str}.sobras.pdf", mime="application/pdf", use_container_width=True)
+                with c_pdf4:
+                    pdf_sem_saldo = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SEM_SALDO")
+                    st.download_button("📑 Baixar PDF (Sem Saldo)", data=pdf_sem_saldo, file_name=f"{numero_loja_ui}.{data_atual_str}.sem_saldo.pdf", mime="application/pdf", use_container_width=True)
             else:
-                st.error("❌ Erro ao processar um ou ambos os arquivos. Verifique o formato.")
+                st.error("❌ Erro ao processar os arquivos.")
         return
 
     # ====================================================================
@@ -894,178 +979,26 @@ def main():
                 num_cols = df_filtrado.select_dtypes(include=['number']).columns.tolist()
                 cat_cols = df_filtrado.select_dtypes(include=['object']).columns.tolist()
                 all_cols = df_filtrado.columns.tolist()
-                
                 resumo_unico = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)[0]
                 
-                # ETAPA 1
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
-                st.markdown("<br>", unsafe_allow_html=True)
-                
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{resumo_unico['total_skus']:,}", f"Pré: {resumo_unico['qtd_antes']:,.0f} un | Pós: {resumo_unico['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{resumo_unico['skus_falta']:,} SKUs ({resumo_unico['perc_falta_itens']:.2f}%)", f"Vol: -{resumo_unico['vol_falta']:,.0f} un | R$ {resumo_unico['val_falta']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Volume Físico Total de Divergências (Sobra + Falta)", f"{resumo_unico['vol_div_total']:,.0f} unidades ({resumo_unico['perc_vol_div']:.2f}%)", f"R$ {resumo_unico['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
                 with c2:
                     st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{resumo_unico['skus_sobra']:,} SKUs ({resumo_unico['perc_sobra_itens']:.2f}%)", f"Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{resumo_unico['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{resumo_unico['total_div']:,} SKUs ({resumo_unico['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {resumo_unico['acuracia_vol']:.2f}% | Fin: {resumo_unico['acuracia_fin']:.2f}%", "Meta Corporativa 97%", eh_negativo=(resumo_unico['acuracia_vol'] < 97), eh_positivo=(resumo_unico['acuracia_vol'] >= 97)), unsafe_allow_html=True)
-                
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("##### 💰 Balanço Patrimonial & Impacto Geral")
-                col_kpi1, col_kpi2 = st.columns(2)
-                with col_kpi1:
-                    st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {resumo_unico['soma_antes']:,.2f}", f"Qtd Pré: {resumo_unico['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Impacto Geral", f"{resumo_unico['impacto_sobre_antes_pct']:.2f}%", f"Ajuste Líquido: R$ {resumo_unico['val_ajuste_liquido']:,.2f}", eh_negativo=(resumo_unico['impacto_sobre_antes_pct'] < 0), eh_positivo=(resumo_unico['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
-                with col_kpi2:
-                    st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {resumo_unico['soma_depois']:,.2f}", f"Qtd Pós: {resumo_unico['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                    st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {resumo_unico['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(resumo_unico['val_ajuste_liquido'] < 0), eh_positivo=(resumo_unico['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
-                st.markdown("---")
-                
-                # ETAPA 2
-                with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
-                    if len(num_cols) >= 1 and len(all_cols) > 0:
-                        col_sel1, col_sel2, col_sel3 = st.columns(3)
-                        with col_sel1:
-                            coluna_categoria_escolhida = st.selectbox("Dimensão (Eixo X):", options=all_cols, index=all_cols.index('Descrição do Produto') if 'Descrição do Produto' in all_cols else 0, key="abc_eixo_x")
-                        with col_sel2:
-                            idx_padrao_y = identificar_coluna_ideal(num_cols, ['valor de estoque', 'valor', 'saldo'])
-                            eixo_y_escolhido = st.selectbox("Métrica Principal (Eixo Y):", options=num_cols, index=idx_padrao_y if idx_padrao_y < len(num_cols) else 0, key="abc_eixo_y")
-                        with col_sel3:
-                            filtro_classe_abc = st.selectbox("Filtro Curva ABC:", options=["Todas as Classes (Geral)", "Classe A (80%)", "Classe B (95%)", "Classe C (100%)"], index=0, key="abc_filtro_classe")
-                        
-                        df_abc = df_filtrado.sort_values(by=eixo_y_escolhido, ascending=False).copy()
-                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolhido].cumsum()
-                        soma_total = df_abc[eixo_y_escolhido].sum()
-                        
-                        if soma_total > 0:
-                            df_abc['%_Acumulado'] = (df_abc['Soma_Acumulada'] / soma_total) * 100
-                            df_abc['Classe_ABC'] = df_abc['%_Acumulado'].apply(lambda p: "Classe A (80%)" if p <= 80 else ("Classe B (95%)" if p <= 95 else "Classe C (100%)"))
-                            
-                            if filtro_classe_abc != "Todas as Classes (Geral)":
-                                df_abc_filtrado = df_abc[df_abc['Classe_ABC'] == filtro_classe_abc].copy()
-                            else:
-                                df_abc_filtrado = df_abc.copy()
-                            
-                            df_plot = df_abc_filtrado.head(50).copy()
-                            if not df_plot.empty:
-                                fig_abc = go.Figure()
-                                fig_abc.add_trace(go.Bar(x=df_plot[coluna_categoria_escolhida], y=df_plot[eixo_y_escolhido], name=eixo_y_escolhido, marker=dict(color=df_plot[eixo_y_escolhido], colorscale=[[0, '#1e3a8a'], [0.5, '#3b82f6'], [1, '#00f2fe']])))
-                                fig_abc.add_trace(go.Scatter(x=df_plot[coluna_categoria_escolhida], y=df_plot['%_Acumulado'], name="% Acumulado (Pareto)", mode='lines+markers', yaxis='y2', line=dict(color='#f59e0b', width=3)))
-                                fig_abc.update_layout(template="plotly_dark", paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=480, yaxis=dict(title=eixo_y_escolhido), yaxis2=dict(title="% Acumulado", overlaying='y', side='right', range=[0, 105], showgrid=False))
-                                st.plotly_chart(fig_abc, use_container_width=True)
-
-                # ETAPA 3
-                with st.expander("🚨 ETAPA 3: Matriz de Criticidade & Discrepância Financeira", expanded=False):
-                    if len(num_cols) >= 2:
-                        col_nome_prod = 'Descrição do Produto' if 'Descrição do Produto' in df_filtrado.columns else all_cols[0]
-                        idx_val_div = identificar_coluna_ideal(num_cols, ['valor de ajuste', 'ajuste', 'valor', 'divergencia'])
-                        col_val_div = num_cols[idx_val_div] if idx_val_div < len(num_cols) else num_cols[0]
-                        
-                        df_critico = df_filtrado.copy()
-                        df_critico['Impacto_Absoluto'] = df_critico[col_val_div].abs()
-                        df_critico = df_critico.sort_values(by='Impacto_Absoluto', ascending=False).head(50)
-                        if not df_critico.empty:
-                            fig_critico = px.bar(df_critico, x=col_nome_prod, y=col_val_div, title="Top 50 Maiores Desvios Financeiros (R$)", template="plotly_dark", color=col_val_div, color_continuous_scale=['#ef4444', '#f59e0b', '#3b82f6'])
-                            fig_critico.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=480)
-                            st.plotly_chart(fig_critico, use_container_width=True)
-
-                # ETAPA 4
-                with st.expander("🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto", expanded=False):
-                    if len(num_cols) >= 2 and len(all_cols) > 0:
-                        df_risco = df_filtrado.copy()
-                        col_val_aju_etapa4 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_risco.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
-                        df_risco['Categoria_Prod'] = df_risco['Descrição do Produto'].astype(str).str.split().str[0]
-                        df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index().sort_values(by=col_val_aju_etapa4, ascending=True).head(15)
-                        fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
-                        fig_risco.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=420)
-                        st.plotly_chart(fig_risco, use_container_width=True)
-
-                # ETAPA 5
-                with st.expander("⚡ ETAPA 5: CENTRO DE COMANDO C-LEVEL (PRESCRITIVO & OPERACIONAL)", expanded=True):
-                    tab_e5_1, tab_e5_2, tab_e5_3, tab_e5_4 = st.tabs(["🔍 1. Matriz Causa Raiz", "📈 2. Quadrante 4D", "🎯 3. Simulador Meta 97%", "📋 4. Plano de Ação Prioritário"])
-                    col_val_aju_e5 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_filtrado.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
-                    col_ajuste_e5 = 'Ajuste' if 'Ajuste' in df_filtrado.columns else 'Ajuste'
-                    
-                    df_causa = df_filtrado.copy()
-                    def classificar_causa(row):
-                        aj = row.get(col_ajuste_e5, 0)
-                        val = abs(row.get(col_val_aju_e5, 0))
-                        saldo_sis = row.get('Saldo em Estoque', 1)
-                        if aj < 0 and val > 200: return "🚨 Furto / Extravio Crítico (Alto Valor)"
-                        elif aj == 0 and saldo_sis == 0: return "👻 Estoque Fantasma / Zumbi"
-                        elif abs(aj) in [6, 12, 24]: return "📦 Erro de Recebimento / Caixa Fechada"
-                        elif aj != 0: return "🔄 Divergência Operacional / Quebra Padrão"
-                        else: return "✅ Conforme"
-                    df_causa['Perfil_Causa'] = df_causa.apply(classificar_causa, axis=1)
-
-                    with tab_e5_1:
-                        resumo_causas = df_causa.groupby('Perfil_Causa').agg(SKUs=('Código do Produto', 'count'), Impacto_Financeiro=(col_val_aju_e5, 'sum')).reset_index()
-                        st.dataframe(resumo_causas.style.format({'SKUs': '{:,}', 'Impacto_Financeiro': 'R$ {:,.2f}'}), use_container_width=True)
-                    with tab_e5_2:
-                        df_scatter = df_causa[df_causa[col_ajuste_e5] != 0].copy()
-                        df_scatter['Tamanho_Bolha'] = df_scatter[col_val_aju_e5].abs().clip(lower=1)
-                        fig_4d = px.scatter(df_scatter, x='Saldo em Estoque', y=col_val_aju_e5, size='Tamanho_Bolha', color='Perfil_Causa', hover_name='Descrição do Produto', template="plotly_dark", height=450)
-                        st.plotly_chart(fig_4d, use_container_width=True)
-                    with tab_e5_3:
-                        c_sim1, c_sim2 = st.columns(2)
-                        with c_sim1:
-                            st.metric("Acurácia Volumétrica Atual", f"{resumo_unico['acuracia_vol']:.2f}%")
-                        with c_sim2:
-                            perc_recup = st.slider("Simular % de Recuperação de Faltas", 0, 100, 30, 5, key="slider_meta_e5")
-                            quebras_totais = abs(df_causa[df_causa[col_ajuste_e5] < 0][col_val_aju_e5].sum())
-                            st.success(f"💰 Ganho de Caixa: R$ {quebras_totais * (perc_recup / 100.0):,.2f}")
-                    with tab_e5_4:
-                        df_plano = df_causa[df_causa[col_ajuste_e5] < 0].sort_values(by=col_val_aju_e5, ascending=True).head(15).copy()
-                        if not df_plano.empty:
-                            st.dataframe(df_plano[['Código do Produto', 'Descrição do Produto', 'Saldo em Estoque', col_ajuste_e5, col_val_aju_e5, 'Perfil_Causa']].style.format({col_val_aju_e5: 'R$ {:,.2f}'}), use_container_width=True)
-
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO C-LEVEL")
                 resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
-                
                 col_cards = st.columns(len(lista_dfs))
                 for idx, r in enumerate(resumos):
                     with col_cards[idx]:
                         with st.container(border=True):
                             st.markdown(f"#### 📄 {r['nome']}")
                             st.markdown(formatar_kpi_html("Total SKUs Auditados", f"{r['total_skus']:,}", f"Pré: {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Produtos com Falta (Negativos)", f"{r['skus_falta']:,} SKUs ({r['perc_falta_itens']:.2f}%)", f"Vol: -{r['vol_falta']:,.0f} un | R$ {r['val_falta']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Produtos com Sobra (Positivos)", f"{r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%)", f"Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Total Falta + Sobra (SKUs)", f"{r['total_div']:,} SKUs ({r['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes", eh_negativo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Volume Físico Total Divergências (Sobra + Falta)", f"{r['vol_div_total']:,.0f} unidades ({r['perc_vol_div']:.2f}%)", f"R$ {r['val_div_absoluto']:,.2f}", eh_negativo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Acuracidade Volumétrica / Financeira", f"Vol: {r['acuracia_vol']:.2f}% | Fin: {r['acuracia_fin']:.2f}%", "Meta Corporativa 97%", eh_negativo=(r['acuracia_vol'] < 97), eh_positivo=(r['acuracia_vol'] >= 97)), unsafe_allow_html=True)
-                            
-                            st.markdown("##### 💰 Balanço Patrimonial")
-                            st.markdown(formatar_kpi_html("Estoque Antes (Sistema / Teórico)", f"R$ {r['soma_antes']:,.2f}", f"Qtd Pré: {r['qtd_antes']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {r['soma_depois']:,.2f}", f"Qtd Pós: {r['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Impacto Geral", f"{r['impacto_sobre_antes_pct']:.2f}%", f"Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f}", eh_negativo=(r['impacto_sobre_antes_pct'] < 0), eh_positivo=(r['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
-                            st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {r['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(r['val_ajuste_liquido'] < 0), eh_positivo=(r['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
-                st.markdown("---")
-                st.subheader("📊 Gráficos Consolidados")
-                
-                df_resumo_geral = pd.DataFrame([
-                    {
-                        "Ficheiro": r['nome'],
-                        "Estoque Antes": r['soma_antes'],
-                        "Estoque Depois": r['soma_depois'],
-                        "Ajuste Líquido": r['val_ajuste_liquido'],
-                        "Impacto Geral (%)": r['impacto_sobre_antes_pct'],
-                        "Total SKUs": r['total_skus'],
-                        "Faltas (SKUs)": r['skus_falta'],
-                        "Sobras (SKUs)": r['skus_sobra']
-                    } for r in resumos
-                ])
-                
-                gc1, gc2 = st.columns(2)
-                with gc1:
-                    fig_val = px.bar(df_resumo_geral, x="Ficheiro", y=["Estoque Antes", "Estoque Depois"], barmode="group", template="plotly_dark", title="Comparativo Valor Estoque (Antes vs Depois)")
-                    st.plotly_chart(fig_val, use_container_width=True)
-                with gc2:
-                    fig_aj = px.bar(df_resumo_geral, x="Ficheiro", y="Impacto Geral (%)", template="plotly_dark", title="Impacto Geral em Percentual")
-                    st.plotly_chart(fig_aj, use_container_width=True)
 
-            # Central de Relatórios
             st.markdown("---")
             st.subheader("📥 Central de Relatórios Executivos C-Level")
             col_e1, col_e2, col_e3, col_e4 = st.columns(4)
