@@ -369,11 +369,19 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
+    # Cabeçalhos limpos estritamente inteiros (Cont. 1, Cont. 2, Cont. 3... e Local 1, Local 2, Local 3...)
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
-        headers_saldo.append(str(int(i)) if i > 1 else "CONT. 1")
+        if i == 1:
+            headers_saldo.append("CONT. 1")
+        else:
+            headers_saldo.append(str(int(i)))
+            
     for i in range(1, max_locais_encontrados + 1):
-        headers_saldo.append(f"Local {int(i)}" if i == 1 else str(int(i)))
+        if i == 1:
+            headers_saldo.append("Local 1")
+        else:
+            headers_saldo.append(str(int(i)))
         
     ws_saldo.row_dimensions[1].height = 24
     ws_saldo.row_dimensions[2].height = 20
@@ -598,7 +606,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     
     headers_pdf = ["Código", "Descrição", "EST.", "COMP.", "DIVERG."]
     for i in range(1, max_locais_encontrados + 1):
-        headers_pdf.append(str(int(i)) if i > 1 else "C.1")
+        headers_pdf.append("C.1" if i == 1 else str(int(i)))
     for i in range(1, max_locais_encontrados + 1):
         headers_pdf.append(f"Loc.{int(i)}" if i == 1 else str(int(i)))
         
@@ -941,6 +949,7 @@ def main():
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3).fillna("")
                 
+                # Tratamento rigoroso para remover qualquer ponto decimal dos nomes das colunas e dados
                 novas_cols_preview = []
                 for col in df_preview_exibir.columns:
                     col_str = str(col).strip()
@@ -949,13 +958,18 @@ def main():
                     novas_cols_preview.append(col_str)
                 df_preview_exibir.columns = novas_cols_preview
                 
-                # Limpa ponto decimal em qualquer coluna ou cabeçalho na pré-visualização
-                df_preview_exibir.columns = [str(c).replace('.0', '') for c in df_preview_exibir.columns]
-                
-                for col in df_preview_exibir.columns:
-                    df_preview_exibir[col] = df_preview_exibir[col].apply(
-                        lambda x: str(int(x)) if isinstance(x, float) and x.is_integer() else (str(x).replace('.0', '') if isinstance(x, float) else x)
-                    )
+                # Converte cabeçalhos para inteiros limpos se forem numéricos
+                colunas_limpas = []
+                for c in df_preview_exibir.columns:
+                    c_str = str(c).replace('.0', '').strip()
+                    try:
+                        c_val = float(c_str)
+                        if c_val.is_integer():
+                            c_str = str(int(c_val))
+                    except Exception:
+                        pass
+                    colunas_limpas.append(c_str)
+                df_preview_exibir.columns = colunas_limpas
                 
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
