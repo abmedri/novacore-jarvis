@@ -369,8 +369,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
-    # ── CONSTRUÇÃO DOS CABEÇALHOS COM NÚMEROS INTEIROS PUROS ──
-    headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
+    headers_saldo = ["Código", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
         if i == 1:
             headers_saldo.append("CONT. 1")
@@ -444,16 +443,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 cell.alignment = Alignment(horizontal="left", vertical="center")
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    for col in ws_saldo.columns:
-        max_len = 0
-        col_letter = get_column_letter(col[0].column)
-        for cell in col:
-            if cell.row >= 4 and cell.value is not None:
-                val_str = str(cell.value)
-                if not val_str.startswith("="):
-                    max_len = max(max_len, len(val_str))
-        ws_saldo.column_dimensions[col_letter].width = max(max_len + 2, 7)
 
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -949,14 +938,11 @@ def main():
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name="Saldo Loja", skiprows=3).fillna("")
                 
-                # ── LIMPEZA RADICAL DOS TÍTULOS NA TELA ──
                 colunas_limpas_tela = []
-                for idx, c in enumerate(df_preview_exibir.columns):
+                for c in df_preview_exibir.columns:
                     c_str = str(c).strip()
                     if c_str.endswith('.0'):
                         c_str = c_str[:-2]
-                    
-                    # Força números inteiros sequenciais limpos a partir da coluna de locais se necessário
                     try:
                         val_f = float(c_str)
                         if val_f.is_integer():
@@ -966,7 +952,13 @@ def main():
                     colunas_limpas_tela.append(c_str)
                 df_preview_exibir.columns = colunas_limpas_tela
                 
-                st.dataframe(df_preview_exibir, use_container_width=True, height=420)
+                # Apenas Código, Estoque, COMPTAR e DIVERGÊNCIA em negrito (Descrição fica normal)
+                cols_principais = [c for c in ["Codigo", "Código", "Estoque", "COMPTAR", "DIVERGÊNCIA"] if c in df_preview_exibir.columns]
+                
+                def aplicar_negrito_principais(s):
+                    return ['font-weight: bold' if s.name in cols_principais else '' for _ in s]
+                
+                st.dataframe(df_preview_exibir.style.apply(aplicar_negrito_principais, axis=0), use_container_width=True, height=420)
                 
                 st.markdown("---")
                 st.markdown("### 📥 1. Listas de Conferência em Excel (Ordem Alfabética)")
