@@ -725,7 +725,7 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
     
     p_assinatura = doc.add_paragraph()
     p_assinatura.add_run("____________________________________________________\n").bold = True
-    p_assinatura.add_run("Time de Inventário & Loss Prevention / Auditoria C-Level\n")
+    p_assinatura.add_run("Time de Inventário / Auditoria C-Level\n")
     p_assinatura.add_run("Grupo KMB - Exatidão • Controle • Eficiência")
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -750,7 +750,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     estilo_texto = ParagraphStyle('TextoExecutivo', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=13, textColor=colors.HexColor('#334155'), spaceAfter=4)
     
     story = []
-    story.append(Paragraph("⚡ GRUPO KMB // DOSSIÊ DE AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
+    story.append(Paragraph("⚡ GRUPO KMB // RELATÓRIO DE AUDITORIA PATRIMONIAL C-LEVEL", estilo_titulo))
     story.append(Paragraph("Relatório oficial consolidado contendo indicadores de impacto, análise de quebras, sobras e itens críticos.", estilo_texto))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3B82F6'), spaceBefore=8, spaceAfter=12))
     
@@ -768,6 +768,33 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
         """
         story.append(Paragraph(texto_unidade, estilo_texto))
         story.append(Spacer(1, 4))
+        
+    story.append(Paragraph("2. Detalhamento de Divergências Críticas", estilo_sub))
+    for idx, df in enumerate(lista_dfs):
+        col_ajuste = 'Ajuste' if 'Ajuste' in df.columns else None
+        if col_ajuste and col_ajuste in df.columns:
+            total_faltas = len(df[df[col_ajuste] < 0])
+            total_sobras = len(df[df[col_ajuste] > 0])
+            total_zerados = len(df[(df[col_ajuste] == 0) & (df.get('Saldo em Estoque', 1) == 0)]) if 'Saldo em Estoque' in df.columns else len(df[df[col_ajuste] == 0])
+            texto_detalhe = f"""
+            <b>• Base / Unidade:</b> {nomes_arquivos[idx]}<br/>
+            <b>- Itens em Falta (Quebras):</b> {total_faltas:,}<br/>
+            <b>- Itens em Sobra:</b> {total_sobras:,}<br/>
+            <b>- Itens com Estoque Congelado Zero:</b> {total_zerados:,}
+            """
+            story.append(Paragraph(texto_detalhe, estilo_texto))
+            story.append(Spacer(1, 4))
+            
+    story.append(Paragraph("3. Validação e Assinatura C-Level", estilo_sub))
+    story.append(Paragraph("Declaro que os dados acima foram auditados eletronicamente através do Protocolo J.A.R.V.I.S. / Grupo KMB e refletem com fidelidade a apuração patrimonial realizada.", estilo_texto))
+    story.append(Spacer(1, 15))
+    
+    texto_assinatura = """
+    <b>____________________________________________________</b><br/>
+    <b>Time de Inventário / Auditoria C-Level</b><br/>
+    Grupo KMB - Exatidão • Controle • Eficiência
+    """
+    story.append(Paragraph(texto_assinatura, estilo_texto))
         
     doc_pdf.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
