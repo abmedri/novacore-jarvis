@@ -382,11 +382,11 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['G2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['G2'].border = borda_destaque
     
-    # Cidade ajustada CORRETAMENTE para a coluna Q (removida da coluna R)
-    ws_saldo['Q2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,""))'
-    ws_saldo['Q2'].font = fonte_negrito
-    ws_saldo['Q2'].alignment = Alignment(horizontal="center", vertical="center")
-    ws_saldo['Q2'].border = borda_destaque
+    # Colunas Q e R totalmente limpas (removida qualquer fórmula residual das colunas)
+    ws_saldo['Q2'] = ""
+    ws_saldo['Q2'].border = borda_fina
+    ws_saldo['R2'] = ""
+    ws_saldo['R2'].border = borda_fina
     
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
@@ -1052,7 +1052,7 @@ def main():
                             st.markdown(formatar_kpi_html("Impacto Geral", f"{r['impacto_sobre_antes_pct']:.2f}%", f"Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f}", eh_negativo=(r['impacto_sobre_antes_pct'] < 0), eh_positivo=(r['impacto_sobre_antes_pct'] >= 0)), unsafe_allow_html=True)
                             st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {r['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(r['val_ajuste_liquido'] < 0), eh_positivo=(r['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
                 st.markdown("---")
-                st.subheader("📊 Gráficos Comparativos Consolidados")
+                st.subheader("📊 Gráficos Consolidados")
                 
                 df_resumo_geral = pd.DataFrame([
                     {
