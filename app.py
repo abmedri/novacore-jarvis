@@ -191,7 +191,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO EXCEL DE CONFERÊNCIA
+# GERADOR DO EXCEL DE CONFERÊNCIA (COLUNA DIVERGÊNCIA COM FUNDO CINZA CLARO)
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -200,6 +200,10 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     fonte_negrito = Font(name="Arial", size=10, bold=True)
     fonte_cabecalho = Font(name="Arial", size=10, bold=True, color="FFFFFF")
     fill_cabecalho = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    
+    # Preenchimento cinza claro para a coluna Divergência
+    fill_cinza_claro = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+    
     borda_fina = Border(
         left=Side(style='thin', color='D3D3D3'), right=Side(style='thin', color='D3D3D3'),
         top=Side(style='thin', color='D3D3D3'), bottom=Side(style='thin', color='D3D3D3')
@@ -424,6 +428,11 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 if isinstance(cell.value, (int, float)):
                     cell.number_format = '0'
             
+            # Aplica fundo cinza claro especificamente na coluna 5 (DIVERGÊNCIA)
+            if cell.column == 5:
+                cell.fill = fill_cinza_claro
+                cell.font = Font(name="Arial", size=10, bold=True)
+            
             if cell.column in [1, 3, 4, 5]:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             elif cell.column == 2:
@@ -448,7 +457,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
 
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (TÍTULOS OTIMIZADOS E LARGURAS AMPLIADAS)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -581,7 +590,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    # Cabeçalho compactado e otimizado com tamanho de fonte ideal para caber perfeitamente na horizontal
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.0, leading=6, textColor=colors.white, alignment=1)
     estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor('#111827'), alignment=1)
@@ -591,7 +599,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
     story.append(Spacer(1, 3))
     
-    # Títulos abreviados e otimizados sem perder o significado para garantir que fiquem 100% em uma linha
     headers_pdf = ["Código", "Descrição", "EST.", "COMP.", "DIVERG."]
     for i in range(1, max_locais_encontrados + 1):
         headers_pdf.append(str(i) if i > 1 else "C.1")
@@ -632,7 +639,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         
     largura_util = 792 - 44
     
-    # Redimensionamento de larguras: mais espaço para as colunas EST, COMP e DIVERG
     largura_codigo = 52
     largura_desc = 150
     largura_est = 26
@@ -649,6 +655,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
     tabela_pdf.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+        ('BACKGROUND', (4, 1), (4, -1), colors.HexColor('#D9D9D9')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 2.0),
