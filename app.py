@@ -188,7 +188,7 @@ def limpar_nome_local(val):
 
 
 # ====================================================================================
-# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM TIMBRE EXECUTIVO SUPERIOR (BRASÃO NO TOPO)
+# GERADOR DO BLOCO 2: PLANILHA DE CONFERÊNCIA COM APENAS O BRASÃO NO TOPO
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -339,44 +339,39 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.oddFooter.right.text = "Página &P de &N"
 
     # ====================================================================================
-    # TIMBRE EXECUTIVO SUPERIOR (INSERÇÃO DO BRASÃO OFICIAL NO TOPO DA FOLHA)
+    # APENAS O BRASÃO OFICIAL NO TOPO DA FOLHA (SEM TEXTOS ADICIONAIS)
     # ====================================================================================
     caminho_brasao_timbre = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
     if caminho_brasao_timbre:
         try:
             img_timbre = OpenpyxlImage(caminho_brasao_timbre)
-            img_timbre.width = 130
-            img_timbre.height = 48
-            # Posiciona o brasão de forma imponente na célula A1 (cabeçalho da folha impressa)
+            img_timbre.width = 110
+            img_timbre.height = 42
+            # Posiciona o brasão de forma limpa na célula A1
             ws_saldo.add_image(img_timbre, 'A1')
         except Exception:
             pass
 
-    # Título corporativo ao lado do brasão no topo
-    ws_saldo['C1'] = "GRUPO KMB // RELATÓRIO DE INVENTÁRIO & CONFERÊNCIA"
-    ws_saldo['C1'].font = Font(name="Arial", size=12, bold=True, color="1F4E78")
-    ws_saldo['C1'].alignment = Alignment(horizontal="left", vertical="center")
-
-    # Posicionamento rigoroso e limpo dos dados do topo (Data e Loja) nas colunas E e F
-    ws_saldo['E1'] = "DATA:"
-    ws_saldo['E1'].font = fonte_negrito
+    # Posicionamento rigoroso e limpo dos dados do topo (Data e Loja) nas colunas D e E
+    ws_saldo['D1'] = "DATA:"
+    ws_saldo['D1'].font = fonte_negrito
+    ws_saldo['D1'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_saldo['D1'].border = borda_destaque
+    
+    ws_saldo['E1'] = pd.Timestamp.now().strftime('%d/%m/%Y')
+    ws_saldo['E1'].font = fonte_padrao
     ws_saldo['E1'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E1'].border = borda_destaque
     
-    ws_saldo['F1'] = pd.Timestamp.now().strftime('%d/%m/%Y')
-    ws_saldo['F1'].font = fonte_padrao
-    ws_saldo['F1'].alignment = Alignment(horizontal="center", vertical="center")
-    ws_saldo['F1'].border = borda_destaque
+    ws_saldo['D2'] = "LOJA:"
+    ws_saldo['D2'].font = fonte_negrito
+    ws_saldo['D2'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_saldo['D2'].border = borda_destaque
     
-    ws_saldo['E2'] = "LOJA:"
+    ws_saldo['E2'] = int(numero_loja_input)
     ws_saldo['E2'].font = fonte_negrito
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
-    
-    ws_saldo['F2'] = int(numero_loja_input)
-    ws_saldo['F2'].font = fonte_negrito
-    ws_saldo['F2'].alignment = Alignment(horizontal="center", vertical="center")
-    ws_saldo['F2'].border = borda_destaque
     
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
@@ -384,12 +379,11 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     for i in range(1, max_locais_encontrados + 1):
         headers_saldo.append(f"Local {i}" if i == 1 else str(i))
         
-    # Deixa as linhas 1 e 2 com altura corporativa elegante e inicia a tabela na linha 4
-    ws_saldo.row_dimensions[1].height = 25
+    # Deixa as linhas superiores ajustadas e inicia a tabela na linha 4
+    ws_saldo.row_dimensions[1].height = 24
     ws_saldo.row_dimensions[2].height = 20
     ws_saldo.row_dimensions[3].height = 10
     
-    # Inserção manual dos cabeçalhos da tabela na linha 4 para garantir o timbre perfeito no topo
     ws_saldo.row_dimensions[4].height = 22
     for col_idx, h_text in enumerate(headers_saldo, start=1):
         cell = ws_saldo.cell(row=4, column=col_idx, value=h_text)
@@ -783,7 +777,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ====================================================================
-    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO E TIMBRE SUPERIOR
+    # MODO 2: PLANILHA DE CONFERÊNCIA COM PRÉ-VISUALIZAÇÃO E APENAS O BRASÃO NO TOPO
     # ====================================================================
     if modo_operacao == "Modo Planilha de Conferência":
         st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
@@ -828,8 +822,8 @@ def main():
                 st.dataframe(df_preview_exibir, use_container_width=True, height=420)
                 
                 st.markdown("---")
-                st.markdown("### 📥 Listas de Conferência para Impressão com Timbre Superior")
-                st.caption("Configuradas com A4 Paisagem, largura blindada, brasão e título oficial no topo para todos os 4 botões.")
+                st.markdown("### 📥 Listas de Conferência para Impressão com Apenas o Brasão no Topo")
+                st.caption("Configuradas com A4 Paisagem, largura blindada e brasão oficial isolado no topo para todos os 4 botões.")
                 
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
