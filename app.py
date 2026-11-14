@@ -376,17 +376,17 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
-    # Coluna G sem rótulo fixo (retirado o texto anterior)
+    # Nome da Loja na coluna G
     ws_saldo['G2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!B:B,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!B:B,""))'
     ws_saldo['G2'].font = fonte_negrito
     ws_saldo['G2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['G2'].border = borda_destaque
     
-    # Colunas Q e R sem o nome "Cidade" (retirado o rótulo da célula Q2)
-    ws_saldo['R2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,""))'
-    ws_saldo['R2'].font = fonte_negrito
-    ws_saldo['R2'].alignment = Alignment(horizontal="center", vertical="center")
-    ws_saldo['R2'].border = borda_destaque
+    # Cidade ajustada CORRETAMENTE para a coluna Q (removida da coluna R)
+    ws_saldo['Q2'] = '=IF(_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,"")=0,"",_xlfn.XLOOKUP(E2,LOJA!A:A,LOJA!C:C,""))'
+    ws_saldo['Q2'].font = fonte_negrito
+    ws_saldo['Q2'].alignment = Alignment(horizontal="center", vertical="center")
+    ws_saldo['Q2'].border = borda_destaque
     
     headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
     for i in range(1, max_locais_encontrados + 1):
