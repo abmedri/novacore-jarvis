@@ -333,10 +333,10 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.page_setup.fitToWidth = 1
     ws_saldo.page_setup.fitToHeight = 0
     
-    # Rodapé de impressão unificado com texto e imagem inseridos de forma robusta
+    # Rodapé de impressão: Centro limpo (sem data) e Brasão miniaturizado alocado na direita via tag &G
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
-    ws_saldo.oddFooter.center.text = "Data: &D"
-    ws_saldo.oddFooter.right.text = "Página &P de &N"
+    ws_saldo.oddFooter.center.text = ""
+    ws_saldo.oddFooter.right.text = "Página &P de &N  &G"
     
     caminho_brasao_rodape = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
     if caminho_brasao_rodape:
@@ -356,7 +356,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
         except Exception:
             pass
 
-    # Posicionamento rigoroso das células de cabeçalho (D1:E2) para evitar vazamento para colunas distantes
+    # Posicionamento rigoroso e limpo dos dados do topo (Data e Loja) nas colunas D e E
     ws_saldo['D1'] = "DATA:"
     ws_saldo['D1'].font = fonte_negrito
     ws_saldo['D1'].alignment = Alignment(horizontal="center", vertical="center")
@@ -377,7 +377,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo['E2'].alignment = Alignment(horizontal="center", vertical="center")
     ws_saldo['E2'].border = borda_destaque
     
-    # Limpeza absoluta das células Q2 e R2 (para evitar qualquer texto ou número flutuando na impressão)
+    # Limpeza absoluta das células Q2 e R2 (evitando vazamento de células na impressão)
     ws_saldo['Q2'] = ""
     ws_saldo['R2'] = ""
     
@@ -441,7 +441,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Ajuste dinâmico e enxuto das larguras de coluna para evitar espaços vazios
+    # Ajuste dinâmico e enxuto das larguras de coluna
     for col in ws_saldo.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
