@@ -207,7 +207,7 @@ def limpar_nome_local(val):
     return s
 
 # ====================================================================================
-# GERADOR DO EXCEL DE CONFERÊNCIA
+# GERADOR DO EXCEL DE CONFERÊNCIA (COM LÓGICA CIRÚRGICA DE FILTROS)
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -268,6 +268,16 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 soma_comptar_val = soma_comptar_por_produto.get(cod, 0)
                 divergencia_val = soma_comptar_val - 0
                 itens_filtrados_temp.append((cod, desc_item, 0, True, soma_comptar_val, divergencia_val, locs))
+    elif tipo_filtro == "ZERADOS":
+        for idx, row in df_estoque.iterrows():
+            cod = str(row.get(col_cod_est, '')).strip()
+            if cod not in locais_por_produto:
+                desc = row.get(col_desc_est, '')
+                try:
+                    est = int(float(row.get(col_est, 0)))
+                except Exception:
+                    est = 0
+                itens_filtrados_temp.append((cod, desc, est, False, 0, -est, []))
     else:
         for idx, row in df_estoque.iterrows():
             cod = str(row.get(col_cod_est, '')).strip()
@@ -285,9 +295,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             incluir = False
             if tipo_filtro == "TODOS":
                 incluir = True
-            elif tipo_filtro == "ZERADOS":
-                if not tem_na_comptar:
-                    incluir = True
             elif tipo_filtro == "FALTAS":
                 if tem_na_comptar and divergencia_val < 0:
                     incluir = True
@@ -297,10 +304,12 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                     
             if incluir:
                 itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
+                
     itens_filtrados_temp.sort(key=lambda x: str(x[1]).strip().upper())
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
-    nome_aba = "Itens Sem Saldo" if tipo_filtro == "SEM_SALDO" else "Saldo Loja"
+    
+    nome_aba = "Itens Sem Saldo" if tipo_filtro == "SEM_SALDO" else ("Zerados" if tipo_filtro == "ZERADOS" else "Saldo Loja")
     ws_saldo = wb.active
     ws_saldo.title = nome_aba
     ws_saldo.views.sheetView[0].showGridLines = True
@@ -321,6 +330,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
     ws_saldo.oddFooter.center.text = "Exatidão • Controle • Eficiência"
     ws_saldo.oddFooter.right.text = "Página &P de &N"
+    
     caminho_brasao_timbre = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
     if caminho_brasao_timbre:
         try:
@@ -330,6 +340,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
             ws_saldo.add_image(img_timbre, 'A1')
         except Exception:
             pass
+            
     ws_saldo['D1'] = "DATA:"
     ws_saldo['D1'].font = fonte_negrito
     ws_saldo['D1'].alignment = Alignment(horizontal="center", vertical="center")
@@ -398,7 +409,10 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                     
             locais_vals = [limpar_nome_local(locs_prod[i][0]) if i < len(locs_prod) else "" for i in range(max_locais_encontrados)]
         else:
-            contagens_vals = ["0 - Comptar"] + [""] * (max_locais_encontrados - 1)
+            if tipo_filtro == "ZERADOS":
+                contagens_vals = ["0 - Comptar"] + [""] * (max_locais_encontrados - 1)
+            else:
+                contagens_vals = ["0"] + [""] * (max_locais_encontrados - 1)
             locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
             
         linha_dados.extend(contagens_vals)
@@ -427,6 +441,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 cell.alignment = Alignment(horizontal="left", vertical="center")
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
+                
     for col in ws_saldo.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
@@ -436,13 +451,14 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
                 if not val_str.startswith("="):
                     max_len = max(max_len, len(val_str))
         ws_saldo.column_dimensions[col_letter].width = max(max_len + 2, 7)
+        
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
     return buffer
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (CORRIGIDO)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM LÓGICA CIRÚRGICA DE FILTROS)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -521,8 +537,18 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
             if cod not in codigos_estoque_set:
                 desc_item = descricoes_comptar.get(cod, "Item Avulso / Sem Cadastro")
                 soma_comptar_val = soma_comptar_por_produto.get(cod, 0)
-                divergencia_val = soma_comptar_val - 0  # CORRIGIDO: Contagem menos estoque zero
+                divergencia_val = soma_comptar_val - 0
                 itens_filtrados_temp.append((cod, desc_item, 0, True, soma_comptar_val, divergencia_val, locs))
+    elif tipo_filtro == "ZERADOS":
+        for idx, row in df_estoque.iterrows():
+            cod = str(row.get(col_cod_est, '')).strip()
+            if cod not in locais_por_produto:
+                desc = str(row.get(col_desc_est, ''))
+                try:
+                    est = int(float(row.get(col_est, 0)))
+                except Exception:
+                    est = 0
+                itens_filtrados_temp.append((cod, desc, est, False, 0, -est, []))
     else:
         for idx, row in df_estoque.iterrows():
             cod = str(row.get(col_cod_est, '')).strip()
@@ -540,9 +566,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
             incluir = False
             if tipo_filtro == "TODOS":
                 incluir = True
-            elif tipo_filtro == "ZERADOS":
-                if not tem_na_comptar:
-                    incluir = True
             elif tipo_filtro == "FALTAS":
                 if tem_na_comptar and divergencia_val < 0:
                     incluir = True
@@ -552,11 +575,12 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
                     
             if incluir:
                 itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
+                
     itens_filtrados_temp.sort(key=lambda x: str(x[1]).strip().upper())
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
-    buffer = io.BytesIO()
     
+    buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(letter),
@@ -588,7 +612,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     
     for cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod in itens_filtrados_temp:
         cel_comptar = soma_comptar_val if tem_na_comptar else 0
-        cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)  # CORRIGIDO: 0 menos estoque se não houver contagem
+        cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
         
         cod_formatado = str(cod).strip().replace(" ", "&nbsp;")
         
@@ -617,7 +641,10 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
                 else:
                     locais_vals.append(Paragraph("", estilo_td_centro))
         else:
-            contagens_vals = [Paragraph("<nobr>0</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
+            if tipo_filtro == "ZERADOS":
+                contagens_vals = [Paragraph("<nobr>0&nbsp;-&nbsp;Comptar</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
+            else:
+                contagens_vals = [Paragraph("<nobr>0</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
             locais_vals = [Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
             
         linha_celulas.extend(contagens_vals)
@@ -1266,7 +1293,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
 def main():
     st.set_page_config(page_title="GRUPO KMB // TIME DE INVENTÁRIO", page_icon="⚡", layout="wide")
     
-    # Segurança protegida via st.secrets com fallback seguro local
     SENHA_MESTRE = st.secrets.get("SENHA_MESTRE", "novacore2026")
     
     if "autenticado" not in st.session_state:
@@ -1410,6 +1436,7 @@ def main():
                 with c_imp4:
                     buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SEM_SALDO")
                     st.download_button("📥 Baixar Excel (Sem Saldo)", data=buf_sem_saldo, file_name=f"Excel_SemSaldo_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                    
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
                 st.markdown("### 📄 2. Listas de Conferência em PDF (Títulos Otimizados sem Quebras + Brasão)")
