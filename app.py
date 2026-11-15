@@ -17,6 +17,8 @@ from docx.shared import Inches, Pt, RGBColor
 from pptx import Presentation
 from pptx.util import Inches as PptxInches, Pt as PptxPt
 from pptx.dml.color import RGBColor as PptxRGBColor
+from pptx.enum.text import PP_ALIGN
+from pptx.enum.shapes import MSO_SHAPE
 # ReportLab para PDFs profissionais com rodapé gráfico personalizado
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
@@ -984,60 +986,276 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
 def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
     prs = Presentation()
-    
-    # Slide 1: Capa Executiva
     slide_layout = prs.slide_layouts[6] # em branco
+    
+    # ----------------------------------------------------
+    # SLIDE 1: CAPA EXECUTIVA MODERNA
+    # ----------------------------------------------------
     slide1 = prs.slides.add_slide(slide_layout)
-    tb1 = slide1.shapes.add_textbox(PptxInches(1), PptxInches(1.5), PptxInches(11.3), PptxInches(4))
+    bg1 = slide1.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
+    bg1.fill.solid()
+    bg1.fill.fore_color.rgb = PptxRGBColor(11, 15, 25) # #0b0f19
+    bg1.line.fill.background()
+    
+    tb1 = slide1.shapes.add_textbox(PptxInches(1), PptxInches(1.8), PptxInches(11.3), PptxInches(4))
     tf1 = tb1.text_frame
     tf1.word_wrap = True
+    
     p1 = tf1.paragraphs[0]
     p1.text = "⚡ GRUPO KMB // DIRETORIA EXECUTIVA"
-    p1.font.size = PptxPt(28)
+    p1.font.size = PptxPt(32)
     p1.font.bold = True
-    p1.font.color.rgb = PptxRGBColor(31, 78, 120)
+    p1.font.color.rgb = PptxRGBColor(0, 242, 254)
+    p1.alignment = PP_ALIGN.CENTER
     
     p2 = tf1.add_paragraph()
     p2.text = "Relatório Executivo de Auditoria Patrimonial & Indicadores"
-    p2.font.size = PptxPt(18)
-    p2.font.color.rgb = PptxRGBColor(15, 23, 42)
-    p2.space_before = PptxPt(10)
+    p2.font.size = PptxPt(20)
+    p2.font.color.rgb = PptxRGBColor(243, 244, 246)
+    p2.space_before = PptxPt(12)
+    p2.alignment = PP_ALIGN.CENTER
     
     p3 = tf1.add_paragraph()
     p3.text = f"Data de Emissão: {pd.Timestamp.now().strftime('%d/%m/%Y')} | Protocolo J.A.R.V.I.S."
-    p3.font.size = PptxPt(12)
-    p3.font.color.rgb = PptxRGBColor(100, 116, 139)
-    p3.space_before = PptxPt(20)
+    p3.font.size = PptxPt(13)
+    p3.font.color.rgb = PptxRGBColor(156, 163, 175)
+    p3.space_before = PptxPt(25)
+    p3.alignment = PP_ALIGN.CENTER
 
-    # Slide 2: Indicadores Consolidados por Unidade
     for r in resumos:
+        # ----------------------------------------------------
+        # SLIDE 2: RESUMO EXECUTIVO CONSOLIDADO
+        # ----------------------------------------------------
         slide2 = prs.slides.add_slide(slide_layout)
-        tb2 = slide2.shapes.add_textbox(PptxInches(0.8), PptxInches(0.8), PptxInches(11.5), PptxInches(5.5))
-        tf2 = tb2.text_frame
-        tf2.word_wrap = True
+        tb_head2 = slide2.shapes.add_textbox(PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8))
+        tf_head2 = tb_head2.text_frame
+        p_h2 = tf_head2.paragraphs[0]
+        p_h2.text = f"📋 Resumo Executivo // {r['nome']}"
+        p_h2.font.size = PptxPt(22)
+        p_h2.font.bold = True
+        p_h2.font.color.rgb = PptxRGBColor(31, 78, 120)
         
-        hp = tf2.paragraphs[0]
-        hp.text = f"📊 Unidade / Arquivo: {r['nome']}"
-        hp.font.size = PptxPt(20)
-        hp.font.bold = True
-        hp.font.color.rgb = PptxRGBColor(31, 78, 120)
+        card_res = slide2.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, PptxInches(0.8), PptxInches(1.5), PptxInches(11.2), PptxInches(5.0))
+        card_res.fill.solid()
+        card_res.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
+        card_res.line.color.rgb = PptxRGBColor(203, 213, 225)
         
-        linhas_slide = [
-            f"• Total de SKUs Auditados: {r['total_skus']:,} (Pré: {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un)",
-            f"• Produtos com Falta: {r['skus_falta']:,} SKUs ({r['perc_falta_itens']:.2f}%) | Vol: -{r['vol_falta']:,.0f} un | R$ {r['val_falta']:,.2f}",
-            f"• Produtos com Sobra: {r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%) | Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}",
-            f"• Volume Físico Total de Divergências: {r['vol_div_total']:,.0f} un ({r['perc_vol_div']:.2f}%) | R$ {r['val_div_absoluto']:,.2f}",
-            f"• Valor Teórico Inicial (Antes): R$ {r['soma_antes']:,.2f} | Auditado Final (Depois): R$ {r['soma_depois']:,.2f}",
-            f"• Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f} (Impacto Geral: {r['impacto_sobre_antes_pct']:.2f}%)",
-            f"• Acurácia Volumétrica: {r['acuracia_vol']:.2f}% | Acurácia Financeira: {r['acuracia_fin']:.2f}%"
-        ]
+        tf_res = card_res.text_frame
+        tf_res.word_wrap = True
+        tf_res.margin_left = PptxInches(0.5)
+        tf_res.margin_top = PptxInches(0.4)
         
-        for linha in linhas_slide:
-            p_l = tf2.add_paragraph()
-            p_l.text = linha
-            p_l.font.size = PptxPt(13)
-            p_l.font.color.rgb = PptxRGBColor(51, 65, 85)
-            p_l.space_before = PptxPt(8)
+        p_rt = tf_res.paragraphs[0]
+        p_rt.text = "🎯 Visão Geral de Governança Patrimonial"
+        p_rt.font.size = PptxPt(16)
+        p_rt.font.bold = True
+        p_rt.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        for l in [
+            f"• Total de SKUs Auditados: {r['total_skus']:,} itens",
+            f"• Acuracidade Volumétrica: {r['acuracia_vol']:.2f}% (Meta Corporativa: 97.00%)",
+            f"• Acuracidade Financeira: {r['acuracia_fin']:.2f}%",
+            f"• Valor Teórico Inicial (Antes): R$ {r['soma_antes']:,.2f}",
+            f"• Valor Auditado Final (Depois): R$ {r['soma_depois']:,.2f}",
+            f"• Ajuste Líquido Consolidado: R$ {r['val_ajuste_liquido']:,.2f} ({r['impacto_sobre_antes_pct']:.2f}%)"
+        ]:
+            pl = tf_res.add_paragraph()
+            pl.text = l
+            pl.font.size = PptxPt(14)
+            pl.font.color.rgb = PptxRGBColor(51, 65, 85)
+            pl.space_before = PptxPt(12)
+
+        # ----------------------------------------------------
+        # SLIDE 3: INDICADORES DE SKUS & VOLUMETRIA
+        # ----------------------------------------------------
+        slide3 = prs.slides.add_slide(slide_layout)
+        tb_head3 = slide3.shapes.add_textbox(PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8))
+        tf_head3 = tb_head3.text_frame
+        p_h3 = tf_head3.paragraphs[0]
+        p_h3.text = f"📊 Indicadores de SKUs & Volumetria // {r['nome']}"
+        p_h3.font.size = PptxPt(22)
+        p_h3.font.bold = True
+        p_h3.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        card3_l = slide3.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, PptxInches(0.8), PptxInches(1.5), PptxInches(5.4), PptxInches(5.0))
+        card3_l.fill.solid()
+        card3_l.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
+        card3_l.line.color.rgb = PptxRGBColor(203, 213, 225)
+        
+        tf3_l = card3_l.text_frame
+        tf3_l.word_wrap = True
+        tf3_l.margin_left = PptxInches(0.4)
+        tf3_l.margin_top = PptxInches(0.4)
+        
+        p3lt = tf3_l.paragraphs[0]
+        p3lt.text = "📦 Composição de SKUs"
+        p3lt.font.size = PptxPt(15)
+        p3lt.font.bold = True
+        p3lt.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        for it in [
+            f"• Total SKUs: {r['total_skus']:,}",
+            f"• Produtos com Falta: {r['skus_falta']:,} ({r['perc_falta_itens']:.2f}%)",
+            f"• Produtos com Sobra: {r['skus_sobra']:,} ({r['perc_sobra_itens']:.2f}%)",
+            f"• SKUs Exatos/Conformes: {r['skus_exatos']:,}"
+        ]:
+            pt = tf3_l.add_paragraph()
+            pt.text = it
+            pt.font.size = PptxPt(13)
+            pt.font.color.rgb = PptxRGBColor(51, 65, 85)
+            pt.space_before = PptxPt(10)
+
+        card3_r = slide3.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, PptxInches(6.6), PptxInches(1.5), PptxInches(5.4), PptxInches(5.0))
+        card3_r.fill.solid()
+        card3_r.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
+        card3_r.line.color.rgb = PptxRGBColor(203, 213, 225)
+        
+        tf3_r = card3_r.text_frame
+        tf3_r.word_wrap = True
+        tf3_r.margin_left = PptxInches(0.4)
+        tf3_r.margin_top = PptxInches(0.4)
+        
+        p3rt = tf3_r.paragraphs[0]
+        p3rt.text = "⚖️ Volume Físico Absoluto"
+        p3rt.font.size = PptxPt(15)
+        p3rt.font.bold = True
+        p3rt.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        for it in [
+            f"• Quantidade Antes (Pré): {r['qtd_antes']:,.0f} un",
+            f"• Quantidade Depois (Pós): {r['qtd_pos']:,.0f} un",
+            f"• Volume Total Divergência: {r['vol_div_total']:,.0f} un",
+            f"• Percentual de Volume Div.: {r['perc_vol_div']:.2f}%"
+        ]:
+            pt = tf3_r.add_paragraph()
+            pt.text = it
+            pt.font.size = PptxPt(13)
+            pt.font.color.rgb = PptxRGBColor(51, 65, 85)
+            pt.space_before = PptxPt(10)
+
+        # ----------------------------------------------------
+        # SLIDE 4: BALANÇO PATRIMONIAL & IMPACTO
+        # ----------------------------------------------------
+        slide4 = prs.slides.add_slide(slide_layout)
+        tb_head4 = slide4.shapes.add_textbox(PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8))
+        tf_head4 = tb_head4.text_frame
+        p_h4 = tf_head4.paragraphs[0]
+        p_h4.text = f"💰 Balanço Patrimonial & Impacto // {r['nome']}"
+        p_h4.font.size = PptxPt(22)
+        p_h4.font.bold = True
+        p_h4.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        card4 = slide4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, PptxInches(0.8), PptxInches(1.5), PptxInches(11.2), PptxInches(5.0))
+        card4.fill.solid()
+        card4.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
+        card4.line.color.rgb = PptxRGBColor(203, 213, 225)
+        
+        tf4 = card4.text_frame
+        tf4.word_wrap = True
+        tf4.margin_left = PptxInches(0.5)
+        tf4.margin_top = PptxInches(0.4)
+        
+        p4t = tf4.paragraphs[0]
+        p4t.text = "📈 Demonstração Financeira Consolidada"
+        p4t.font.size = PptxPt(16)
+        p4t.font.bold = True
+        p4t.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        for it in [
+            f"• Estoque Teórico (Antes): R$ {r['soma_antes']:,.2f}",
+            f"• Estoque Físico Auditado (Depois): R$ {r['soma_depois']:,.2f}",
+            f"• Ajuste Líquido Financeiro: R$ {r['val_ajuste_liquido']:,.2f}",
+            f"• Impacto Geral sobre o Saldo: {r['impacto_sobre_antes_pct']:.2f}%",
+            f"• Total em Faltas (Quebras): R$ {r['val_falta']:,.2f}",
+            f"• Total em Sobras: R$ +{r['val_sobra']:,.2f}"
+        ]:
+            pt = tf4.add_paragraph()
+            pt.text = it
+            pt.font.size = PptxPt(13.5)
+            pt.font.color.rgb = PptxRGBColor(51, 65, 85)
+            pt.space_before = PptxPt(10)
+
+        # ----------------------------------------------------
+        # SLIDE 5: ANÁLISE DE CRITICIDADE E QUEBRAS
+        # ----------------------------------------------------
+        slide5 = prs.slides.add_slide(slide_layout)
+        tb_head5 = slide5.shapes.add_textbox(PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8))
+        tf_head5 = tb_head5.text_frame
+        p_h5 = tf_head5.paragraphs[0]
+        p_h5.text = f"🚨 Análise de Criticidade & Desvios // {r['nome']}"
+        p_h5.font.size = PptxPt(22)
+        p_h5.font.bold = True
+        p_h5.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        card5 = slide5.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, PptxInches(0.8), PptxInches(1.5), PptxInches(11.2), PptxInches(5.0))
+        card5.fill.solid()
+        card5.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
+        card5.line.color.rgb = PptxRGBColor(203, 213, 225)
+        
+        tf5 = card5.text_frame
+        tf5.word_wrap = True
+        tf5.margin_left = PptxInches(0.5)
+        tf5.margin_top = PptxInches(0.4)
+        
+        p5t = tf5.paragraphs[0]
+        p5t.text = "⚠️ Diagnóstico Operacional C-Level"
+        p5t.font.size = PptxPt(16)
+        p5t.font.bold = True
+        p5t.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        for it in [
+            f"• SKUs com Quebra Crítica (Falta): {r['skus_falta']:,} produtos",
+            f"• Volume Financeiro de Faltas: R$ {r['val_falta']:,.2f}",
+            f"• SKUs com Sobra Operacional: {r['skus_sobra']:,} produtos",
+            f"• Volume Financeiro de Sobras: R$ +{r['val_sobra']:,.2f}",
+            "• Recomendação: Atuação imediata nas linhas de maior desvio apontadas na Etapa 5."
+        ]:
+            pt = tf5.add_paragraph()
+            pt.text = it
+            pt.font.size = PptxPt(13.5)
+            pt.font.color.rgb = PptxRGBColor(51, 65, 85)
+            pt.space_before = PptxPt(12)
+
+        # ----------------------------------------------------
+        # SLIDE 6: PLANO DE AÇÃO C-LEVEL & GOVERNANÇA
+        # ----------------------------------------------------
+        slide6 = prs.slides.add_slide(slide_layout)
+        tb_head6 = slide6.shapes.add_textbox(PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8))
+        tf_head6 = tb_head6.text_frame
+        p_h6 = tf_head6.paragraphs[0]
+        p_h6.text = f"🎯 Plano de Ação C-Level & Governança // {r['nome']}"
+        p_h6.font.size = PptxPt(22)
+        p_h6.font.bold = True
+        p_h6.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        card6 = slide6.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, PptxInches(0.8), PptxInches(1.5), PptxInches(11.2), PptxInches(5.0))
+        card6.fill.solid()
+        card6.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
+        card6.line.color.rgb = PptxRGBColor(203, 213, 225)
+        
+        tf6 = card6.text_frame
+        tf6.word_wrap = True
+        tf6.margin_left = PptxInches(0.5)
+        tf6.margin_top = PptxInches(0.4)
+        
+        p6t = tf6.paragraphs[0]
+        p6t.text = "🛡️ Validação & Diretrizes Estratégicas"
+        p6t.font.size = PptxPt(16)
+        p6t.font.bold = True
+        p6t.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        for it in [
+            "1. Auditoria Eletrônica Validada via Protocolo J.A.R.V.I.S. / Grupo KMB.",
+            "2. Homologação dos ajustes e baixa contábil das quebras críticas identificadas.",
+            "3. Implantação de rondas preventivas nos setores com maior índice de divergência.",
+            "____________________________________________________",
+            "Time de Inventário / Auditoria C-Level • Exatidão • Controle • Eficiência"
+        ]:
+            pt = tf6.add_paragraph()
+            pt.text = it
+            pt.font.size = PptxPt(13)
+            pt.font.color.rgb = PptxRGBColor(51, 65, 85)
+            pt.space_before = PptxPt(10)
 
     buffer = io.BytesIO()
     prs.save(buffer)
