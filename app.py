@@ -207,7 +207,7 @@ def limpar_nome_local(val):
     return s
 
 # ====================================================================================
-# GERADOR DO EXCEL DE CONFERÊNCIA (COM LÓGICA CIRÚRGICA DE FILTROS)
+# GERADOR DO EXCEL DE CONFERÊNCIA
 # ====================================================================================
 def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
@@ -666,9 +666,17 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     col_widths = [largura_codigo, largura_desc, largura_est, largura_comp, largura_div] + [largura_outras] * colunas_restantes
     
     tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
+    
+    # Índices dinâmicos para a estilização das colunas especiais (Divergência, C.1 e Loc.1)
+    idx_col_divergencia = 4
+    idx_col_c1 = 5
+    idx_col_loc1 = 5 + max_locais_encontrados
+    
     tabela_pdf.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
-        ('BACKGROUND', (4, 1), (4, -1), colors.HexColor('#D9D9D9')),
+        ('BACKGROUND', (idx_col_divergencia, 1), (idx_col_divergencia, -1), colors.HexColor('#D9D9D9')),
+        ('BACKGROUND', (idx_col_c1, 1), (idx_col_c1, -1), colors.HexColor('#F1F5F9')),
+        ('BACKGROUND', (idx_col_loc1, 1), (idx_col_loc1, -1), colors.HexColor('#F1F5F9')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
