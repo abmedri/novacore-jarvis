@@ -1,5 +1,5 @@
 # ====================================================================================
-# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO OFICIAL UNIFICADA COMPLETA)
+# ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO OFICIAL UNIFICADA COMPLETA - CORRIGIDA)
 # ====================================================================================
 import os
 import io
@@ -442,7 +442,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     return buffer
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM NEGRITO EM CONTAGENS E LOCAIS)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (CORRIGIDO)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -497,9 +497,9 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     for _, row in df_localizacao.iterrows():
         loc = limpar_nome_local(row.get(col_loc, ''))
         cod = str(row.get(col_cod_loc, '')).strip()
-        desc = str(row.get(col_desc_loc, '')).strip().replace('\n', ' ')
+        desc = str(row.get(col_desc_loc, '')).strip()
         try:
-            qtd = float(str(row.get(col_qtd_loc, 0)).replace(',', '.'))
+            qtd = int(float(row.get(col_qtd_loc, 0)))
         except Exception:
             qtd = 0
             
@@ -519,17 +519,18 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     if tipo_filtro == "SEM_SALDO":
         for cod, locs in locais_por_produto.items():
             if cod not in codigos_estoque_set:
-                desc_item = descricoes_comptar.get(cod, "Item Avulso / Sem Cadastro").replace('\n', ' ')
+                desc_item = descricoes_comptar.get(cod, "Item Avulso / Sem Cadastro")
                 soma_comptar_val = soma_comptar_por_produto.get(cod, 0)
-                itens_filtrados_temp.append((cod, desc_item, 0, True, soma_comptar_val, soma_comptar_val, locs))
+                divergencia_val = soma_comptar_val - 0  # CORRIGIDO: Contagem menos estoque zero
+                itens_filtrados_temp.append((cod, desc_item, 0, True, soma_comptar_val, divergencia_val, locs))
     else:
         for idx, row in df_estoque.iterrows():
             cod = str(row.get(col_cod_est, '')).strip()
-            desc = str(row.get(col_desc_est, '')).strip().replace('\n', ' ')
+            desc = str(row.get(col_desc_est, ''))
             try:
-                est = float(str(row.get(col_est, 0)).replace('.', '').replace(',', '.'))
+                est = int(float(row.get(col_est, 0)))
             except Exception:
-                est = 0.0
+                est = 0
             
             locs_prod = locais_por_produto.get(cod, [])
             tem_na_comptar = len(locs_prod) > 0
@@ -551,7 +552,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
                     
             if incluir:
                 itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
-                
     itens_filtrados_temp.sort(key=lambda x: str(x[1]).strip().upper())
     locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
     max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
@@ -560,50 +560,42 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(letter),
-        rightMargin=8,
-        leftMargin=8,
-        topMargin=15,
-        bottomMargin=25
+        rightMargin=22,
+        leftMargin=22,
+        topMargin=20,
+        bottomMargin=30
     )
     
     styles = getSampleStyleSheet()
-    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=8.5, textColor=colors.HexColor('#1F4E78'))
-    estilo_th = ParagraphStyle('TH_Auto', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=5.5, leading=6.5, textColor=colors.white, alignment=1)
-    estilo_td_codigo = ParagraphStyle('TD_Codigo', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_centro = ParagraphStyle('TD_Centro', parent=styles['Normal'], fontName='Helvetica', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_esq = ParagraphStyle('TD_Esq', parent=styles['Normal'], fontName='Helvetica', fontSize=6.0, leading=7.5, textColor=colors.HexColor('#111827'), alignment=0)
+    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    # Estilos específicos em NEGRITO com blindagem <nobr> para as colunas de contagem e locais
-    estilo_td_contagem_negrito = ParagraphStyle('TD_ContNegrito', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_local_negrito = ParagraphStyle('TD_LocNegrito', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=6.5, leading=8, textColor=colors.HexColor('#111827'), alignment=1)
+    estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=6.0, leading=7, textColor=colors.white, alignment=1)
+    estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=7.5, leading=9, textColor=colors.HexColor('#111827'), alignment=1)
+    estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=7.5, leading=9, textColor=colors.HexColor('#111827'), alignment=1)
+    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=8.0, leading=10, textColor=colors.HexColor('#111827'), alignment=0)
     
     story = []
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
-    story.append(Spacer(1, 2))
+    story.append(Spacer(1, 3))
     
     headers_pdf = ["Código", "Descrição", "EST.", "COMP.", "DIVERG."]
     for i in range(1, max_locais_encontrados + 1):
-        headers_pdf.append(f"C.{int(i)}" if i == 1 else str(int(i)))
+        headers_pdf.append("C.1" if i == 1 else str(int(i)))
     for i in range(1, max_locais_encontrados + 1):
         headers_pdf.append(f"Loc.{int(i)}" if i == 1 else str(int(i)))
         
     dados_tabela = [[Paragraph(f"<nobr>{str(h).strip().replace('.0', '').replace(' ', '&nbsp;')}</nobr>", estilo_th) for h in headers_pdf]]
     
     for cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod in itens_filtrados_temp:
-        cel_comptar = int(soma_comptar_val) if isinstance(soma_comptar_val, (int, float)) and float(soma_comptar_val).is_integer() else soma_comptar_val
-        cel_divergencia = int(divergencia_val) if isinstance(divergencia_val, (int, float)) and float(divergencia_val).is_integer() else divergencia_val
-        est_val = int(est) if isinstance(est, (int, float)) and float(est).is_integer() else est
-        cod_formatado = str(cod).strip().replace(" ", "&nbsp;")
+        cel_comptar = soma_comptar_val if tem_na_comptar else 0
+        cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)  # CORRIGIDO: 0 menos estoque se não houver contagem
         
-        desc_limpa = str(desc).strip()
-        if len(desc_limpa) > 34:
-            desc_limpa = desc_limpa[:32] + "..."
-        desc_formatada = f"<nobr>{desc_limpa.replace(' ', '&nbsp;')}</nobr>"
+        cod_formatado = str(cod).strip().replace(" ", "&nbsp;")
         
         linha_celulas = [
             Paragraph(f"<nobr>{cod_formatado}</nobr>", estilo_td_codigo),
-            Paragraph(desc_formatada, estilo_td_esq),
-            Paragraph(f"<nobr>{est_val}</nobr>", estilo_td_centro),
+            Paragraph(str(desc), estilo_td_esq),
+            Paragraph(f"<nobr>{est}</nobr>", estilo_td_centro),
             Paragraph(f"<nobr>{cel_comptar}</nobr>", estilo_td_centro),
             Paragraph(f"<nobr>{cel_divergencia}</nobr>", estilo_td_centro)
         ]
@@ -612,40 +604,37 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
             contagens_vals = []
             for i in range(max_locais_encontrados):
                 if i < len(locs_prod):
-                    val_raw = locs_prod[i][1]
-                    val_contagem = int(val_raw) if isinstance(val_raw, (int, float)) and float(val_raw).is_integer() else val_raw
-                    contagens_vals.append(Paragraph(f"<nobr><b>{val_contagem}</b></nobr>", estilo_td_contagem_negrito))
+                    contagens_vals.append(Paragraph(f"<nobr>{int(float(locs_prod[i][1]))}</nobr>", estilo_td_centro))
                 else:
-                    contagens_vals.append(Paragraph("", estilo_td_contagem_negrito))
+                    contagens_vals.append(Paragraph("", estilo_td_centro))
             
             locais_vals = []
             for i in range(max_locais_encontrados):
                 if i < len(locs_prod):
                     nome_loc_original = str(limpar_nome_local(locs_prod[i][0]))
-                    nome_loc_seguro = nome_loc_original.replace('.', '.').replace(' ', '&nbsp;')
-                    locais_vals.append(Paragraph(f"<nobr><b>{nome_loc_seguro}</b></nobr>", estilo_td_local_negrito))
+                    nome_loc_seguro = nome_loc_original.replace('.', '&#46;').replace(' ', '&nbsp;')
+                    locais_vals.append(Paragraph(f"<nobr>{nome_loc_seguro}</nobr>", estilo_td_centro))
                 else:
-                    locais_vals.append(Paragraph("", estilo_td_local_negrito))
+                    locais_vals.append(Paragraph("", estilo_td_centro))
         else:
-            contagens_vals = [Paragraph("<nobr><b>0</b></nobr>", estilo_td_contagem_negrito)] + [Paragraph("", estilo_td_contagem_negrito)] * (max_locais_encontrados - 1)
-            locais_vals = [Paragraph("<nobr><b>Sem&nbsp;local</b></nobr>", estilo_td_local_negrito)] + [Paragraph("", estilo_td_local_negrito)] * (max_locais_encontrados - 1)
+            contagens_vals = [Paragraph("<nobr>0</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
+            locais_vals = [Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
             
         linha_celulas.extend(contagens_vals)
         linha_celulas.extend(locais_vals)
         dados_tabela.append(linha_celulas)
         
-    largura_util = 792 - 16
-    largura_codigo = 45
-    largura_desc = 130
-    largura_est = 26
-    largura_comp = 28
-    largura_div = 32
+    largura_util = 792 - 44
+    largura_codigo = 58
+    largura_desc = 120
+    largura_est = 24
+    largura_comp = 24
+    largura_div = 28
     largura_fixa_inicial = largura_codigo + largura_desc + largura_est + largura_comp + largura_div
     
     num_colunas = len(headers_pdf)
     colunas_restantes = num_colunas - 5
-    largura_util_dinamica = largura_util - largura_fixa_inicial
-    largura_outras = max(largura_util_dinamica / max(colunas_restantes, 1), 20)
+    largura_outras = max((largura_util - largura_fixa_inicial) / colunas_restantes, 24) if colunas_restantes > 0 else 22
     
     col_widths = [largura_codigo, largura_desc, largura_est, largura_comp, largura_div] + [largura_outras] * colunas_restantes
     
@@ -655,8 +644,8 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         ('BACKGROUND', (4, 1), (4, -1), colors.HexColor('#D9D9D9')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.0),
-        ('TOPPADDING', (0, 0), (-1, -1), 1.0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
+        ('TOPPADDING', (0, 0), (-1, -1), 1.5),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
     ]))
     
