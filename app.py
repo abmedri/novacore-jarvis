@@ -206,10 +206,7 @@ def limpar_nome_local(val):
 # ====================================================================================
 # GERADOR DO EXCEL DE CONFERÊNCIA
 # ====================================================================================
-def gerar_planilha_filtrada_kmb(df_localizacao_json, df_estoque_json, numero_loja_input, tipo_filtro):
-    df_localizacao = pd.read_json(df_localizacao_json, orient='split')
-    df_estoque = pd.read_json(df_estoque_json, orient='split')
-    
+def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     wb = openpyxl.Workbook()
     
     fonte_padrao = Font(name="Arial", size=10)
@@ -484,10 +481,7 @@ class NumberedCanvas(canvas.Canvas):
         self.drawRightString(largura_pagina - margem, 10, texto_pagina)
         self.restoreState()
 
-def gerar_pdf_conferencia_kmb(df_localizacao_json, df_estoque_json, numero_loja_input, tipo_filtro):
-    df_localizacao = pd.read_json(df_localizacao_json, orient='split')
-    df_estoque = pd.read_json(df_estoque_json, orient='split')
-    
+def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     col_loc = next((c for c in df_localizacao.columns if 'local' in c.lower()), df_localizacao.columns[2])
     col_cod_loc = next((c for c in df_localizacao.columns if 'codigo' in c.lower() or 'cod' in c.lower()), df_localizacao.columns[3])
     col_desc_loc = next((c for c in df_localizacao.columns if 'desc' in c.lower()), df_localizacao.columns[4])
@@ -1090,7 +1084,7 @@ def main():
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
                 
-                buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "TODOS")
+                buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name=0, skiprows=3, dtype=str).fillna("")
                 
@@ -1130,16 +1124,16 @@ def main():
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
                 with c_imp1:
-                    buf_zerados = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "ZERADOS")
+                    buf_zerados = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "ZERADOS")
                     st.download_button("📥 Baixar Excel (Zerados)", data=buf_zerados, file_name=f"Excel_Zerados_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp2:
-                    buf_faltas = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "FALTAS")
+                    buf_faltas = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "FALTAS")
                     st.download_button("📥 Baixar Excel (Faltas)", data=buf_faltas, file_name=f"Excel_Faltas_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp3:
-                    buf_sobras = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "SOBRAS")
+                    buf_sobras = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SOBRAS")
                     st.download_button("📥 Baixar Excel (Sobras)", data=buf_sobras, file_name=f"Excel_Sobras_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp4:
-                    buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "SEM_SALDO")
+                    buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SEM_SALDO")
                     st.download_button("📥 Baixar Excel (Sem Saldo)", data=buf_sem_saldo, file_name=f"Excel_SemSaldo_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
@@ -1147,16 +1141,16 @@ def main():
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
-                    pdf_zerados = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "ZERADOS")
+                    pdf_zerados = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "ZERADOS")
                     st.download_button("📑 Baixar PDF (Zerados)", data=pdf_zerados, file_name=f"{numero_loja_ui}.{data_atual_str}.zerados.pdf", mime="application/pdf", use_container_width=True)
                 with c_pdf2:
-                    pdf_faltas = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "FALTAS")
+                    pdf_faltas = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "FALTAS")
                     st.download_button("📑 Baixar PDF (Faltas)", data=pdf_faltas, file_name=f"{numero_loja_ui}.{data_atual_str}.faltas.pdf", mime="application/pdf", use_container_width=True)
                 with c_pdf3:
-                    pdf_sobras = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "SOBRAS")
+                    pdf_sobras = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SOBRAS")
                     st.download_button("📑 Baixar PDF (Sobras)", data=pdf_sobras, file_name=f"{numero_loja_ui}.{data_atual_str}.sobras.pdf", mime="application/pdf", use_container_width=True)
                 with c_pdf4:
-                    pdf_sem_saldo = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "SEM_SALDO")
+                    pdf_sem_saldo = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SEM_SALDO")
                     st.download_button("📑 Baixar PDF (Sem Saldo)", data=pdf_sem_saldo, file_name=f"{numero_loja_ui}.{data_atual_str}.sem_saldo.pdf", mime="application/pdf", use_container_width=True)
             else:
                 st.error("❌ Erro ao processar os arquivos.")
