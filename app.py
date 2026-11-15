@@ -15,7 +15,8 @@ from openpyxl.drawing.image import Image as OpenpyxlImage
 import docx
 from docx.shared import Inches, Pt, RGBColor
 from pptx import Presentation
-from pptx.util import Inches as PptxInches
+from pptx.util import Inches as PptxInches, Pt as PptxPt
+from pptx.dml.color import RGBColor as PptxRGBColor
 # ReportLab para PDFs profissionais com rodapé gráfico personalizado
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
@@ -981,10 +982,63 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     return buffer
 
 def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
+    resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
     prs = Presentation()
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    tb = slide.shapes.add_textbox(PptxInches(1), PptxInches(1), PptxInches(11), PptxInches(2))
-    tb.text_frame.text = "⚡ GRUPO KMB // RELATÓRIO EXECUTIVO C-LEVEL"
+    
+    # Slide 1: Capa Executiva
+    slide_layout = prs.slide_layouts[6] # em branco
+    slide1 = prs.slides.add_slide(slide_layout)
+    tb1 = slide1.shapes.add_textbox(PptxInches(1), PptxInches(1.5), PptxInches(11.3), PptxInches(4))
+    tf1 = tb1.text_frame
+    tf1.word_wrap = True
+    p1 = tf1.paragraphs[0]
+    p1.text = "⚡ GRUPO KMB // DIRETORIA EXECUTIVA"
+    p1.font.size = PptxPt(28)
+    p1.font.bold = True
+    p1.font.color.rgb = PptxRGBColor(31, 78, 120)
+    
+    p2 = tf1.add_paragraph()
+    p2.text = "Relatório Executivo de Auditoria Patrimonial & Indicadores"
+    p2.font.size = PptxPt(18)
+    p2.font.color.rgb = PptxRGBColor(15, 23, 42)
+    p2.space_before = PptxPt(10)
+    
+    p3 = tf1.add_paragraph()
+    p3.text = f"Data de Emissão: {pd.Timestamp.now().strftime('%d/%m/%Y')} | Protocolo J.A.R.V.I.S."
+    p3.font.size = PptxPt(12)
+    p3.font.color.rgb = PptxRGBColor(100, 116, 139)
+    p3.space_before = PptxPt(20)
+
+    # Slide 2: Indicadores Consolidados por Unidade
+    for r in resumos:
+        slide2 = prs.slides.add_slide(slide_layout)
+        tb2 = slide2.shapes.add_textbox(PptxInches(0.8), PptxInches(0.8), PptxInches(11.5), PptxInches(5.5))
+        tf2 = tb2.text_frame
+        tf2.word_wrap = True
+        
+        hp = tf2.paragraphs[0]
+        hp.text = f"📊 Unidade / Arquivo: {r['nome']}"
+        hp.font.size = PptxPt(20)
+        hp.font.bold = True
+        hp.font.color.rgb = PptxRGBColor(31, 78, 120)
+        
+        linhas_slide = [
+            f"• Total de SKUs Auditados: {r['total_skus']:,} (Pré: {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un)",
+            f"• Produtos com Falta: {r['skus_falta']:,} SKUs ({r['perc_falta_itens']:.2f}%) | Vol: -{r['vol_falta']:,.0f} un | R$ {r['val_falta']:,.2f}",
+            f"• Produtos com Sobra: {r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%) | Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}",
+            f"• Volume Físico Total de Divergências: {r['vol_div_total']:,.0f} un ({r['perc_vol_div']:.2f}%) | R$ {r['val_div_absoluto']:,.2f}",
+            f"• Valor Teórico Inicial (Antes): R$ {r['soma_antes']:,.2f} | Auditado Final (Depois): R$ {r['soma_depois']:,.2f}",
+            f"• Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f} (Impacto Geral: {r['impacto_sobre_antes_pct']:.2f}%)",
+            f"• Acurácia Volumétrica: {r['acuracia_vol']:.2f}% | Acurácia Financeira: {r['acuracia_fin']:.2f}%"
+        ]
+        
+        for linha in linhas_slide:
+            p_l = tf2.add_paragraph()
+            p_l.text = linha
+            p_l.font.size = PptxPt(13)
+            p_l.font.color.rgb = PptxRGBColor(51, 65, 85)
+            p_l.space_before = PptxPt(8)
+
     buffer = io.BytesIO()
     prs.save(buffer)
     buffer.seek(0)
@@ -993,7 +1047,9 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
 def main():
     st.set_page_config(page_title="GRUPO KMB // TIME DE INVENTÁRIO", page_icon="⚡", layout="wide")
     
-    SENHA_MESTRE = "novacore2026"
+    # Segurança protegida via st.secrets com fallback seguro local
+    SENHA_MESTRE = st.secrets.get("SENHA_MESTRE", "novacore2026")
+    
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
         
@@ -1082,7 +1138,7 @@ def main():
                 st.success("✅ Arquivos carregados e validados com sucesso!")
                 
                 st.markdown("---")
-                st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
+                st.markdown("### 👁️ Pré-visualização na Tela")
                 
                 buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
                 
