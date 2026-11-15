@@ -23,9 +23,11 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 
-def processar_arquivo_upload(arquivo_carregado):
-    nome = arquivo_carregado.name.lower()
+@st.cache_data
+def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
+    nome = nome_arquivo.lower()
     try:
+        arquivo_carregado = io.BytesIO(conteudo_bytes)
         if nome.endswith('.csv'):
             for enc in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
                 try:
@@ -93,7 +95,10 @@ def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=
     </div>
     """
 
-def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
+@st.cache_data
+def calcular_metricas_gerenciais(lista_dfs_tupla, nomes_tupla):
+    lista_dfs = list(lista_dfs_tupla)
+    nomes_arquivos = list(nomes_tupla)
     resumo_ficheiros = []
     for idx, df in enumerate(lista_dfs):
         num_cols = df.select_dtypes(include=['number']).columns.tolist()
@@ -183,9 +188,13 @@ def limpar_nome_local(val):
     return s
 
 # ====================================================================================
-# GERADOR DO EXCEL DE CONFERÊNCIA (APENAS ABA PRINCIPAL COM MARGENS MÍNIMAS)
+# GERADOR DO EXCEL DE CONFERÊNCIA
 # ====================================================================================
-def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
+@st.cache_data
+def gerar_planilha_filtrada_kmb(df_localizacao_json, df_estoque_json, numero_loja_input, tipo_filtro):
+    df_localizacao = pd.read_json(df_localizacao_json)
+    df_estoque = pd.read_json(df_estoque_json)
+    
     wb = openpyxl.Workbook()
     
     fonte_padrao = Font(name="Arial", size=10)
@@ -418,7 +427,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     return buffer
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (TEXTO IDÊNTICO + ANTI-QUEBRA DE LINHA)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -460,7 +469,11 @@ class NumberedCanvas(canvas.Canvas):
         self.drawRightString(largura_pagina - margem, 10, texto_pagina)
         self.restoreState()
 
-def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
+@st.cache_data
+def gerar_pdf_conferencia_kmb(df_localizacao_json, df_estoque_json, numero_loja_input, tipo_filtro):
+    df_localizacao = pd.read_json(df_localizacao_json)
+    df_estoque = pd.read_json(df_estoque_json)
+    
     col_loc = next((c for c in df_localizacao.columns if 'local' in c.lower()), df_localizacao.columns[2])
     col_cod_loc = next((c for c in df_localizacao.columns if 'codigo' in c.lower() or 'cod' in c.lower()), df_localizacao.columns[3])
     col_desc_loc = next((c for c in df_localizacao.columns if 'desc' in c.lower()), df_localizacao.columns[4])
@@ -630,7 +643,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     return buffer
 
 # ====================================================================================
-# GERADOR DE PDF VISUAL DOS INDICADORES (MODELO EXECUTIVO IDÊNTICO AO PADRÃO C-LEVEL)
+# GERADOR DE PDF VISUAL DOS INDICADORES (MODELO C-LEVEL)
 # ====================================================================================
 def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     buffer = io.BytesIO()
@@ -658,13 +671,11 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     
     story = []
     
-    # Cabeçalho Executivo
     story.append(Paragraph("<b>GRUPO KMB DIRETORIA EXECUTIVA & AUDITORIA PATRIMONIAL</b>", estilo_titulo))
     story.append(Paragraph("Relatório Executivo de Indicadores", estilo_sub_topo))
     story.append(Paragraph(f"Unidade / Arquivo: {nome_arquivo} | Data de Emissão: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_meta_topo))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#1F4E78'), spaceBefore=4, spaceAfter=8))
     
-    # Seção 1: Indicadores de SKUs e Volumetria (Tabela Estruturada)
     story.append(Paragraph("1. Indicadores de SKUs e Volumetria", estilo_secao))
     
     dados_tabela_ind = [
@@ -703,7 +714,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     story.append(tabela_ind_pdf)
     story.append(Spacer(1, 4))
     
-    # Seção 2: Balanço Patrimonial & Impacto Geral
     story.append(Paragraph("2. Balanço Patrimonial & Impacto Geral", estilo_secao))
     
     cor_impacto = '#10b981' if resumo_unico['impacto_sobre_antes_pct'] >= 0 else '#ef4444'
@@ -750,7 +760,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     story.append(tabela_balanco)
     story.append(Spacer(1, 4))
     
-    # Seção 3: Parecer Técnico de Governança
     story.append(Paragraph("3. Parecer Técnico de Governança", estilo_secao))
     
     status_acuracia = "atendendo à meta corporativa" if resumo_unico['acuracia_vol'] >= 97 else "abaixo da meta corporativa de 97,00%"
@@ -780,7 +789,7 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
 # FUNÇÕES DE EXPORTAÇÃO C-LEVEL
 # ====================================================================================
 def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
-    resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
+    resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
     wb = openpyxl.Workbook()
     
     ws1 = wb.active
@@ -847,7 +856,7 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     return buffer
 
 def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
-    resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
+    resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
     doc = docx.Document()
     
     doc.add_heading("⚡ GRUPO KMB // RELATÓRIO EXECUTIVO DE AUDITORIA C-LEVEL", level=1)
@@ -895,7 +904,7 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
     return buffer
 
 def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
-    resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
+    resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
     buffer = io.BytesIO()
     
     doc_pdf = SimpleDocTemplate(
@@ -1058,8 +1067,8 @@ def main():
             arq_est = st.file_uploader("2. Arquivo de Saldo de Estoque (ex: saldo-estoque.csv)", type=['csv', 'xlsx', 'xls'], key="up_est")
             
         if arq_loc and arq_est:
-            df_loc_temp, msg1 = processar_arquivo_upload(arq_loc)
-            df_est_temp, msg2 = processar_arquivo_upload(arq_est)
+            df_loc_temp, msg1 = processar_arquivo_upload(arq_loc.getvalue(), arq_loc.name)
+            df_est_temp, msg2 = processar_arquivo_upload(arq_est.getvalue(), arq_est.name)
             
             if df_loc_temp is not None and df_est_temp is not None:
                 st.success("✅ Arquivos carregados e validados com sucesso!")
@@ -1067,7 +1076,7 @@ def main():
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
                 
-                buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "TODOS")
+                buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "TODOS")
                 
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name=0, skiprows=3, dtype=str).fillna("")
                 
@@ -1107,16 +1116,16 @@ def main():
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
                 with c_imp1:
-                    buf_zerados = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "ZERADOS")
+                    buf_zerados = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "ZERADOS")
                     st.download_button("📥 Baixar Excel (Zerados)", data=buf_zerados, file_name=f"Excel_Zerados_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp2:
-                    buf_faltas = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "FALTAS")
+                    buf_faltas = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "FALTAS")
                     st.download_button("📥 Baixar Excel (Faltas)", data=buf_faltas, file_name=f"Excel_Faltas_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp3:
-                    buf_sobras = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SOBRAS")
+                    buf_sobras = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "SOBRAS")
                     st.download_button("📥 Baixar Excel (Sobras)", data=buf_sobras, file_name=f"Excel_Sobras_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp4:
-                    buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SEM_SALDO")
+                    buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "SEM_SALDO")
                     st.download_button("📥 Baixar Excel (Sem Saldo)", data=buf_sem_saldo, file_name=f"Excel_SemSaldo_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
@@ -1124,16 +1133,16 @@ def main():
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
-                    pdf_zerados = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "ZERADOS")
+                    pdf_zerados = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "ZERADOS")
                     st.download_button("📑 Baixar PDF (Zerados)", data=pdf_zerados, file_name=f"{numero_loja_ui}.{data_atual_str}.zerados.pdf", mime="application/pdf", use_container_width=True)
                 with c_pdf2:
-                    pdf_faltas = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "FALTAS")
+                    pdf_faltas = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "FALTAS")
                     st.download_button("📑 Baixar PDF (Faltas)", data=pdf_faltas, file_name=f"{numero_loja_ui}.{data_atual_str}.faltas.pdf", mime="application/pdf", use_container_width=True)
                 with c_pdf3:
-                    pdf_sobras = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SOBRAS")
+                    pdf_sobras = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "SOBRAS")
                     st.download_button("📑 Baixar PDF (Sobras)", data=pdf_sobras, file_name=f"{numero_loja_ui}.{data_atual_str}.sobras.pdf", mime="application/pdf", use_container_width=True)
                 with c_pdf4:
-                    pdf_sem_saldo = gerar_pdf_conferencia_kmb(df_loc_temp, df_est_temp, numero_loja_ui, "SEM_SALDO")
+                    pdf_sem_saldo = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "SEM_SALDO")
                     st.download_button("📑 Baixar PDF (Sem Saldo)", data=pdf_sem_saldo, file_name=f"{numero_loja_ui}.{data_atual_str}.sem_saldo.pdf", mime="application/pdf", use_container_width=True)
             else:
                 st.error("❌ Erro ao processar os arquivos.")
@@ -1145,7 +1154,7 @@ def main():
         lista_dfs = []
         nomes_arquivos = []
         for arq in arquivos_submetidos:
-            df_temp, msg = processar_arquivo_upload(arq)
+            df_temp, msg = processar_arquivo_upload(arq.getvalue(), arq.name)
             if df_temp is not None:
                 lista_dfs.append(df_temp)
                 nomes_arquivos.append(arq.name)
@@ -1157,7 +1166,7 @@ def main():
                 cat_cols = df_filtrado.select_dtypes(include=['object']).columns.tolist()
                 all_cols = df_filtrado.columns.tolist()
                 
-                resumo_unico = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)[0]
+                resumo_unico = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))[0]
                 
                 st.markdown("### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico")
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -1286,7 +1295,7 @@ def main():
                             st.dataframe(df_plano[['Código do Produto', 'Descrição do Produto', 'Saldo em Estoque', col_ajuste_e5, col_val_aju_e5, 'Perfil_Causa']].style.format({col_val_aju_e5: 'R$ {:,.2f}'}), use_container_width=True)
             else:
                 st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO C-LEVEL")
-                resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
+                resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
                 
                 col_cards = st.columns(len(lista_dfs))
                 for idx, r in enumerate(resumos):
