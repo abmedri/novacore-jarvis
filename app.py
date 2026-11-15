@@ -442,7 +442,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     return buffer
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM FORMATAÇÃO PROFISSIONAL E TIMBRE)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -1265,6 +1265,7 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
 def main():
     st.set_page_config(page_title="GRUPO KMB // TIME DE INVENTÁRIO", page_icon="⚡", layout="wide")
     
+    # Segurança protegida via st.secrets com fallback seguro local
     SENHA_MESTRE = st.secrets.get("SENHA_MESTRE", "novacore2026")
     
     if "autenticado" not in st.session_state:
