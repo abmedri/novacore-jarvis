@@ -630,40 +630,110 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     return buffer
 
 # ====================================================================================
-# GERADOR DE PDF VISUAL DOS INDICADORES (TELA EXECUTIVA)
+# GERADOR DE PDF VISUAL DOS INDICADORES (MODELO EXECUTIVO IDÊNTICO AO PADRÃO C-LEVEL)
 # ====================================================================================
 def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     
     styles = getSampleStyleSheet()
-    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=14, leading=18, textColor=colors.HexColor('#1F4E78'))
-    estilo_sub = ParagraphStyle('SubPDF', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor('#0F172A'), spaceBefore=10, spaceAfter=6)
-    estilo_texto = ParagraphStyle('TextoPDF', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=14, textColor=colors.HexColor('#334155'))
+    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor('#1F4E78'))
+    estilo_sub_topo = ParagraphStyle('SubTopoPDF', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, leading=12, textColor=colors.HexColor('#0F172A'))
+    estilo_meta_topo = ParagraphStyle('MetaTopoPDF', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=11, textColor=colors.HexColor('#334155'))
+    
+    estilo_secao = ParagraphStyle('SecaoPDF', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=10, leading=13, textColor=colors.HexColor('#1F4E78'), spaceBefore=10, spaceAfter=4)
+    
+    estilo_th = ParagraphStyle('TH_PDF', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.white, alignment=0)
+    estilo_th_center = ParagraphStyle('TH_PDF_C', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.white, alignment=1)
+    
+    estilo_td_esq = ParagraphStyle('TD_PDF_E', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#111827'), alignment=0)
+    estilo_td_esq_bold = ParagraphStyle('TD_PDF_EB', fontName='Helvetica-Bold', fontSize=8, leading=11, textColor=colors.HexColor('#111827'), alignment=0)
+    estilo_td_centro = ParagraphStyle('TD_PDF_C', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#111827'), alignment=1)
+    
+    estilo_balanco_tit = ParagraphStyle('Bal_Tit', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#1F4E78'), alignment=0)
+    estilo_balanco_val = ParagraphStyle('Bal_Val', fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor('#0F172A'), alignment=0)
+    estilo_balanco_sub = ParagraphStyle('Bal_Sub', fontName='Helvetica', fontSize=7.5, leading=10, textColor=colors.HexColor('#475569'), alignment=0)
+    
+    estilo_parecer = ParagraphStyle('ParecerTxt', fontName='Helvetica', fontSize=8.5, leading=12, textColor=colors.HexColor('#334155'))
     
     story = []
-    story.append(Paragraph("⚡ GRUPO KMB // RELATÓRIO DE INDICADORES", estilo_titulo))
-    story.append(Paragraph(f"Arquivo analisado: {nome_arquivo} | Data: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_texto))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3B82F6'), spaceBefore=6, spaceAfter=10))
     
-    story.append(Paragraph("1. Indicadores de SKUs e Volumetria", estilo_sub))
-    texto_volumetria = f"""
-    <b>• Total SKUs Auditados:</b> {resumo_unico['total_skus']:,} (Pré: {resumo_unico['qtd_antes']:,.0f} un | Pós: {resumo_unico['qtd_pos']:,.0f} un)<br/>
-    <b>• Produtos com Falta (Negativos):</b> {resumo_unico['skus_falta']:,} SKUs ({resumo_unico['perc_falta_itens']:.2f}%) | Vol: -{resumo_unico['vol_falta']:,.0f} un | R$ {resumo_unico['val_falta']:,.2f}<br/>
-    <b>• Produtos com Sobra (Positivos):</b> {resumo_unico['skus_sobra']:,} SKUs ({resumo_unico['perc_sobra_itens']:.2f}%) | Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{resumo_unico['val_sobra']:,.2f}<br/>
-    <b>• Total Falta + Sobra (SKUs):</b> {resumo_unico['total_div']:,} SKUs ({resumo_unico['perc_divergencia']:.2f}%)<br/>
-    <b>• Volume Físico Total de Divergências:</b> {resumo_unico['vol_div_total']:,.0f} unidades ({resumo_unico['perc_vol_div']:.2f}%) | R$ {resumo_unico['val_div_absoluto']:,.2f}<br/>
-    <b>• Acuracidade Volumétrica / Financeira:</b> Vol: {resumo_unico['acuracia_vol']:.2f}% | Fin: {resumo_unico['acuracia_fin']:.2f}% (Meta Corporativa: 97%)
-    """
-    story.append(Paragraph(texto_volumetria, estilo_texto))
+    # Cabeçalho Executivo
+    story.append(Paragraph("<b>GRUPO KMB DIRETORIA EXECUTIVA & AUDITORIA PATRIMONIAL</b>", estilo_titulo))
+    story.append(Paragraph("Relatório Executivo de Indicadores", estilo_sub_topo))
+    story.append(Paragraph(f"Unidade / Arquivo: {nome_arquivo} | Data de Emissão: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_meta_topo))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#1F4E78'), spaceBefore=4, spaceAfter=8))
+    
+    # Seção 1: Indicadores de SKUs e Volumetria (Tabela Estruturada)
+    story.append(Paragraph("1. Indicadores de SKUs e Volumetria", estilo_secao))
+    
+    dados_tabela_ind = [
+        [Paragraph("Indicador Operacional", estilo_th), Paragraph("Resultado Apurado", estilo_th_center), Paragraph("Detalhamento / Referência", estilo_th)]
+    ]
+    
+    linhas_indicadores = [
+        ("Total SKUs Auditados", f"{resumo_unico['total_skus']:,} SKUs", f"Pré: {resumo_unico['qtd_antes']:,.0f} un | Pós: {resumo_unico['qtd_pos']:,.0f} un"),
+        ("Produtos com Falta (Negativos)", f"{resumo_unico['skus_falta']:,} SKUs ({resumo_unico['perc_falta_itens']:.2f}%)", f"Vol: -{resumo_unico['vol_falta']:,.0f} un | R$ {resumo_unico['val_falta']:,.2f}"),
+        ("Produtos com Sobra (Positivos)", f"{resumo_unico['skus_sobra']:,} SKUs ({resumo_unico['perc_sobra_itens']:.2f}%)", f"Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{resumo_unico['val_sobra']:,.2f}"),
+        ("Total Falta + Sobra (SKUs)", f"{resumo_unico['total_div']:,} SKUs ({resumo_unico['perc_divergencia']:.2f}%)", "Total de Produtos Divergentes"),
+        ("Volume Físico Total de Divergências", f"{resumo_unico['vol_div_total']:,.0f} unidades ({resumo_unico['perc_vol_div']:.2f}%)", f"Movimentação Absoluta: R$ {resumo_unico['val_div_absoluto']:,.2f}"),
+        ("Acuracidade Volumétrica / Financeira", f"Vol: {resumo_unico['acuracia_vol']:.2f}% | Fin: {resumo_unico['acuracia_fin']:.2f}%", "Meta Corporativa: 97,00%")
+    ]
+    
+    for label, res, det in linhas_indicadores:
+        dados_tabela_ind.append([
+            Paragraph(label, estilo_td_esq_bold),
+            Paragraph(res, estilo_td_centro),
+            Paragraph(det, estilo_td_esq)
+        ])
+        
+    tabela_ind_pdf = Table(dados_tabela_ind, colWidths=[150, 140, 250])
+    tabela_ind_pdf.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8FAFC')])
+    ]))
+    
+    story.append(tabela_ind_pdf)
     story.append(Spacer(1, 4))
     
-    story.append(Paragraph("2. Balanço Patrimonial & Impacto Geral", estilo_sub))
+    # Seção 2: Balanço Patrimonial & Impacto Geral
+    story.append(Paragraph("2. Balanço Patrimonial & Impacto Geral", estilo_secao))
+    
+    cor_impacto = '#10b981' if resumo_unico['impacto_sobre_antes_pct'] >= 0 else '#ef4444'
+    cor_ajuste = '#10b981' if resumo_unico['val_ajuste_liquido'] >= 0 else '#ef4444'
+    
     dados_balanco = [
-        [Paragraph(f"<b>Estoque Antes (Sistema / Teórico)</b><br/><font size=11 color='#1F4E78'><b>R$ {resumo_unico['soma_antes']:,.2f}</b></font><br/>Qtd Pré: {resumo_unico['qtd_antes']:,.0f} un", estilo_texto),
-         Paragraph(f"<b>Estoque Depois (Físico Auditado)</b><br/><font size=11 color='#1F4E78'><b>R$ {resumo_unico['soma_depois']:,.2f}</b></font><br/>Qtd Pós: {resumo_unico['qtd_pos']:,.0f} un", estilo_texto)],
-        [Paragraph(f"<b>Impacto Geral</b><br/><font size=11 color='{'#10b981' if resumo_unico['impacto_sobre_antes_pct'] >= 0 else '#ef4444'}'><b>{resumo_unico['impacto_sobre_antes_pct']:.2f}%</b></font><br/>Variação Percentual", estilo_texto),
-         Paragraph(f"<b>Divergência / Ajuste Líquido</b><br/><font size=11 color='{'#10b981' if resumo_unico['val_ajuste_liquido'] >= 0 else '#ef4444'}'><b>R$ {resumo_unico['val_ajuste_liquido']:,.2f}</b></font><br/>Variação Financeira Apurada", estilo_texto)]
+        [
+            Paragraph("ESTOQUE ANTES (SISTEMA / TEÓRICO)", estilo_balanco_tit),
+            Paragraph("ESTOQUE DEPOIS (FÍSICO AUDITADO)", estilo_balanco_tit)
+        ],
+        [
+            Paragraph(f"<b>R$ {resumo_unico['soma_antes']:,.2f}</b>", estilo_balanco_val),
+            Paragraph(f"<b>R$ {resumo_unico['soma_depois']:,.2f}</b>", estilo_balanco_val)
+        ],
+        [
+            Paragraph(f"Quantidade Pré-Inventário: {resumo_unico['qtd_antes']:,.0f} unidades", estilo_balanco_sub),
+            Paragraph(f"Quantidade Pós-Inventário: {resumo_unico['qtd_pos']:,.0f} unidades", estilo_balanco_sub)
+        ],
+        [
+            Paragraph("IMPACTO GERAL SOBRE ESTOQUE TEÓRICO", estilo_balanco_tit),
+            Paragraph("DIVERGÊNCIA / AJUSTE LÍQUIDO", estilo_balanco_tit)
+        ],
+        [
+            Paragraph(f"<font color='{cor_impacto}'><b>{resumo_unico['impacto_sobre_antes_pct']:.2f}%</b></font>", estilo_balanco_val),
+            Paragraph(f"<font color='{cor_ajuste}'><b>R$ {resumo_unico['val_ajuste_liquido']:,.2f}</b></font>", estilo_balanco_val)
+        ],
+        [
+            Paragraph("Variação percentual líquida apurada", estilo_balanco_sub),
+            Paragraph("Resultado financeiro consolidado (Sobras - Faltas)", estilo_balanco_sub)
+        ]
     ]
     
     tabela_balanco = Table(dados_balanco, colWidths=[270, 270])
@@ -671,12 +741,36 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
         ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
         ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
     ]))
+    
     story.append(tabela_balanco)
+    story.append(Spacer(1, 4))
+    
+    # Seção 3: Parecer Técnico de Governança
+    story.append(Paragraph("3. Parecer Técnico de Governança", estilo_secao))
+    
+    status_acuracia = "atendendo à meta corporativa" if resumo_unico['acuracia_vol'] >= 97 else "abaixo da meta corporativa de 97,00%"
+    texto_parecer = f"""
+    A unidade apresentou acuracidade volumétrica de {resumo_unico['acuracia_vol']:.2f}% ({status_acuracia}) e 
+    acuracidade financeira de {resumo_unico['acuracia_fin']:.2f}%, registrando ajuste líquido de R$ {resumo_unico['val_ajuste_liquido']:,.2f} 
+    ({resumo_unico['impacto_sobre_antes_pct']:.2f}% sobre o saldo teórico inicial). Recomenda-se atuação imediata nas {resumo_unico['skus_falta']} 
+    linhas com quebra apontadas na Etapa 5 (Plano de Ação Prioritário).
+    """
+    
+    tabela_parecer = Table([[Paragraph(texto_parecer.strip(), estilo_parecer)]], colWidths=[540])
+    tabela_parecer.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F1F5F9')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(tabela_parecer)
     
     doc.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
