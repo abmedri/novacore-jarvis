@@ -22,6 +22,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable,
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
+
 def processar_arquivo_upload(arquivo_carregado):
     nome = arquivo_carregado.name.lower()
     try:
@@ -65,12 +66,14 @@ def processar_arquivo_upload(arquivo_carregado):
             return None, "Formato não suportado."
     except Exception as e:
         return None, "Erro ao processar ficheiro: " + str(e)
+
 def identificar_coluna_ideal(colunas_numericas, palavras_alvo):
     for palavra in palavras_alvo:
         for idx, col in enumerate(colunas_numericas):
             if palavra in col.lower() and 'codigo' not in col.lower() and 'código' not in col.lower():
                 return idx
     return 0
+
 def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=False):
     cor_delta = "#9ca3af"
     sinal = ""
@@ -89,6 +92,7 @@ def formatar_kpi_html(label, valor, delta_texto, eh_negativo=False, eh_positivo=
         <div style="color: {cor_delta}; font-size: 0.8rem; font-weight: 600; margin-top: 4px;">{sinal}{delta_texto}</div>
     </div>
     """
+
 def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
     resumo_ficheiros = []
     for idx, df in enumerate(lista_dfs):
@@ -171,11 +175,13 @@ def calcular_metricas_gerenciais(lista_dfs, nomes_arquivos):
             "df": df
         })
     return resumo_ficheiros
+
 def limpar_nome_local(val):
     s = str(val).strip()
     if s.endswith('.0'):
         s = s[:-2]
     return s
+
 # ====================================================================================
 # GERADOR DO EXCEL DE CONFERÊNCIA (APENAS ABA PRINCIPAL COM MARGENS MÍNIMAS)
 # ====================================================================================
@@ -410,6 +416,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     wb.save(buffer)
     buffer.seek(0)
     return buffer
+
 # ====================================================================================
 # GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (TEXTO IDÊNTICO + ANTI-QUEBRA DE LINHA)
 # ====================================================================================
@@ -452,6 +459,7 @@ class NumberedCanvas(canvas.Canvas):
         texto_pagina = f"Página {self._pageNumber} de {page_count}"
         self.drawRightString(largura_pagina - margem, 10, texto_pagina)
         self.restoreState()
+
 def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
     col_loc = next((c for c in df_localizacao.columns if 'local' in c.lower()), df_localizacao.columns[2])
     col_cod_loc = next((c for c in df_localizacao.columns if 'codigo' in c.lower() or 'cod' in c.lower()), df_localizacao.columns[3])
@@ -620,6 +628,60 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     doc.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer
+
+# ====================================================================================
+# GERADOR DE PDF VISUAL DOS INDICADORES (TELA EXECUTIVA)
+# ====================================================================================
+def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    
+    styles = getSampleStyleSheet()
+    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=14, leading=18, textColor=colors.HexColor('#1F4E78'))
+    estilo_sub = ParagraphStyle('SubPDF', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor('#0F172A'), spaceBefore=10, spaceAfter=6)
+    estilo_texto = ParagraphStyle('TextoPDF', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=14, textColor=colors.HexColor('#334155'))
+    
+    story = []
+    story.append(Paragraph("⚡ GRUPO KMB // RELATÓRIO DE INDICADORES", estilo_titulo))
+    story.append(Paragraph(f"Arquivo analisado: {nome_arquivo} | Data: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_texto))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3B82F6'), spaceBefore=6, spaceAfter=10))
+    
+    story.append(Paragraph("1. Indicadores de SKUs e Volumetria", estilo_sub))
+    texto_volumetria = f"""
+    <b>• Total SKUs Auditados:</b> {resumo_unico['total_skus']:,} (Pré: {resumo_unico['qtd_antes']:,.0f} un | Pós: {resumo_unico['qtd_pos']:,.0f} un)<br/>
+    <b>• Produtos com Falta (Negativos):</b> {resumo_unico['skus_falta']:,} SKUs ({resumo_unico['perc_falta_itens']:.2f}%) | Vol: -{resumo_unico['vol_falta']:,.0f} un | R$ {resumo_unico['val_falta']:,.2f}<br/>
+    <b>• Produtos com Sobra (Positivos):</b> {resumo_unico['skus_sobra']:,} SKUs ({resumo_unico['perc_sobra_itens']:.2f}%) | Vol: +{resumo_unico['vol_sobra']:,.0f} un | R$ +{resumo_unico['val_sobra']:,.2f}<br/>
+    <b>• Total Falta + Sobra (SKUs):</b> {resumo_unico['total_div']:,} SKUs ({resumo_unico['perc_divergencia']:.2f}%)<br/>
+    <b>• Volume Físico Total de Divergências:</b> {resumo_unico['vol_div_total']:,.0f} unidades ({resumo_unico['perc_vol_div']:.2f}%) | R$ {resumo_unico['val_div_absoluto']:,.2f}<br/>
+    <b>• Acuracidade Volumétrica / Financeira:</b> Vol: {resumo_unico['acuracia_vol']:.2f}% | Fin: {resumo_unico['acuracia_fin']:.2f}% (Meta Corporativa: 97%)
+    """
+    story.append(Paragraph(texto_volumetria, estilo_texto))
+    story.append(Spacer(1, 4))
+    
+    story.append(Paragraph("2. Balanço Patrimonial & Impacto Geral", estilo_sub))
+    dados_balanco = [
+        [Paragraph(f"<b>Estoque Antes (Sistema / Teórico)</b><br/><font size=11 color='#1F4E78'><b>R$ {resumo_unico['soma_antes']:,.2f}</b></font><br/>Qtd Pré: {resumo_unico['qtd_antes']:,.0f} un", estilo_texto),
+         Paragraph(f"<b>Estoque Depois (Físico Auditado)</b><br/><font size=11 color='#1F4E78'><b>R$ {resumo_unico['soma_depois']:,.2f}</b></font><br/>Qtd Pós: {resumo_unico['qtd_pos']:,.0f} un", estilo_texto)],
+        [Paragraph(f"<b>Impacto Geral</b><br/><font size=11 color='{'#10b981' if resumo_unico['impacto_sobre_antes_pct'] >= 0 else '#ef4444'}'><b>{resumo_unico['impacto_sobre_antes_pct']:.2f}%</b></font><br/>Variação Percentual", estilo_texto),
+         Paragraph(f"<b>Divergência / Ajuste Líquido</b><br/><font size=11 color='{'#10b981' if resumo_unico['val_ajuste_liquido'] >= 0 else '#ef4444'}'><b>R$ {resumo_unico['val_ajuste_liquido']:,.2f}</b></font><br/>Variação Financeira Apurada", estilo_texto)]
+    ]
+    
+    tabela_balanco = Table(dados_balanco, colWidths=[270, 270])
+    tabela_balanco.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+    ]))
+    story.append(tabela_balanco)
+    
+    doc.build(story, canvasmaker=NumberedCanvas)
+    buffer.seek(0)
+    return buffer
+
 # ====================================================================================
 # FUNÇÕES DE EXPORTAÇÃO C-LEVEL
 # ====================================================================================
@@ -689,6 +751,7 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     wb.save(buffer)
     buffer.seek(0)
     return buffer
+
 def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
     doc = docx.Document()
@@ -736,6 +799,7 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
     doc.save(buffer)
     buffer.seek(0)
     return buffer
+
 def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(lista_dfs, nomes_arquivos)
     buffer = io.BytesIO()
@@ -804,6 +868,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
     doc_pdf.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer
+
 def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     prs = Presentation()
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -813,6 +878,7 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     prs.save(buffer)
     buffer.seek(0)
     return buffer
+
 def main():
     st.set_page_config(page_title="GRUPO KMB // TIME DE INVENTÁRIO", page_icon="⚡", layout="wide")
     
@@ -847,6 +913,7 @@ def main():
                 else:
                     st.error("❌ Senha incorreta. Acesso negado.")
         return
+
     st.markdown("""
     <style>
     .stApp { background-color: #0b0f19; color: #f3f4f6; font-family: 'Inter', 'Segoe UI', monospace; }
@@ -876,6 +943,7 @@ def main():
         if st.button("🔒 Encerrar Sessão (Sair)", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
+
     st.markdown("""
     <div class="main-header">
         <div class="jarvis-title">⚡ GRUPO KMB // DIRETORIA EXECUTIVA</div>
@@ -1019,6 +1087,15 @@ def main():
                 with col_kpi2:
                     st.markdown(formatar_kpi_html("Estoque Depois (Físico Auditado)", f"R$ {resumo_unico['soma_depois']:,.2f}", f"Qtd Pós: {resumo_unico['qtd_pos']:,.0f} un", eh_positivo=True), unsafe_allow_html=True)
                     st.markdown(formatar_kpi_html("Divergência / Ajuste Líquido", f"R$ {resumo_unico['val_ajuste_liquido']:,.2f}", "Variação Apurada", eh_negativo=(resumo_unico['val_ajuste_liquido'] < 0), eh_positivo=(resumo_unico['val_ajuste_liquido'] >= 0)), unsafe_allow_html=True)
+                
+                buf_pdf_indicadores = gerar_pdf_indicadores_tela(resumo_unico, nomes_arquivos[0])
+                st.download_button(
+                    label="📑 Baixar Relatório de Indicadores em PDF",
+                    data=buf_pdf_indicadores,
+                    file_name=f"Relatorio_Indicadores_{nomes_arquivos[0].rsplit('.', 1)[0]}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
                 st.markdown("---")
                 
                 with st.expander("🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)", expanded=True):
@@ -1165,5 +1242,6 @@ def main():
             with col_e2: st.download_button("📄 Word Gerencial", data=gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             with col_e3: st.download_button("📑 PDF Gerencial", data=gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Relatorio_GrupoKMB.pdf", mime="application/pdf")
             with col_e4: st.download_button("📊 Apresentação PPTX", data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos), file_name="Apresentacao_GrupoKMB.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
 if __name__ == "__main__":
     main()
