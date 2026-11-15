@@ -23,6 +23,20 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 
+def limpar_colunas_duplicadas(df):
+    novas_colunas = []
+    contagem = {}
+    for col in df.columns:
+        col_str = str(col).strip()
+        if col_str in contagem:
+            contagem[col_str] += 1
+            novas_colunas.append(f"{col_str}_{contagem[col_str]}")
+        else:
+            contagem[col_str] = 0
+            novas_colunas.append(col_str)
+    df.columns = novas_colunas
+    return df
+
 @st.cache_data
 def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
     nome = nome_arquivo.lower()
@@ -37,6 +51,7 @@ def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
                         arquivo_carregado.seek(0)
                         df = pd.read_csv(arquivo_carregado, encoding=enc, sep=',', low_memory=False)
                     
+                    df = limpar_colunas_duplicadas(df)
                     col_mapping = {}
                     for col in df.columns:
                         col_lower = col.lower().strip()
@@ -63,6 +78,7 @@ def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
             return None, "Erro: Não foi possível decodificar o ficheiro CSV."
         elif nome.endswith(('.xls', '.xlsx')):
             df = pd.read_excel(arquivo_carregado)
+            df = limpar_colunas_duplicadas(df)
             return df, "Excel processado com sucesso."
         else:
             return None, "Formato não suportado."
@@ -190,10 +206,9 @@ def limpar_nome_local(val):
 # ====================================================================================
 # GERADOR DO EXCEL DE CONFERÊNCIA
 # ====================================================================================
-@st.cache_data
 def gerar_planilha_filtrada_kmb(df_localizacao_json, df_estoque_json, numero_loja_input, tipo_filtro):
-    df_localizacao = pd.read_json(df_localizacao_json)
-    df_estoque = pd.read_json(df_estoque_json)
+    df_localizacao = pd.read_json(df_localizacao_json, orient='split')
+    df_estoque = pd.read_json(df_estoque_json, orient='split')
     
     wb = openpyxl.Workbook()
     
@@ -469,10 +484,9 @@ class NumberedCanvas(canvas.Canvas):
         self.drawRightString(largura_pagina - margem, 10, texto_pagina)
         self.restoreState()
 
-@st.cache_data
 def gerar_pdf_conferencia_kmb(df_localizacao_json, df_estoque_json, numero_loja_input, tipo_filtro):
-    df_localizacao = pd.read_json(df_localizacao_json)
-    df_estoque = pd.read_json(df_estoque_json)
+    df_localizacao = pd.read_json(df_localizacao_json, orient='split')
+    df_estoque = pd.read_json(df_estoque_json, orient='split')
     
     col_loc = next((c for c in df_localizacao.columns if 'local' in c.lower()), df_localizacao.columns[2])
     col_cod_loc = next((c for c in df_localizacao.columns if 'codigo' in c.lower() or 'cod' in c.lower()), df_localizacao.columns[3])
@@ -1076,7 +1090,7 @@ def main():
                 st.markdown("---")
                 st.markdown("### 👁️ Pré-visualização na Tela (Aba Saldo Loja)")
                 
-                buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "TODOS")
+                buf_preview = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "TODOS")
                 
                 df_preview_exibir = pd.read_excel(buf_preview, sheet_name=0, skiprows=3, dtype=str).fillna("")
                 
@@ -1116,16 +1130,16 @@ def main():
                 c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
                 
                 with c_imp1:
-                    buf_zerados = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "ZERADOS")
+                    buf_zerados = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "ZERADOS")
                     st.download_button("📥 Baixar Excel (Zerados)", data=buf_zerados, file_name=f"Excel_Zerados_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp2:
-                    buf_faltas = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "FALTAS")
+                    buf_faltas = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "FALTAS")
                     st.download_button("📥 Baixar Excel (Faltas)", data=buf_faltas, file_name=f"Excel_Faltas_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp3:
-                    buf_sobras = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "SOBRAS")
+                    buf_sobras = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "SOBRAS")
                     st.download_button("📥 Baixar Excel (Sobras)", data=buf_sobras, file_name=f"Excel_Sobras_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with c_imp4:
-                    buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "SEM_SALDO")
+                    buf_sem_saldo = gerar_planilha_filtrada_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "SEM_SALDO")
                     st.download_button("📥 Baixar Excel (Sem Saldo)", data=buf_sem_saldo, file_name=f"Excel_SemSaldo_Loja_{numero_loja_ui}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 data_atual_str = pd.Timestamp.now().strftime('%d.%m.%Y')
                 st.markdown("---")
@@ -1133,16 +1147,16 @@ def main():
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 
                 with c_pdf1:
-                    pdf_zerados = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "ZERADOS")
+                    pdf_zerados = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "ZERADOS")
                     st.download_button("📑 Baixar PDF (Zerados)", data=pdf_zerados, file_name=f"{numero_loja_ui}.{data_atual_str}.zerados.pdf", mime="application/pdf", use_container_width=True)
                 with c_pdf2:
-                    pdf_faltas = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "FALTAS")
+                    pdf_faltas = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "FALTAS")
                     st.download_button("📑 Baixar PDF (Faltas)", data=pdf_faltas, file_name=f"{numero_loja_ui}.{data_atual_str}.faltas.pdf", mime="application/pdf", use_container_width=True)
                 with c_pdf3:
-                    pdf_sobras = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "SOBRAS")
+                    pdf_sobras = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "SOBRAS")
                     st.download_button("📑 Baixar PDF (Sobras)", data=pdf_sobras, file_name=f"{numero_loja_ui}.{data_atual_str}.sobras.pdf", mime="application/pdf", use_container_width=True)
                 with c_pdf4:
-                    pdf_sem_saldo = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(), df_est_temp.to_json(), numero_loja_ui, "SEM_SALDO")
+                    pdf_sem_saldo = gerar_pdf_conferencia_kmb(df_loc_temp.to_json(orient='split'), df_est_temp.to_json(orient='split'), numero_loja_ui, "SEM_SALDO")
                     st.download_button("📑 Baixar PDF (Sem Saldo)", data=pdf_sem_saldo, file_name=f"{numero_loja_ui}.{data_atual_str}.sem_saldo.pdf", mime="application/pdf", use_container_width=True)
             else:
                 st.error("❌ Erro ao processar os arquivos.")
@@ -1250,7 +1264,7 @@ def main():
                 with st.expander("🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto", expanded=False):
                     if len(num_cols) >= 2 and len(all_cols) > 0:
                         df_risco = df_filtrado.copy()
-                        col_val_aju_etapa4 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_risco.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
+                        col_val_aju_etapa4 = 'Valor de Ajuste (R$)' in df_risco.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
                         df_risco['Categoria_Prod'] = df_risco['Descrição do Produto'].astype(str).str.split().str[0]
                         df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index().sort_values(by=col_val_aju_etapa4, ascending=True).head(15)
                         fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
