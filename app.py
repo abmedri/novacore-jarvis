@@ -595,7 +595,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.0, leading=6.0, textColor=colors.white, alignment=1)
     
-    # NOVOS TAMANHOS DE FONTE SOLICITADOS (5.5 pt para Código/Descrição, 6.0 pt em negrito para Estoque/Comptar/Divergência/Contagens/Locais)
     estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=5.5, leading=6.5, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=5.5, leading=6.5, textColor=colors.HexColor('#111827'), alignment=0, leftIndent=0, firstLineIndent=0, rightIndent=0)
     
@@ -664,7 +663,11 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         
     largura_util = 792 - 28
     largura_codigo = 45
-    largura_desc = 110
+    
+    # Largura da descrição ajustada automaticamente ao maior nome de produto da lista (em linha reta)
+    max_len_desc = max([len(str(item[1]).strip()) for item in itens_filtrados_temp]) if itens_filtrados_temp else 20
+    largura_desc = max(110.0, min(float(max_len_desc * 3.3), 300.0))
+    
     largura_est = 28
     largura_comp = 28
     largura_div = 30
@@ -959,7 +962,7 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
         else:
             doc.add_paragraph("Coluna de ajuste não mapeada diretamente para listagem individual detalhada neste bloco.")
     doc.add_heading("3. Validação e Assinatura C-Level", level=2)
-    doc.add_paragraph("Declaro que os dados acima foram auditados eletronicamente através do Protocolo J.A.R.V.I.S. / Grupo KMB e refletem com fidelidade a apuração patrimonial realizada.\n\n\n")
+    doc.add_paragraph("Declaro que os dados acima foram auditados eletronicamente através do Protocolo J.A.R.V.I.S. / Grupo KMB e refletem com fidelidade a apuração patrimonial realizada.\n\n")
     
     p_assinatura = doc.add_paragraph()
     p_assinatura.add_run("____________________________________________________\n").bold = True
