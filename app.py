@@ -458,7 +458,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     return buffer
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM TETO AJUSTADO PARA 250 PT)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (MULTIPLICADOR CORRIGIDO PARA 4.2)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -664,9 +664,9 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     largura_util = 792 - 28
     largura_codigo = 45
     
-    # Largura da descrição ajustada com teto de segurança equilibrado em 250 pt
+    # MULTIPLICADOR CORRIGIDO PARA 4.2 (Garante largura real para fontes Helvetica sem quebrar)
     max_len_desc = max([len(str(item[1]).strip()) for item in itens_filtrados_temp]) if itens_filtrados_temp else 20
-    largura_desc = max(110.0, min(float(max_len_desc * 3.3), 250.0))
+    largura_desc = max(110.0, min(float(max_len_desc * 4.2), 250.0))
     
     largura_est = 28
     largura_comp = 28
@@ -1044,7 +1044,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
 def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
     prs = Presentation()
-    slide_layout = prs.slide_layouts[6] # em branco
+    slide_layout = prs.slide_layouts[6]
     
     slide1 = prs.slides.add_slide(slide_layout)
     bg1 = slide1.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
