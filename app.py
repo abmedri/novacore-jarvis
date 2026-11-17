@@ -458,7 +458,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     return buffer
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM FONTES E BORDAS PRETAS AJUSTADAS)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM TETO AJUSTADO PARA 250 PT)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -664,9 +664,9 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     largura_util = 792 - 28
     largura_codigo = 45
     
-    # Largura da descrição ajustada automaticamente ao maior nome de produto da lista (em linha reta)
+    # Largura da descrição ajustada com teto de segurança equilibrado em 250 pt
     max_len_desc = max([len(str(item[1]).strip()) for item in itens_filtrados_temp]) if itens_filtrados_temp else 20
-    largura_desc = max(110.0, min(float(max_len_desc * 3.3), 300.0))
+    largura_desc = max(110.0, min(float(max_len_desc * 3.3), 250.0))
     
     largura_est = 28
     largura_comp = 28
@@ -694,7 +694,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     idx_col_c1 = 5
     idx_col_loc1 = 5 + max_locais_encontrados
     
-    # BORDAS EM PRETO SÓLIDO (#000000)
     tabela_pdf.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
         ('BACKGROUND', (idx_col_divergencia, 1), (idx_col_divergencia, -1), colors.HexColor('#D9D9D9')),
@@ -1047,13 +1046,10 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     prs = Presentation()
     slide_layout = prs.slide_layouts[6] # em branco
     
-    # ----------------------------------------------------
-    # SLIDE 1: CAPA EXECUTIVA MODERNA
-    # ----------------------------------------------------
     slide1 = prs.slides.add_slide(slide_layout)
     bg1 = slide1.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
     bg1.fill.solid()
-    bg1.fill.fore_color.rgb = PptxRGBColor(11, 15, 25) # #0b0f19
+    bg1.fill.fore_color.rgb = PptxRGBColor(11, 15, 25)
     bg1.line.fill.background()
     
     tb1 = slide1.shapes.add_textbox(PptxInches(1), PptxInches(1.8), PptxInches(11.3), PptxInches(4))
@@ -1082,9 +1078,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     p3.alignment = PP_ALIGN.CENTER
 
     for r in resumos:
-        # ----------------------------------------------------
-        # SLIDE 2: RESUMO EXECUTIVO CONSOLIDADO
-        # ----------------------------------------------------
         slide2 = prs.slides.add_slide(slide_layout)
         tb_head2 = slide2.shapes.add_textbox(PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8))
         tf_head2 = tb_head2.text_frame
@@ -1124,9 +1117,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
             pl.font.color.rgb = PptxRGBColor(51, 65, 85)
             pl.space_before = PptxPt(12)
 
-        # ----------------------------------------------------
-        # SLIDE 3: INDICADORES DE SKUS & VOLUMETRIA
-        # ----------------------------------------------------
         slide3 = prs.slides.add_slide(slide_layout)
         tb_head3 = slide3.shapes.add_textbox(PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8))
         tf_head3 = tb_head3.text_frame
@@ -1192,9 +1182,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
             pt.font.color.rgb = PptxRGBColor(51, 65, 85)
             pt.space_before = PptxPt(10)
 
-        # ----------------------------------------------------
-        # SLIDE 4: BALANÇO PATRIMONIAL & IMPACTO
-        # ----------------------------------------------------
         slide4 = prs.slides.add_slide(slide_layout)
         tb_head4 = slide4.shapes.add_textbox(PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8))
         tf_head4 = tb_head4.text_frame
@@ -1234,9 +1221,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
             pt.font.color.rgb = PptxRGBColor(51, 65, 85)
             pt.space_before = PptxPt(10)
 
-        # ----------------------------------------------------
-        # SLIDE 5: ANÁLISE DE CRITICIDADE E QUEBRAS
-        # ----------------------------------------------------
         slide5 = prs.slides.add_slide(slide_layout)
         tb_head5 = slide5.shapes.add_textbox(PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8))
         tf_head5 = tb_head5.text_frame
@@ -1275,9 +1259,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
             pt.font.color.rgb = PptxRGBColor(51, 65, 85)
             pt.space_before = PptxPt(12)
 
-        # ----------------------------------------------------
-        # SLIDE 6: PLANO DE AÇÃO C-LEVEL & GOVERNANÇA
-        # ----------------------------------------------------
         slide6 = prs.slides.add_slide(slide_layout)
         tb_head6 = slide6.shapes.add_textbox(PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8))
         tf_head6 = tb_head6.text_frame
