@@ -458,7 +458,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     return buffer
 
 # ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM LÓGICA CIRÚRGICA DE FILTROS)
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (COM FONTES E BORDAS PRETAS AJUSTADAS)
 # ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -482,140 +482,7 @@ class NumberedCanvas(canvas.Canvas):
         largura_pagina, altura_pagina = self._pagesize
         margem = 10
         
-        self.setStrokeColor(colors.HexColor('#cbd5e1'))
-        self.setLineWidth(0.5)
-        self.line(margem, 22, largura_pagina - margem, 22)
-        
-        caminho_brasao = "brasao_sem_fundo.png" if os.path.exists("brasao_sem_fundo.png") else ("1000352084.jpg" if os.path.exists("1000352084.jpg") else None)
-        if caminho_brasao:
-            try:
-                self.drawImage(caminho_brasao, margem, 6, width=45, height=13, preserveAspectRatio=True, mask='auto')
-            except Exception:
-                pass
-                
-        texto_esquerda = "GRUPO KMB // Auditoria Patrimonial • Exatidão • Controle • Eficiência"
-        self.drawString(margem + 50, 10, texto_esquerda)
-        
-        texto_pagina = f"Página {self._pageNumber} de {page_count}"
-        self.drawRightString(largura_pagina - margem, 10, texto_pagina)
-        self.restoreState()
-
-def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tipo_filtro):
-    col_loc = next((c for c in df_localizacao.columns if 'local' in c.lower()), df_localizacao.columns[2])
-    col_cod_loc = next((c for c in df_localizacao.columns if 'codigo' in c.lower() or 'cod' in c.lower()), df_localizacao.columns[3])
-    col_desc_loc = next((c for c in df_localizacao.columns if 'desc' in c.lower()), df_localizacao.columns[4])
-    col_qtd_loc = next((c for c in df_localizacao.columns if 'qtd' in c.lower() or 'quantidade' in c.lower()), df_localizacao.columns[5])
-    
-    locais_por_produto = {}
-    soma_comptar_por_produto = {}
-    descricoes_comptar = {}
-    
-    for _, row in df_localizacao.iterrows():
-        loc = limpar_nome_local(row.get(col_loc, ''))
-        cod = str(row.get(col_cod_loc, '')).strip()
-        desc = str(row.get(col_desc_loc, '')).strip()
-        try:
-            qtd = int(float(row.get(col_qtd_loc, 0)))
-        except Exception:
-            qtd = 0
-            
-        if cod not in locais_por_produto:
-            locais_por_produto[cod] = []
-            soma_comptar_por_produto[cod] = 0
-            descricoes_comptar[cod] = desc
-        locais_por_produto[cod].append((loc, qtd))
-        soma_comptar_por_produto[cod] += qtd
-        
-    col_cod_est = next((c for c in df_estoque.columns if 'codigo' in c.lower()), 'Codigo')
-    col_desc_est = next((c for c in df_estoque.columns if 'desc' in c.lower()), 'Descrição')
-    col_est = next((c for c in df_estoque.columns if 'estoque' in c.lower()), 'Estoque')
-    codigos_estoque_set = set(df_estoque[col_cod_est].astype(str).str.strip().values)
-    
-    itens_filtrados_temp = []
-    if tipo_filtro == "SEM_SALDO":
-        for cod, locs in locais_por_produto.items():
-            if cod not in codigos_estoque_set:
-                desc_item = descricoes_comptar.get(cod, "Item Avulso / Sem Cadastro")
-                soma_comptar_val = soma_comptar_por_produto.get(cod, 0)
-                divergencia_val = soma_comptar_val - 0
-                itens_filtrados_temp.append((cod, desc_item, 0, True, soma_comptar_val, divergencia_val, locs))
-    elif tipo_filtro == "ZERADOS":
-        for idx, row in df_estoque.iterrows():
-            cod = str(row.get(col_cod_est, '')).strip()
-            if cod not in locais_por_produto:
-                desc = str(row.get(col_desc_est, ''))
-                try:
-                    est = int(float(row.get(col_est, 0)))
-                except Exception:
-                    est = 0
-                itens_filtrados_temp.append((cod, desc, est, False, 0, -est, []))
-    else:
-        for idx, row in df_estoque.iterrows():
-            cod = str(row.get(col_cod_est, '')).strip()
-            desc = str(row.get(col_desc_est, ''))
-            try:
-                est = int(float(row.get(col_est, 0)))
-            except Exception:
-                est = 0
-            
-            locs_prod = locais_por_produto.get(cod, [])
-            tem_na_comptar = len(locs_prod) > 0
-            soma_comptar_val = soma_comptar_por_produto.get(cod, 0) if tem_na_comptar else 0
-            divergencia_val = soma_comptar_val - est
-            
-            incluir = False
-            if tipo_filtro == "TODOS":
-                incluir = True
-            elif tipo_filtro == "FALTAS":
-                if tem_na_comptar and divergencia_val < 0:
-                    incluir = True
-            elif tipo_filtro == "SOBRAS":
-                if tem_na_comptar and divergencia_val > 0:
-                    incluir = True
-                    
-            if incluir:
-                itens_filtrados_temp.append((cod, desc, est, tem_na_comptar, soma_comptar_val, divergencia_val, locs_prod))
-                
-    itens_filtrados_temp.sort(key=lambda x: str(x[1]).strip().upper())
-    locais_com_contagem = [len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0]
-    max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
-    
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=landscape(letter),
-        rightMargin=22,
-        leftMargin=22,
-        topMargin=20,
-        bottomMargin=30
-    )
-    
-# ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (MANTIDO INTACTO)
-# ====================================================================================
-class NumberedCanvas(canvas.Canvas):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._saved_page_states = []
-    def showPage(self):
-        self._saved_page_states.append(dict(self.__dict__))
-        self._startPage()
-    def save(self):
-        num_pages = len(self._saved_page_states)
-        for state in self._saved_page_states:
-            self.__dict__.update(state)
-            self.draw_page_decorations(num_pages)
-            super().showPage()
-        super().save()
-    def draw_page_decorations(self, page_count):
-        self.saveState()
-        self.setFont("Helvetica", 7)
-        self.setFillColor(colors.HexColor('#64748b'))
-        
-        largura_pagina, altura_pagina = self._pagesize
-        margem = 10
-        
-        self.setStrokeColor(colors.HexColor('#cbd5e1'))
+        self.setStrokeColor(colors.HexColor('#000000'))
         self.setLineWidth(0.5)
         self.line(margem, 22, largura_pagina - margem, 22)
         
@@ -726,10 +593,13 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     styles = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
-    estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=4.5, leading=5.5, textColor=colors.white, alignment=1)
-    estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=5.0, leading=6.0, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_centro = ParagraphStyle('TD_Centro', fontName='Helvetica', fontSize=4.5, leading=5.5, textColor=colors.HexColor('#111827'), alignment=1)
-    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=3.8, leading=4.8, textColor=colors.HexColor('#111827'), alignment=0, leftIndent=0, firstLineIndent=0, rightIndent=0)
+    estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.0, leading=6.0, textColor=colors.white, alignment=1)
+    
+    # NOVOS TAMANHOS DE FONTE SOLICITADOS (5.5 pt para Código/Descrição, 6.0 pt em negrito para Estoque/Comptar/Divergência/Contagens/Locais)
+    estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=5.5, leading=6.5, textColor=colors.HexColor('#111827'), alignment=1)
+    estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=5.5, leading=6.5, textColor=colors.HexColor('#111827'), alignment=0, leftIndent=0, firstLineIndent=0, rightIndent=0)
+    
+    estilo_td_negrito_centro = ParagraphStyle('TD_Negrito_Centro', fontName='Helvetica-Bold', fontSize=6.0, leading=7.0, textColor=colors.HexColor('#111827'), alignment=1)
     
     story = []
     story.append(Paragraph(f"<b>GRUPO KMB // RELATÓRIO DE CONFERÊNCIA ({tipo_filtro})</b> — LOJA: {numero_loja_input} | DATA: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_titulo))
@@ -755,9 +625,9 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         linha_celulas = [
             Paragraph(f"<nobr>{cod_formatado}</nobr>", estilo_td_codigo),
             Paragraph(f"<nobr>{desc_limpa}</nobr>", estilo_td_esq),
-            Paragraph(f"<nobr>{est}</nobr>", estilo_td_centro),
-            Paragraph(f"<nobr>{cel_comptar}</nobr>", estilo_td_centro),
-            Paragraph(f"<nobr>{cel_divergencia}</nobr>", estilo_td_centro)
+            Paragraph(f"<nobr>{est}</nobr>", estilo_td_negrito_centro),
+            Paragraph(f"<nobr>{cel_comptar}</nobr>", estilo_td_negrito_centro),
+            Paragraph(f"<nobr>{cel_divergencia}</nobr>", estilo_td_negrito_centro)
         ]
         
         contagens_vals = []
@@ -766,25 +636,25 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
             for i in range(max_locais_encontrados):
                 if i < len(locs_prod):
                     val_qtd_str = str(int(float(locs_prod[i][1])))
-                    contagens_vals.append(Paragraph(f"<nobr>{val_qtd_str}</nobr>", estilo_td_centro))
+                    contagens_vals.append(Paragraph(f"<nobr>{val_qtd_str}</nobr>", estilo_td_negrito_centro))
                     max_chars_por_coluna[i] = max(max_chars_por_coluna[i], len(val_qtd_str))
                     
                     nome_loc_original = str(limpar_nome_local(locs_prod[i][0]))
                     nome_loc_seguro = nome_loc_original.replace(' ', '&nbsp;')
-                    locais_vals.append(Paragraph(f"<nobr>{nome_loc_seguro}</nobr>", estilo_td_centro))
+                    locais_vals.append(Paragraph(f"<nobr>{nome_loc_seguro}</nobr>", estilo_td_negrito_centro))
                     max_chars_por_coluna[max_locais_encontrados + i] = max(max_chars_por_coluna[max_locais_encontrados + i], len(nome_loc_original))
                 else:
-                    contagens_vals.append(Paragraph("", estilo_td_centro))
-                    locais_vals.append(Paragraph("", estilo_td_centro))
+                    contagens_vals.append(Paragraph("", estilo_td_negrito_centro))
+                    locais_vals.append(Paragraph("", estilo_td_negrito_centro))
         else:
             if tipo_filtro == "ZERADOS":
-                contagens_vals = [Paragraph("<nobr>0&nbsp;-&nbsp;Comptar</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
-                locais_vals = [Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
+                contagens_vals = [Paragraph("<nobr>0&nbsp;-&nbsp;Comptar</nobr>", estilo_td_negrito_centro)] + [Paragraph("", estilo_td_negrito_centro)] * (max_locais_encontrados - 1)
+                locais_vals = [Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_negrito_centro)] + [Paragraph("", estilo_td_negrito_centro)] * (max_locais_encontrados - 1)
                 max_chars_por_coluna[0] = max(max_chars_por_coluna[0], 12)
                 max_chars_por_coluna[max_locais_encontrados] = max(max_chars_por_coluna[max_locais_encontrados], 9)
             else:
-                contagens_vals = [Paragraph("<nobr>0</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
-                locais_vals = [Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_centro)] + [Paragraph("", estilo_td_centro)] * (max_locais_encontrados - 1)
+                contagens_vals = [Paragraph("<nobr>0</nobr>", estilo_td_negrito_centro)] + [Paragraph("", estilo_td_negrito_centro)] * (max_locais_encontrados - 1)
+                locais_vals = [Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_negrito_centro)] + [Paragraph("", estilo_td_negrito_centro)] * (max_locais_encontrados - 1)
                 max_chars_por_coluna[0] = max(max_chars_por_coluna[0], 1)
                 max_chars_por_coluna[max_locais_encontrados] = max(max_chars_por_coluna[max_locais_encontrados], 9)
             
@@ -793,11 +663,11 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         dados_tabela.append(linha_celulas)
         
     largura_util = 792 - 28
-    largura_codigo = 42
-    largura_desc = 100
-    largura_est = 26
-    largura_comp = 26
-    largura_div = 28
+    largura_codigo = 45
+    largura_desc = 110
+    largura_est = 28
+    largura_comp = 28
+    largura_div = 30
     largura_fixa_inicial = largura_codigo + largura_desc + largura_est + largura_comp + largura_div
     
     largura_restante_total = largura_util - largura_fixa_inicial
@@ -813,7 +683,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     
     for peso in pesos_colunas:
         L_calc = (peso / soma_pesos) * largura_restante_total
-        col_widths.append(max(L_calc, 16.0))
+        col_widths.append(max(L_calc, 18.0))
         
     tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
     
@@ -821,6 +691,7 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     idx_col_c1 = 5
     idx_col_loc1 = 5 + max_locais_encontrados
     
+    # BORDAS EM PRETO SÓLIDO (#000000)
     tabela_pdf.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
         ('BACKGROUND', (idx_col_divergencia, 1), (idx_col_divergencia, -1), colors.HexColor('#D9D9D9')),
@@ -828,9 +699,9 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
         ('BACKGROUND', (idx_col_loc1, 1), (idx_col_loc1, -1), colors.HexColor('#F1F5F9')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 0.8),
-        ('TOPPADDING', (0, 0), (-1, -1), 0.8),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.0),
+        ('TOPPADDING', (0, 0), (-1, -1), 1.0),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#000000')),
     ]))
     
     story.append(tabela_pdf)
@@ -899,7 +770,7 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#000000')),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('LEFTPADDING', (0, 0), (-1, -1), 6),
@@ -945,8 +816,8 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     tabela_balanco = Table(dados_balanco, colWidths=[270, 270])
     tabela_balanco.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#000000')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#000000')),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('LEFTPADDING', (0, 0), (-1, -1), 8),
@@ -969,7 +840,7 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     tabela_parecer = Table([[Paragraph(texto_parecer.strip(), estilo_parecer)]], colWidths=[540])
     tabela_parecer.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F1F5F9')),
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#000000')),
         ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('LEFTPADDING', (0, 0), (-1, -1), 8),
