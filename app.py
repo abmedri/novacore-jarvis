@@ -831,12 +831,12 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     
     story.append(Paragraph("3. Parecer Técnico de Governança", estilo_secao))
     
-    status_acuracia = "atendendo à meta corporativa" if resumo_unico['acuracia_vol'] >= 97 else "abaixo da meta corporativa de 97,00%"
+    status_acuracia = "atendendo à meta corporativa" if resumo_unico['acuracia_vol'] >= 97 else "abaixo da meta corporativa"
     texto_parecer = f"""
     A unidade apresentou acuracidade volumétrica de {resumo_unico['acuracia_vol']:.2f}% ({status_acuracia}) e 
     acuracidade financeira de {resumo_unico['acuracia_fin']:.2f}%, registrando ajuste líquido de R$ {resumo_unico['val_ajuste_liquido']:,.2f} 
     ({resumo_unico['impacto_sobre_antes_pct']:.2f}% sobre o saldo teórico inicial). Recomenda-se atuação imediata nas {resumo_unico['skus_falta']} 
-    linhas com quebra apontadas na Etapa 5 (Plano de Ação Prioritário).
+    linhas com quebra apontadas (Plano de Ação Prioritário).
     """
     
     tabela_parecer = Table([[Paragraph(texto_parecer.strip(), estilo_parecer)]], colWidths=[540])
