@@ -238,7 +238,7 @@ class EtiquetasNumberedCanvas(canvas.Canvas):
 
 def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
     buffer = io.BytesIO()
-    c = EtiquetasNumberedCanvas(buffer, pagesize=A4)
+    c = canvas.Canvas(buffer, pagesize=A4)
     
     # Medidas exatas do modelo: 2 colunas x 7 linhas = 14 etiquetas por página A4
     margin_top = 38.0
@@ -250,24 +250,39 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
     w_num = 122.0
     w_brasao = 54.0
     
-    current_col = 0
-    current_row = 0
-    
     brasao_reader = None
     if caminho_brasao and os.path.exists(caminho_brasao):
         try:
             brasao_reader = ImageReader(caminho_brasao)
         except Exception:
             brasao_reader = None
+
+    total_etiquetas = (fim - inicio) + 1
+    total_paginas = (total_etiquetas + 13) // 14
+
+    def desenhar_rodape(pagina_atual):
+        c.saveState()
+        c.setFont("Helvetica", 8.5)
+        c.setFillColorRGB(0.35, 0.35, 0.35)
+        text = f"Gerador de QrCode KMB  -  Página {pagina_atual} de {total_paginas}"
+        c.drawCentredString(A4[0] / 2.0, 18, text)
+        c.restoreState()
+
+    for idx, num in enumerate(range(inicio, fim + 1)):
+        pos_na_pagina = idx % 14
+        
+        # Inicia nova página a cada 14 etiquetas (exceto na primeira)
+        if idx > 0 and pos_na_pagina == 0:
+            c.showPage()
             
-    for num in range(inicio, fim + 1):
-        if current_row >= 7:
-            current_row = 0
-            current_col += 1
-            if current_col >= 2:
-                c.showPage()
-                current_col = 0
-                
+        # Desenha o rodapé assim que inicia a página
+        if pos_na_pagina == 0:
+            pagina_atual = (idx // 14) + 1
+            desenhar_rodape(pagina_atual)
+            
+        current_col = pos_na_pagina // 7
+        current_row = pos_na_pagina % 7
+        
         x = col_lefts[current_col]
         y = A4[1] - margin_top - ((current_row + 1) * row_height)
         
@@ -282,9 +297,9 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
         c.line(x_num, y, x_num, y + row_height)
         c.line(x_brasao, y, x_brasao, y + row_height)
         
-        # QR Code em memória com prefixo KMB
+        # QR Code em memória apenas com o número formatado (sem prefixo)
         str_num = f"{num:02d}"
-        texto_qr = f"KMB-{str_num}"
+        texto_qr = str_num
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -319,8 +334,6 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
         if brasao_reader:
             c.drawImage(brasao_reader, x_brasao + 3, y + 8, width=w_brasao - 6, height=row_height - 16, preserveAspectRatio=True, mask='auto')
             
-        current_row += 1
-        
     c.save()
     buffer.seek(0)
     return buffer
