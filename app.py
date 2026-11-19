@@ -210,7 +210,7 @@ def limpar_nome_local(val):
     return s
 
 # ====================================================================================
-# BLOCO 3: GERADOR DE ETIQUETAS QR CODE KMB (A4 - 2 COLUNAS / 14 POR PÁGINA)
+# BLOCO 3: GERADOR DE ETIQUETAS QR CODE KMB
 # ====================================================================================
 class EtiquetasNumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
