@@ -8,6 +8,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import qrcode
+import datetime
 # Dependências para relatórios executivos avançados C-Level e Planilhas de Conferência
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -240,7 +241,6 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     
-    # Medidas exatas do modelo: 2 colunas x 7 linhas = 14 etiquetas por página A4
     margin_top = 38.0
     row_height = 104.0
     col_width = 272.0
@@ -271,11 +271,9 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
     for idx, num in enumerate(range(inicio, fim + 1)):
         pos_na_pagina = idx % 14
         
-        # Inicia nova página a cada 14 etiquetas (exceto na primeira)
         if idx > 0 and pos_na_pagina == 0:
             c.showPage()
             
-        # Desenha o rodapé assim que inicia a página
         if pos_na_pagina == 0:
             pagina_atual = (idx // 14) + 1
             desenhar_rodape(pagina_atual)
@@ -290,14 +288,12 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
         x_num = x_qr + w_qr
         x_brasao = x_num + w_num
         
-        # Bordas externas e divisórias internas
         c.setStrokeColorRGB(0.15, 0.15, 0.15)
         c.setLineWidth(0.8)
         c.rect(x, y, col_width, row_height)
         c.line(x_num, y, x_num, y + row_height)
         c.line(x_brasao, y, x_brasao, y + row_height)
         
-        # QR Code em memória apenas com o número formatado (sem prefixo)
         str_num = f"{num:02d}"
         texto_qr = str_num
         qr = qrcode.QRCode(
@@ -315,7 +311,6 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
         qr_buf.seek(0)
         c.drawImage(ImageReader(qr_buf), x_qr + 5, y + 5, width=w_qr - 10, height=row_height - 10, preserveAspectRatio=True)
         
-        # Número grande e encorpado preenchendo a célula central
         c.setFillColorRGB(0, 0, 0)
         if len(str_num) <= 2:
             font_size = 74
@@ -330,13 +325,61 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
         c.setFont("Helvetica-Bold", font_size)
         c.drawCentredString(x_num + (w_num / 2.0), y + (row_height / 2.0) - y_offset, str_num)
         
-        # Brasão na terceira coluna
         if brasao_reader:
             c.drawImage(brasao_reader, x_brasao + 3, y + 8, width=w_brasao - 6, height=row_height - 16, preserveAspectRatio=True, mask='auto')
             
     c.save()
     buffer.seek(0)
     return buffer
+
+# ====================================================================================
+# BLOCO 4: AGENDA DE COMPROMISSOS & TAREFAS C-LEVEL
+# ====================================================================================
+def renderizar_bloco_agenda():
+    st.markdown("### 📅 BLOCO 4: AGENDA DE COMPROMISSOS & TAREFAS C-LEVEL")
+    st.markdown("Gerencie os compromissos, prazos de auditoria e entregas estratégicas do Grupo KMB.")
+    
+    if "agenda_tarefas" not in st.session_state:
+        st.session_state.agenda_tarefas = [
+            {"data": str(datetime.date.today()), "hora": "09:00", "titulo": "Auditoria Loja Principal", "status": "Pendente"},
+            {"data": str(datetime.date.today()), "hora": "14:00", "titulo": "Reunião C-Level / Diretoria", "status": "Pendente"}
+        ]
+        
+    with st.form("form_nova_tarefa", clear_on_submit=True):
+        st.markdown("#### Adicionar Novo Compromisso")
+        col_ag1, col_ag2, col_ag3 = st.columns(3)
+        with col_ag1:
+            data_compromisso = st.date_input("Data", value=datetime.date.today())
+        with col_ag2:
+            hora_compromisso = st.text_input("Hora (ex: 10:30)", value="09:00")
+        with col_ag3:
+            status_compromisso = st.selectbox("Status", ["Pendente", "Em Andamento", "Concluído"])
+            
+        titulo_compromisso = st.text_input("Título / Descrição do Compromisso")
+        
+        btn_adicionar = st.form_submit_button("➕ Adicionar à Agenda", use_container_width=True)
+        if btn_adicionar:
+            if titulo_compromisso.strip():
+                st.session_state.agenda_tarefas.append({
+                    "data": str(data_compromisso),
+                    "hora": hora_compromisso,
+                    "titulo": titulo_compromisso,
+                    "status": status_compromisso
+                })
+                st.success("✅ Compromisso adicionado com sucesso!")
+            else:
+                st.error("❌ O título do compromisso não pode estar vazio.")
+                
+    st.markdown("#### 📋 Compromissos Registrados")
+    if st.session_state.agenda_tarefas:
+        df_agenda = pd.DataFrame(st.session_state.agenda_tarefas)
+        st.dataframe(df_agenda, use_container_width=True)
+        
+        if st.button("🗑️ Limpar Todos os Compromissos", use_container_width=True):
+            st.session_state.agenda_tarefas = []
+            st.rerun()
+    else:
+        st.info("Nenhum compromisso cadastrado na agenda no momento.")
 
 # ====================================================================================
 # GERADOR DO EXCEL DE CONFERÊNCIA (COM BORDAS PRETAS NÍTIDAS)
@@ -351,7 +394,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     fill_cabecalho = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     fill_cinza_claro = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
     
-    # Borda fina preta (#000000) para garantir forte destaque na impressão
     borda_fina = Border(
         left=Side(style='thin', color='000000'), right=Side(style='thin', color='000000'),
         top=Side(style='thin', color='000000'), bottom=Side(style='thin', color='000000')
@@ -590,9 +632,6 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     buffer.seek(0)
     return buffer
 
-# ====================================================================================
-# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (MULTIPLICADOR CORRIGIDO PARA 4.2)
-# ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -727,10 +766,8 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.0, leading=6.0, textColor=colors.white, alignment=1)
-    
     estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=5.5, leading=6.5, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=5.5, leading=6.5, textColor=colors.HexColor('#111827'), alignment=0, leftIndent=0, firstLineIndent=0, rightIndent=0)
-    
     estilo_td_negrito_centro = ParagraphStyle('TD_Negrito_Centro', fontName='Helvetica-Bold', fontSize=6.0, leading=7.0, textColor=colors.HexColor('#111827'), alignment=1)
     
     story = []
@@ -843,9 +880,6 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     buffer.seek(0)
     return buffer
     
-# ====================================================================================
-# GERADOR DE PDF VISUAL DOS INDICADORES (MODELO C-LEVEL)
-# ====================================================================================
 def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
@@ -871,7 +905,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     estilo_parecer = ParagraphStyle('ParecerTxt', fontName='Helvetica', fontSize=8.5, leading=12, textColor=colors.HexColor('#334155'))
     
     story = []
-    
     story.append(Paragraph("<b>GRUPO KMB DIRETORIA EXECUTIVA & AUDITORIA PATRIMONIAL</b>", estilo_titulo))
     story.append(Paragraph("Relatório Executivo de Indicadores", estilo_sub_topo))
     story.append(Paragraph(f"Unidade / Arquivo: {nome_arquivo} | Data de Emissão: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_meta_topo))
@@ -986,9 +1019,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     buffer.seek(0)
     return buffer
 
-# ====================================================================================
-# FUNÇÕES DE EXPORTAÇÃO C-LEVEL
-# ====================================================================================
 def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
     wb = openpyxl.Workbook()
@@ -1176,7 +1206,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
 def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
     prs = Presentation()
-    slide_layout = prs.slide_layouts[6] # em branco
+    slide_layout = prs.slide_layouts[6]
     
     slide1 = prs.slides.add_slide(slide_layout)
     bg1 = slide1.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
@@ -1494,7 +1524,8 @@ def main():
             [
                 "Auditoria de Inventário (5 Etapas)",
                 "Modo Planilha de Conferência",
-                "Gerador de Etiquetas QR Code"
+                "Gerador de Etiquetas QR Code",
+                "Agenda e Compromissos (Bloco 4)"
             ],
             key="radio_modo_operacao"
         )
@@ -1511,6 +1542,10 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
+    if modo_operacao == "Agenda e Compromissos (Bloco 4)":
+        renderizar_bloco_agenda()
+        return
+
     if modo_operacao == "Gerador de Etiquetas QR Code":
         st.markdown("### 🏷️ GERADOR DE ETIQUETAS QR CODE // PADRÃO A4 (14 POR PÁGINA)")
         st.markdown("Gere etiquetas com QR Code (prefixo **KMB**), numeração encorpada e brasão oficial prontas para impressão em folha A4.")
@@ -1705,7 +1740,7 @@ def main():
                             filtro_classe_abc = st.selectbox("Filtro Curva ABC:", options=["Todas as Classes (Geral)", "Classe A (80%)", "Classe B (95%)", "Classe C (100%)"], index=0, key="abc_filtro_classe")
                         
                         df_abc = df_filtrado.sort_values(by=eixo_y_escolhido, ascending=False).copy()
-                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolhido].cumsum()
+                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolh_ido if 'eixo_y_escolh_ido' in locals() else eixo_y_escolhido].cumsum() if eixo_y_escolhido in df_abc.columns else df_abc[eixo_y_escolhido].cumsum()
                         soma_total = df_abc[eixo_y_escolhido].sum()
                         
                         if soma_total > 0:
@@ -1745,7 +1780,7 @@ def main():
                         col_val_aju_etapa4 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_risco.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
                         df_risco['Categoria_Prod'] = df_risco['Descrição do Produto'].astype(str).str.split().str[0]
                         df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index().sort_values(by=col_val_aju_etapa4, ascending=True).head(15)
-                        fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etayo4 if 'col_val_aju_etayo4' in locals() else col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
+                        fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
                         fig_risco.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=420)
                         st.plotly_chart(fig_risco, use_container_width=True)
                 
