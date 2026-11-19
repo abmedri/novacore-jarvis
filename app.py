@@ -1547,7 +1547,7 @@ def main():
         return
 
     if modo_operacao == "Gerador de Etiquetas QR Code":
-        st.markdown("### 🏷️ GERADOR DE ETIQUETAS QR CODE // PADRÃO A4 (14 POR PÁGINA)")
+        st.markdown("### 🏷️ GERADOR DE ETIQUETAS QR CODE // PADRÃO A4 ")
         st.markdown("Gere etiquetas com QR Code (prefixo **KMB**), numeração encorpada e brasão oficial prontas para impressão em folha A4.")
         
         col_etq1, col_etq2 = st.columns(2)
