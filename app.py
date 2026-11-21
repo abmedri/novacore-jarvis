@@ -3341,7 +3341,7 @@ def main():
         "Número da Loja (ex: 13016 ou 17315)",
         min_value=1,
         max_value=99999,
-        value=13016,
+        value=0,
         step=1,
     )
 
