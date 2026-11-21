@@ -8,7 +8,6 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import qrcode
-import datetime
 # Dependências para relatórios executivos avançados C-Level e Planilhas de Conferência
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -210,7 +209,7 @@ def limpar_nome_local(val):
     return s
 
 # ====================================================================================
-# BLOCO 3: GERADOR DE ETIQUETAS QR CODE KMB
+# BLOCO 3: GERADOR DE ETIQUETAS QR CODE KMB (A4 - 2 COLUNAS / 14 POR PÁGINA)
 # ====================================================================================
 class EtiquetasNumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -241,6 +240,7 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     
+    # Medidas exatas do modelo: 2 colunas x 7 linhas = 14 etiquetas por página A4
     margin_top = 38.0
     row_height = 104.0
     col_width = 272.0
@@ -271,9 +271,11 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
     for idx, num in enumerate(range(inicio, fim + 1)):
         pos_na_pagina = idx % 14
         
+        # Inicia nova página a cada 14 etiquetas (exceto na primeira)
         if idx > 0 and pos_na_pagina == 0:
             c.showPage()
             
+        # Desenha o rodapé assim que inicia a página
         if pos_na_pagina == 0:
             pagina_atual = (idx // 14) + 1
             desenhar_rodape(pagina_atual)
@@ -288,12 +290,14 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
         x_num = x_qr + w_qr
         x_brasao = x_num + w_num
         
+        # Bordas externas e divisórias internas
         c.setStrokeColorRGB(0.15, 0.15, 0.15)
         c.setLineWidth(0.8)
         c.rect(x, y, col_width, row_height)
         c.line(x_num, y, x_num, y + row_height)
         c.line(x_brasao, y, x_brasao, y + row_height)
         
+        # QR Code em memória apenas com o número formatado (sem prefixo)
         str_num = f"{num:02d}"
         texto_qr = str_num
         qr = qrcode.QRCode(
@@ -311,6 +315,7 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
         qr_buf.seek(0)
         c.drawImage(ImageReader(qr_buf), x_qr + 5, y + 5, width=w_qr - 10, height=row_height - 10, preserveAspectRatio=True)
         
+        # Número grande e encorpado preenchendo a célula central
         c.setFillColorRGB(0, 0, 0)
         if len(str_num) <= 2:
             font_size = 74
@@ -325,61 +330,13 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
         c.setFont("Helvetica-Bold", font_size)
         c.drawCentredString(x_num + (w_num / 2.0), y + (row_height / 2.0) - y_offset, str_num)
         
+        # Brasão na terceira coluna
         if brasao_reader:
             c.drawImage(brasao_reader, x_brasao + 3, y + 8, width=w_brasao - 6, height=row_height - 16, preserveAspectRatio=True, mask='auto')
             
     c.save()
     buffer.seek(0)
     return buffer
-
-# ====================================================================================
-# BLOCO 4: AGENDA DE COMPROMISSOS & TAREFAS C-LEVEL
-# ====================================================================================
-def renderizar_bloco_agenda():
-    st.markdown("### 📅 BLOCO 4: AGENDA DE COMPROMISSOS & TAREFAS C-LEVEL")
-    st.markdown("Gerencie os compromissos, prazos de auditoria e entregas estratégicas do Grupo KMB.")
-    
-    if "agenda_tarefas" not in st.session_state:
-        st.session_state.agenda_tarefas = [
-            {"data": str(datetime.date.today()), "hora": "09:00", "titulo": "Auditoria Loja Principal", "status": "Pendente"},
-            {"data": str(datetime.date.today()), "hora": "14:00", "titulo": "Reunião C-Level / Diretoria", "status": "Pendente"}
-        ]
-        
-    with st.form("form_nova_tarefa", clear_on_submit=True):
-        st.markdown("#### Adicionar Novo Compromisso")
-        col_ag1, col_ag2, col_ag3 = st.columns(3)
-        with col_ag1:
-            data_compromisso = st.date_input("Data", value=datetime.date.today())
-        with col_ag2:
-            hora_compromisso = st.text_input("Hora (ex: 10:30)", value="09:00")
-        with col_ag3:
-            status_compromisso = st.selectbox("Status", ["Pendente", "Em Andamento", "Concluído"])
-            
-        titulo_compromisso = st.text_input("Título / Descrição do Compromisso")
-        
-        btn_adicionar = st.form_submit_button("➕ Adicionar à Agenda", use_container_width=True)
-        if btn_adicionar:
-            if titulo_compromisso.strip():
-                st.session_state.agenda_tarefas.append({
-                    "data": str(data_compromisso),
-                    "hora": hora_compromisso,
-                    "titulo": titulo_compromisso,
-                    "status": status_compromisso
-                })
-                st.success("✅ Compromisso adicionado com sucesso!")
-            else:
-                st.error("❌ O título do compromisso não pode estar vazio.")
-                
-    st.markdown("#### 📋 Compromissos Registrados")
-    if st.session_state.agenda_tarefas:
-        df_agenda = pd.DataFrame(st.session_state.agenda_tarefas)
-        st.dataframe(df_agenda, use_container_width=True)
-        
-        if st.button("🗑️ Limpar Todos os Compromissos", use_container_width=True):
-            st.session_state.agenda_tarefas = []
-            st.rerun()
-    else:
-        st.info("Nenhum compromisso cadastrado na agenda no momento.")
 
 # ====================================================================================
 # GERADOR DO EXCEL DE CONFERÊNCIA (COM BORDAS PRETAS NÍTIDAS)
@@ -394,6 +351,7 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     fill_cabecalho = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     fill_cinza_claro = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
     
+    # Borda fina preta (#000000) para garantir forte destaque na impressão
     borda_fina = Border(
         left=Side(style='thin', color='000000'), right=Side(style='thin', color='000000'),
         top=Side(style='thin', color='000000'), bottom=Side(style='thin', color='000000')
@@ -632,6 +590,9 @@ def gerar_planilha_filtrada_kmb(df_localizacao, df_estoque, numero_loja_input, t
     buffer.seek(0)
     return buffer
 
+# ====================================================================================
+# GERADOR DE PDF DE CONFERÊNCIA OTIMIZADO (MULTIPLICADOR CORRIGIDO PARA 4.2)
+# ====================================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -766,8 +727,10 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#1F4E78'))
     
     estilo_th = ParagraphStyle('TH_Auto', fontName='Helvetica-Bold', fontSize=5.0, leading=6.0, textColor=colors.white, alignment=1)
+    
     estilo_td_codigo = ParagraphStyle('TD_Codigo', fontName='Helvetica-Bold', fontSize=5.5, leading=6.5, textColor=colors.HexColor('#111827'), alignment=1)
     estilo_td_esq = ParagraphStyle('TD_Esq', fontName='Helvetica', fontSize=5.5, leading=6.5, textColor=colors.HexColor('#111827'), alignment=0, leftIndent=0, firstLineIndent=0, rightIndent=0)
+    
     estilo_td_negrito_centro = ParagraphStyle('TD_Negrito_Centro', fontName='Helvetica-Bold', fontSize=6.0, leading=7.0, textColor=colors.HexColor('#111827'), alignment=1)
     
     story = []
@@ -880,6 +843,9 @@ def gerar_pdf_conferencia_kmb(df_localizacao, df_estoque, numero_loja_input, tip
     buffer.seek(0)
     return buffer
     
+# ====================================================================================
+# GERADOR DE PDF VISUAL DOS INDICADORES (MODELO C-LEVEL)
+# ====================================================================================
 def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
@@ -905,6 +871,7 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     estilo_parecer = ParagraphStyle('ParecerTxt', fontName='Helvetica', fontSize=8.5, leading=12, textColor=colors.HexColor('#334155'))
     
     story = []
+    
     story.append(Paragraph("<b>GRUPO KMB DIRETORIA EXECUTIVA & AUDITORIA PATRIMONIAL</b>", estilo_titulo))
     story.append(Paragraph("Relatório Executivo de Indicadores", estilo_sub_topo))
     story.append(Paragraph(f"Unidade / Arquivo: {nome_arquivo} | Data de Emissão: {pd.Timestamp.now().strftime('%d/%m/%Y')}", estilo_meta_topo))
@@ -1019,6 +986,9 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     buffer.seek(0)
     return buffer
 
+# ====================================================================================
+# FUNÇÕES DE EXPORTAÇÃO C-LEVEL
+# ====================================================================================
 def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
     wb = openpyxl.Workbook()
@@ -1206,7 +1176,7 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
 def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     resumos = calcular_metricas_gerenciais(tuple(lista_dfs), tuple(nomes_arquivos))
     prs = Presentation()
-    slide_layout = prs.slide_layouts[6]
+    slide_layout = prs.slide_layouts[6] # em branco
     
     slide1 = prs.slides.add_slide(slide_layout)
     bg1 = slide1.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
@@ -1464,6 +1434,504 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     buffer.seek(0)
     return buffer
 
+# ====================================================================================
+# BLOCO 4: AGENDA INTERATIVA DIÁRIA & AUTOMAÇÕES (WHATSAPP, E-MAIL, EXCEL, PDF)
+# ====================================================================================
+def _b4_garantir_estado_agenda():
+    if "b4_compromissos" not in st.session_state:
+        hoje_str = pd.Timestamp.now().strftime("%Y-%m-%d")
+        st.session_state.b4_compromissos = [
+            {
+                "id": "EVT-101",
+                "data": hoje_str,
+                "hora": "09:00",
+                "titulo": "Briefing Diário de Inventário & Auditoria",
+                "categoria": "Trabalho",
+                "prioridade": "Alta",
+                "status": "Confirmado",
+                "aviso_min": 15,
+                "destino_wa": "",
+                "destino_email": "",
+                "notas": "Revisar divergências críticas e confirmar rondas das lojas."
+            },
+            {
+                "id": "EVT-102",
+                "data": hoje_str,
+                "hora": "14:30",
+                "titulo": "Fechamento de Conferência e Relatórios C-Level",
+                "categoria": "Urgente",
+                "prioridade": "Alta",
+                "status": "Pendente",
+                "aviso_min": 10,
+                "destino_wa": "",
+                "destino_email": "",
+                "notas": "Exportar PDF/Excel e disparar resumo para liderança."
+            }
+        ]
+    if "b4_avisos_disparados" not in st.session_state:
+        st.session_state.b4_avisos_disparados = []
+    if "b4_log_automacoes" not in st.session_state:
+        st.session_state.b4_log_automacoes = []
+
+def _b4_formatar_texto_agenda(compromissos, titulo_secao="AGENDA DIÁRIA"):
+    if not compromissos:
+        return f"📅 *{titulo_secao}*\nNenhum compromisso encontrado para o filtro selecionado."
+    linhas = [f"📅 *{titulo_secao}* ({len(compromissos)} compromisso(s))", ""]
+    for item in compromissos:
+        linhas.append(
+            f"• *{item.get('hora', '--:--')}* — {item.get('titulo', 'Sem título')} "
+            f"[{item.get('categoria', 'Geral')} | {item.get('status', 'Pendente')}]"
+        )
+        notas = str(item.get("notas", "")).strip()
+        if notas:
+            linhas.append(f"  _Obs:_ {notas}")
+    return "\n".join(linhas)
+
+def _b4_gerar_excel_agenda(df_agenda, nome_aba="Agenda"):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = nome_aba[:31]
+    ws.views.sheetView[0].showGridLines = True
+
+    fonte_cab = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+    fill_cab = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    fonte_pad = Font(name="Arial", size=10)
+    borda = Border(
+        left=Side(style='thin', color='000000'), right=Side(style='thin', color='000000'),
+        top=Side(style='thin', color='000000'), bottom=Side(style='thin', color='000000')
+    )
+
+    colunas = ["ID", "Data", "Hora", "Título", "Categoria", "Prioridade", "Status", "Aviso (min)", "WhatsApp", "E-mail", "Notas"]
+    ws.append(colunas)
+    for col_idx in range(1, len(colunas) + 1):
+        c = ws.cell(row=1, column=col_idx)
+        c.font = fonte_cab
+        c.fill = fill_cab
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = borda
+
+    for _, r in df_agenda.iterrows():
+        ws.append([str(r.get(col, "")) for col in colunas])
+
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(colunas)):
+        for cell in row:
+            cell.font = fonte_pad
+            cell.border = borda
+            cell.alignment = Alignment(horizontal="left" if cell.column in [4, 11] else "center", vertical="center")
+
+    for col in ws.columns:
+        col_letter = get_column_letter(col[0].column)
+        max_len = max([len(str(cell.value or "")) for cell in col] + [8])
+        ws.column_dimensions[col_letter].width = min(max_len + 3, 45)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+def _b4_gerar_pdf_agenda(df_agenda, titulo_relatorio):
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(letter), rightMargin=20, leftMargin=20, topMargin=24, bottomMargin=28)
+    styles = getSampleStyleSheet()
+    estilo_tit = ParagraphStyle('B4TitPDF', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#1F4E78'))
+    estilo_th = ParagraphStyle('B4TH', fontName='Helvetica-Bold', fontSize=7.5, textColor=colors.white, alignment=1)
+    estilo_td = ParagraphStyle('B4TD', fontName='Helvetica', fontSize=7.5, textColor=colors.HexColor('#111827'), alignment=0)
+    estilo_td_c = ParagraphStyle('B4TDC', fontName='Helvetica', fontSize=7.5, textColor=colors.HexColor('#111827'), alignment=1)
+
+    story = [
+        Paragraph(f"<b>GRUPO KMB // AGENDA INTERATIVA — {titulo_relatorio}</b>", estilo_tit),
+        Paragraph(f"Emitido em: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']),
+        Spacer(1, 8)
+    ]
+
+    headers = ["Data", "Hora", "Compromisso", "Categoria", "Prioridade", "Status", "Aviso", "Observações"]
+    tabela_dados = [[Paragraph(h, estilo_th) for h in headers]]
+
+    for _, r in df_agenda.iterrows():
+        tabela_dados.append([
+            Paragraph(str(r.get("Data", "")), estilo_td_c),
+            Paragraph(str(r.get("Hora", "")), estilo_td_c),
+            Paragraph(str(r.get("Título", "")), estilo_td),
+            Paragraph(str(r.get("Categoria", "")), estilo_td_c),
+            Paragraph(str(r.get("Prioridade", "")), estilo_td_c),
+            Paragraph(str(r.get("Status", "")), estilo_td_c),
+            Paragraph(f"{r.get('Aviso (min)', 15)} min", estilo_td_c),
+            Paragraph(str(r.get("Notas", "")), estilo_td),
+        ])
+
+    tbl = Table(tabela_dados, colWidths=[68, 48, 185, 75, 65, 75, 50, 186], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#000000')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8FAFC')]),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(tbl)
+    doc.build(story, canvasmaker=NumberedCanvas)
+    buf.seek(0)
+    return buf
+
+def _b4_importar_compromissos_excel(arquivo_upload):
+    try:
+        df_imp = pd.read_excel(io.BytesIO(arquivo_upload.getvalue()))
+        df_imp.columns = [str(c).strip() for c in df_imp.columns]
+        adicionados = 0
+        for idx, row in df_imp.iterrows():
+            titulo = str(row.get("Título", row.get("Titulo", row.get("Compromisso", "")))).strip()
+            if not titulo or titulo.lower() == "nan":
+                continue
+            data_val = str(row.get("Data", pd.Timestamp.now().strftime("%Y-%m-%d"))).strip()
+            hora_val = str(row.get("Hora", "09:00")).strip()[:5]
+            st.session_state.b4_compromissos.append({
+                "id": str(row.get("ID", f"IMP-{pd.Timestamp.now().strftime('%H%M%S')}-{idx+1}")).strip(),
+                "data": data_val,
+                "hora": hora_val,
+                "titulo": titulo,
+                "categoria": str(row.get("Categoria", "Trabalho")).strip() or "Trabalho",
+                "prioridade": str(row.get("Prioridade", "Média")).strip() or "Média",
+                "status": str(row.get("Status", "Pendente")).strip() or "Pendente",
+                "aviso_min": int(float(row.get("Aviso (min)", 15) or 15)),
+                "destino_wa": "" if str(row.get("WhatsApp", "")).lower() == "nan" else str(row.get("WhatsApp", "")).strip(),
+                "destino_email": "" if str(row.get("E-mail", "")).lower() == "nan" else str(row.get("E-mail", "")).strip(),
+                "notas": "" if str(row.get("Notas", "")).lower() == "nan" else str(row.get("Notas", "")).strip(),
+            })
+            adicionados += 1
+        return adicionados, None
+    except Exception as e:
+        return 0, str(e)
+
+def _b4_verificar_avisos_automaticos(lista_comp):
+    agora = pd.Timestamp.now()
+    hoje_str = agora.strftime("%Y-%m-%d")
+    minutos_agora = agora.hour * 60 + agora.minute
+    alertas_ativos = []
+    for item in lista_comp:
+        if item.get("data") == hoje_str and item.get("status") != "Concluído":
+            hora_str = str(item.get("hora", "00:00"))
+            try:
+                partes = hora_str.split(":")
+                min_evento = int(partes[0]) * 60 + int(partes[1])
+                antecedencia = int(item.get("aviso_min", 15))
+                diff = min_evento - minutos_agora
+                if -5 <= diff <= antecedencia:
+                    alertas_ativos.append((item, diff))
+            except Exception:
+                pass
+    return alertas_ativos
+
+def renderizar_bloco_4_agenda():
+    _b4_garantir_estado_agenda()
+
+    st.markdown("### 🗓️ BLOCO 4 // AGENDA INTERATIVA DIÁRIA & AUTOMAÇÕES")
+    st.markdown("Organize sua agenda diária, receba avisos automáticos de compromissos, dispare por WhatsApp/E-mail e importe/exporte em Excel ou PDF.")
+
+    agora_dt = pd.Timestamp.now()
+    hoje_str = agora_dt.strftime("%Y-%m-%d")
+    todos_comp = st.session_state.b4_compromissos
+
+    alertas = _b4_verificar_avisos_automaticos(todos_comp)
+    if alertas:
+        for item_alerta, diff_min in alertas:
+            chave_alerta = f"{item_alerta['id']}_{hoje_str}_{item_alerta['hora']}"
+            if diff_min > 0:
+                msg_alerta = f"⏰ **AVISO AUTOMÁTICO:** *{item_alerta['titulo']}* às **{item_alerta['hora']}** (em {diff_min} min — antecedência configurada: {item_alerta.get('aviso_min', 15)} min)."
+            elif diff_min == 0:
+                msg_alerta = f"🔔 **AVISO AUTOMÁTICO:** *{item_alerta['titulo']}* começa **AGORA ({item_alerta['hora']})**!"
+            else:
+                msg_alerta = f"⏱️ **AVISO AUTOMÁTICO:** *{item_alerta['titulo']}* estava previsto para **{item_alerta['hora']}**."
+            st.warning(msg_alerta)
+            if chave_alerta not in st.session_state.b4_avisos_disparados:
+                st.session_state.b4_avisos_disparados.append(chave_alerta)
+                st.session_state.b4_log_automacoes.insert(0, f"[{agora_dt.strftime('%d/%m/%Y %H:%M:%S')}] Aviso automático disparado: {item_alerta['titulo']} ({item_alerta['hora']})")
+
+    comp_hoje = [c for c in todos_comp if c.get("data") == hoje_str]
+    pendentes_hoje = [c for c in comp_hoje if c.get("status") != "Concluído"]
+    concluidos_hoje = [c for c in comp_hoje if c.get("status") == "Concluído"]
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Compromissos Hoje", len(comp_hoje))
+    m2.metric("Pendentes Hoje", len(pendentes_hoje))
+    m3.metric("Concluídos Hoje", len(concluidos_hoje))
+    m4.metric("Total na Agenda", len(todos_comp))
+
+    aba_dia, aba_novo, aba_ie, aba_auto = st.tabs([
+        "📋 Agenda & Filtro por Data",
+        "➕ Novo Compromisso",
+        "📥📤 Excel & PDF",
+        "⚙️ Automação (WhatsApp / E-mail)"
+    ])
+
+    with aba_dia:
+        f1, f2, f3 = st.columns([1.2, 1.2, 1.6])
+        with f1:
+            modo_visualizacao = st.selectbox(
+                "Escopo da Agenda:",
+                ["Data Selecionada", "Agenda Inteira"],
+                key="b4_escopo_agenda"
+            )
+        with f2:
+            data_filtro = st.date_input(
+                "Data de Referência:",
+                value=agora_dt.date(),
+                key="b4_data_filtro"
+            )
+        with f3:
+            busca_texto = st.text_input(
+                "Buscar por título, categoria ou status:",
+                placeholder="Ex: Auditoria, Urgente, Confirmado...",
+                key="b4_busca_texto"
+            )
+
+        data_filtro_str = data_filtro.strftime("%Y-%m-%d")
+        lista_filtrada = []
+        for c in todos_comp:
+            if modo_visualizacao == "Data Selecionada" and c.get("data") != data_filtro_str:
+                continue
+            if busca_texto.strip():
+                termo = busca_texto.strip().lower()
+                alvo = f"{c.get('titulo', '')} {c.get('categoria', '')} {c.get('status', '')} {c.get('notas', '')}".lower()
+                if termo not in alvo:
+                    continue
+            lista_filtrada.append(c)
+
+        lista_filtrada.sort(key=lambda x: (str(x.get("data", "")), str(x.get("hora", ""))))
+
+        if not lista_filtrada:
+            st.info("Nenhum compromisso encontrado para o filtro selecionado.")
+        else:
+            for idx_item, comp in enumerate(lista_filtrada):
+                with st.container(border=True):
+                    col_info, col_acoes = st.columns([3.2, 1.3])
+                    with col_info:
+                        st.markdown(
+                            f"**{comp.get('hora', '--:--')}** • **{comp.get('titulo', 'Sem título')}** "
+                            f"| `Data: {comp.get('data', '')}` | `{comp.get('categoria', 'Geral')}` | `{comp.get('status', 'Pendente')}`"
+                        )
+                        if comp.get("notas"):
+                            st.caption(comp.get("notas"))
+                        st.caption(f"Aviso automático: {comp.get('aviso_min', 15)} min antes | Prioridade: {comp.get('prioridade', 'Média')}")
+                    with col_acoes:
+                        novo_status = st.selectbox(
+                            "Status",
+                            ["Pendente", "Confirmado", "Concluído", "Adiado"],
+                            index=["Pendente", "Confirmado", "Concluído", "Adiado"].index(comp.get("status", "Pendente")) if comp.get("status", "Pendente") in ["Pendente", "Confirmado", "Concluído", "Adiado"] else 0,
+                            key=f"b4_status_{comp['id']}_{idx_item}",
+                            label_visibility="collapsed"
+                        )
+                        if novo_status != comp.get("status"):
+                            for real_c in st.session_state.b4_compromissos:
+                                if real_c["id"] == comp["id"]:
+                                    real_c["status"] = novo_status
+                            st.rerun()
+
+                        if st.button("🗑️ Remover", key=f"b4_del_{comp['id']}_{idx_item}", use_container_width=True):
+                            st.session_state.b4_compromissos = [
+                                real_c for real_c in st.session_state.b4_compromissos if real_c["id"] != comp["id"]
+                            ]
+                            st.rerun()
+
+    with aba_novo:
+        with st.form("b4_form_novo_compromisso", clear_on_submit=True):
+            fc1, fc2, fc3 = st.columns(3)
+            with fc1:
+                n_data = st.date_input("Data", value=agora_dt.date())
+            with fc2:
+                n_hora = st.time_input("Hora", value=agora_dt.time().replace(second=0, microsecond=0))
+            with fc3:
+                n_aviso = st.number_input("Aviso Automático (min antes)", min_value=0, max_value=1440, value=15, step=5)
+
+            n_titulo = st.text_input("Título do Compromisso *", placeholder="Ex: Reunião de alinhamento com gerência")
+
+            fc4, fc5, fc6 = st.columns(3)
+            with fc4:
+                n_categoria = st.selectbox("Categoria", ["Trabalho", "Auditoria", "Pessoal", "Urgente", "Reunião"])
+            with fc5:
+                n_prioridade = st.selectbox("Prioridade", ["Alta", "Média", "Baixa"])
+            with fc6:
+                n_status = st.selectbox("Status Inicial", ["Pendente", "Confirmado", "Concluído", "Adiado"])
+
+            fc7, fc8 = st.columns(2)
+            with fc7:
+                n_wa = st.text_input("WhatsApp para Envio (opcional)", placeholder="Ex: 5511999999999")
+            with fc8:
+                n_email = st.text_input("E-mail para Envio (opcional)", placeholder="Ex: gestor@empresa.com")
+
+            n_notas = st.text_area("Observações / Checklist", placeholder="Detalhes importantes do compromisso...")
+            enviado = st.form_submit_button("💾 Salvar Compromisso na Agenda", use_container_width=True)
+
+            if enviado:
+                if not n_titulo.strip():
+                    st.error("❌ Informe o título do compromisso.")
+                else:
+                    novo_id = f"EVT-{pd.Timestamp.now().strftime('%Y%m%d%H%M%S')}"
+                    st.session_state.b4_compromissos.append({
+                        "id": novo_id,
+                        "data": n_data.strftime("%Y-%m-%d"),
+                        "hora": n_hora.strftime("%H:%M"),
+                        "titulo": n_titulo.strip(),
+                        "categoria": n_categoria,
+                        "prioridade": n_prioridade,
+                        "status": n_status,
+                        "aviso_min": int(n_aviso),
+                        "destino_wa": n_wa.strip(),
+                        "destino_email": n_email.strip(),
+                        "notas": n_notas.strip(),
+                    })
+                    st.success("✅ Compromisso adicionado à agenda!")
+                    st.rerun()
+
+    with aba_ie:
+        st.markdown("#### 📥 Importar Compromissos em Excel (.xlsx)")
+        arq_agenda_xlsx = st.file_uploader("Selecione uma planilha Excel (.xlsx) com seus compromissos", type=["xlsx"], key="b4_up_xlsx")
+        if arq_agenda_xlsx is not None:
+            if st.button("📥 Processar Importação Excel", key="b4_btn_imp_xlsx", use_container_width=True):
+                qtd_imp, erro_imp = _b4_importar_compromissos_excel(arq_agenda_xlsx)
+                if erro_imp:
+                    st.error(f"❌ Erro ao importar Excel: {erro_imp}")
+                else:
+                    st.success(f"✅ {qtd_imp} compromisso(s) importado(s) com sucesso!")
+                    st.rerun()
+
+        st.markdown("---")
+        st.markdown("#### 📤 Exportar Agenda em Excel ou PDF (Por Data ou Agenda Inteira)")
+        exp_c1, exp_c2 = st.columns(2)
+        with exp_c1:
+            escopo_exp = st.radio(
+                "Escolha o que exportar:",
+                ["Data Selecionada", "Agenda Inteira"],
+                key="b4_escopo_exportacao",
+                horizontal=True
+            )
+        with exp_c2:
+            data_exp = st.date_input(
+                "Data para Exportação:",
+                value=agora_dt.date(),
+                key="b4_data_exportacao"
+            )
+
+        data_exp_str = data_exp.strftime("%Y-%m-%d")
+        if escopo_exp == "Data Selecionada":
+            dados_exp = [c for c in todos_comp if c.get("data") == data_exp_str]
+            rotulo_exp = f"Data_{data_exp_str}"
+            titulo_pdf_exp = f"DATA {data_exp.strftime('%d/%m/%Y')}"
+        else:
+            dados_exp = list(todos_comp)
+            rotulo_exp = "Agenda_Inteira"
+            titulo_pdf_exp = "AGENDA INTEIRA"
+
+        dados_exp.sort(key=lambda x: (str(x.get("data", "")), str(x.get("hora", ""))))
+        df_exp = pd.DataFrame([
+            {
+                "ID": d.get("id", ""),
+                "Data": d.get("data", ""),
+                "Hora": d.get("hora", ""),
+                "Título": d.get("titulo", ""),
+                "Categoria": d.get("categoria", ""),
+                "Prioridade": d.get("prioridade", ""),
+                "Status": d.get("status", ""),
+                "Aviso (min)": d.get("aviso_min", 15),
+                "WhatsApp": d.get("destino_wa", ""),
+                "E-mail": d.get("destino_email", ""),
+                "Notas": d.get("notas", ""),
+            }
+            for d in dados_exp
+        ])
+
+        ex_b1, ex_b2 = st.columns(2)
+        with ex_b1:
+            buf_xl_agenda = _b4_gerar_excel_agenda(df_exp, nome_aba=rotulo_exp)
+            st.download_button(
+                label=f"📊 Baixar Excel ({escopo_exp})",
+                data=buf_xl_agenda,
+                file_name=f"Agenda_{rotulo_exp}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="b4_dl_excel"
+            )
+        with ex_b2:
+            buf_pdf_agenda = _b4_gerar_pdf_agenda(df_exp, titulo_relatorio=titulo_pdf_exp)
+            st.download_button(
+                label=f"📑 Baixar PDF ({escopo_exp})",
+                data=buf_pdf_agenda,
+                file_name=f"Agenda_{rotulo_exp}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="b4_dl_pdf"
+            )
+
+    with aba_auto:
+        st.markdown("#### 📲 Envio por WhatsApp e E-mail + Automação")
+        auto_c1, auto_c2 = st.columns(2)
+        with auto_c1:
+            escopo_envio = st.selectbox(
+                "Conteúdo para Envio:",
+                ["Compromissos de Hoje", "Agenda Inteira"],
+                key="b4_escopo_envio"
+            )
+        with auto_c2:
+            numero_wa = st.text_input(
+                "Número WhatsApp (com DDI + DDD):",
+                value="",
+                placeholder="Ex: 5511999999999",
+                key="b4_numero_wa"
+            )
+
+        lista_envio = comp_hoje if escopo_envio == "Compromissos de Hoje" else todos_comp
+        lista_envio = sorted(lista_envio, key=lambda x: (str(x.get("data", "")), str(x.get("hora", ""))))
+        texto_msg = _b4_formatar_texto_agenda(lista_envio, titulo_secao=escopo_envio.upper())
+
+        st.text_area("Prévia da Mensagem Formatada:", value=texto_msg, height=160, key="b4_previa_msg")
+
+        import urllib.parse
+        fone_limpo = "".join(ch for ch in numero_wa if ch.isdigit())
+        msg_codificada = urllib.parse.quote(texto_msg)
+        link_wa = f"https://wa.me/{fone_limpo}?text={msg_codificada}" if fone_limpo else f"https://wa.me/?text={msg_codificada}"
+
+        env_c1, env_c2, env_c3 = st.columns(3)
+        with env_c1:
+            st.link_button("🟢 Abrir no WhatsApp", url=link_wa, use_container_width=True)
+        with env_c2:
+            dest_email = st.text_input("E-mail Destino", value="", placeholder="destino@exemplo.com", key="b4_dest_email", label_visibility="collapsed")
+            assunto_enc = urllib.parse.quote(f"Grupo KMB // {escopo_envio}")
+            corpo_enc = urllib.parse.quote(texto_msg)
+            link_mailto = f"mailto:{dest_email}?subject={assunto_enc}&body={corpo_enc}"
+            st.link_button("✉️ Enviar por E-mail", url=link_mailto, use_container_width=True)
+        with env_c3:
+            webhook_url = st.text_input("Webhook Automação (n8n / Make / API)", value="", placeholder="https://...", key="b4_webhook_url", label_visibility="collapsed")
+            if st.button("⚡ Disparar Automação Agora", key="b4_btn_webhook", use_container_width=True):
+                if not webhook_url.strip():
+                    st.warning("Informe uma URL de webhook para disparo automático.")
+                else:
+                    try:
+                        import urllib.request
+                        import json
+                        payload = json.dumps({
+                            "escopo": escopo_envio,
+                            "whatsapp": fone_limpo,
+                            "email": dest_email.strip(),
+                            "mensagem": texto_msg,
+                            "compromissos": lista_envio,
+                        }).encode("utf-8")
+                        req = urllib.request.Request(
+                            webhook_url.strip(),
+                            data=payload,
+                            headers={"Content-Type": "application/json"},
+                            method="POST"
+                        )
+                        with urllib.request.urlopen(req, timeout=8) as resp:
+                            st.success(f"✅ Automação disparada! Status HTTP: {resp.status}")
+                            st.session_state.b4_log_automacoes.insert(0, f"[{pd.Timestamp.now().strftime('%d/%m/%Y %H:%M:%S')}] Webhook disparado ({escopo_envio}) -> HTTP {resp.status}")
+                    except Exception as e:
+                        st.error(f"❌ Falha ao disparar automação: {e}")
+
+        if st.session_state.b4_log_automacoes:
+            st.markdown("---")
+            st.markdown("##### 📜 Registro de Avisos & Automações")
+            for log_entry in st.session_state.b4_log_automacoes[:15]:
+                st.caption(log_entry)
+
 def main():
     st.set_page_config(page_title="GRUPO KMB // TIME DE INVENTÁRIO", page_icon="⚡", layout="wide")
     
@@ -1525,7 +1993,7 @@ def main():
                 "Auditoria de Inventário (5 Etapas)",
                 "Modo Planilha de Conferência",
                 "Gerador de Etiquetas QR Code",
-                "Agenda e Compromissos (Bloco 4)"
+                "Bloco 4 // Agenda & Automação"
             ],
             key="radio_modo_operacao"
         )
@@ -1541,13 +2009,13 @@ def main():
         <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 4px;">AUDITORIA DE ESTOQUE & ANÁLISE COMPARATIVA MULTI-INVENTÁRIO</div>
     </div>
     """, unsafe_allow_html=True)
-    
-    if modo_operacao == "Agenda e Compromissos (Bloco 4)":
-        renderizar_bloco_agenda()
-        return
 
+    if modo_operacao == "Bloco 4 // Agenda & Automação":
+        renderizar_bloco_4_agenda()
+        return
+    
     if modo_operacao == "Gerador de Etiquetas QR Code":
-        st.markdown("### 🏷️ GERADOR DE ETIQUETAS QR CODE // PADRÃO A4 ")
+        st.markdown("### 🏷️ GERADOR DE ETIQUETAS QR CODE // PADRÃO A4 (14 POR PÁGINA)")
         st.markdown("Gere etiquetas com QR Code (prefixo **KMB**), numeração encorpada e brasão oficial prontas para impressão em folha A4.")
         
         col_etq1, col_etq2 = st.columns(2)
@@ -1740,7 +2208,7 @@ def main():
                             filtro_classe_abc = st.selectbox("Filtro Curva ABC:", options=["Todas as Classes (Geral)", "Classe A (80%)", "Classe B (95%)", "Classe C (100%)"], index=0, key="abc_filtro_classe")
                         
                         df_abc = df_filtrado.sort_values(by=eixo_y_escolhido, ascending=False).copy()
-                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolh_ido if 'eixo_y_escolh_ido' in locals() else eixo_y_escolhido].cumsum() if eixo_y_escolhido in df_abc.columns else df_abc[eixo_y_escolhido].cumsum()
+                        df_abc['Soma_Acumulada'] = df_abc[eixo_y_escolhido].cumsum()
                         soma_total = df_abc[eixo_y_escolhido].sum()
                         
                         if soma_total > 0:
@@ -1780,7 +2248,7 @@ def main():
                         col_val_aju_etapa4 = 'Valor de Ajuste (R$)' if 'Valor de Ajuste (R$)' in df_risco.columns else next((c for c in num_cols if 'ajuste' in c.lower() and 'valor' in c.lower()), num_cols[0])
                         df_risco['Categoria_Prod'] = df_risco['Descrição do Produto'].astype(str).str.split().str[0]
                         df_agrupado_val = df_risco.groupby('Categoria_Prod')[col_val_aju_etapa4].sum().reset_index().sort_values(by=col_val_aju_etapa4, ascending=True).head(15)
-                        fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
+                        fig_risco = px.bar(df_agrupado_val, x='Categoria_Prod', y=col_val_aju_etapa4, title="Balanço Líquido de Divergências por Categoria (R$)", template="plotly_dark", color=col_val_aju_etayo4 if 'col_val_aju_etayo4' in locals() else col_val_aju_etapa4, color_continuous_scale=['#ef4444', '#3b82f6', '#10b981'])
                         fig_risco.update_layout(paper_bgcolor='rgba(11, 15, 25, 0.9)', plot_bgcolor='rgba(11, 15, 25, 0.9)', height=420)
                         st.plotly_chart(fig_risco, use_container_width=True)
                 
@@ -1875,3 +2343,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
