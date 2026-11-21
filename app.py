@@ -2480,53 +2480,227 @@ def _b4_gerar_pdf_agenda(df_agenda, titulo_relatorio):
   return buf
 
 
+def _b4_separar_data_hora(val_data, val_hora=None):
+  hoje_padrao = pd.Timestamp.now().strftime("%Y-%m-%d")
+  hora_padrao = "09:00"
+
+  texto_data = "" if pd.isna(val_data) else str(val_data).strip()
+  texto_hora = "" if pd.isna(val_hora) else str(val_hora).strip()
+
+  if not texto_data and not texto_hora:
+    return hoje_padrao, hora_padrao
+
+  combinado = f"{texto_data} {texto_hora}".strip()
+  dt_parsed = pd.to_datetime(combinado, dayfirst=True, errors="coerce")
+
+  if pd.isna(dt_parsed) and texto_data:
+    dt_parsed = pd.to_datetime(texto_data, dayfirst=True, errors="coerce")
+
+  data_final = (
+      dt_parsed.strftime("%Y-%m-%d") if not pd.isna(dt_parsed) else hoje_padrao
+  )
+
+  if texto_hora:
+    hora_dt = pd.to_datetime(texto_hora, errors="coerce")
+    if not pd.isna(hora_dt):
+      hora_final = hora_dt.strftime("%H:%M")
+    else:
+      hora_final = texto_hora[:5] if len(texto_hora) >= 5 else hora_padrao
+  elif not pd.isna(dt_parsed) and (
+      ":" in texto_data or "T" in texto_data or len(texto_data) > 10
+  ):
+    hora_final = dt_parsed.strftime("%H:%M")
+  else:
+    hora_final = hora_padrao
+
+  return data_final, hora_final
+
+
+def _b4_buscar_coluna(df, candidatos):
+  mapa_lower = {str(c).strip().lower(): c for c in df.columns}
+  for cand in candidatos:
+    chave = cand.strip().lower()
+    if chave in mapa_lower:
+      return mapa_lower[chave]
+  for col_low, col_orig in mapa_lower.items():
+    for cand in candidatos:
+      if cand.strip().lower() in col_low:
+        return col_orig
+  return None
+
+
 def _b4_importar_compromissos_excel(arquivo_upload):
   try:
-    df_imp = pd.read_excel(io.BytesIO(arquivo_upload.getvalue()))
+    nome_arq = str(getattr(arquivo_upload, "name", "")).lower()
+    raw_bytes = arquivo_upload.getvalue()
+
+    if nome_arq.endswith(".csv"):
+      df_imp = None
+      for enc in ["utf-8-sig", "utf-8", "latin-1", "cp1252"]:
+        for sep in [",", ";", "\t"]:
+          try:
+            temp = pd.read_csv(io.BytesIO(raw_bytes), encoding=enc, sep=sep)
+            if temp.shape[1] > 1 or len(temp) > 0:
+              df_imp = temp
+              break
+          except Exception:
+            continue
+        if df_imp is not None:
+          break
+      if df_imp is None:
+        return 0, "Não foi possível ler o arquivo CSV exportado."
+    else:
+      df_imp = pd.read_excel(io.BytesIO(raw_bytes))
+
     df_imp.columns = [str(c).strip() for c in df_imp.columns]
+
+    col_id = _b4_buscar_coluna(df_imp, ["ID"])
+    col_titulo = _b4_buscar_coluna(
+        df_imp,
+        [
+            "Título",
+            "Titulo",
+            "Compromisso",
+            "Subject",
+            "Title",
+            "Assunto",
+            "Evento",
+            "Meeting",
+        ],
+    )
+    col_data = _b4_buscar_coluna(
+        df_imp,
+        [
+            "Data",
+            "Start Date",
+            "Data de Início",
+            "Data de Inicio",
+            "Start",
+            "Start Time",
+            "Início",
+            "Inicio",
+            "Date",
+        ],
+    )
+    col_hora = _b4_buscar_coluna(
+        df_imp,
+        [
+            "Hora",
+            "Start Time",
+            "Hora de Início",
+            "Hora de Inicio",
+            "Time",
+        ],
+    )
+    col_cat = _b4_buscar_coluna(df_imp, ["Categoria", "Category", "Categories"])
+    col_prio = _b4_buscar_coluna(df_imp, ["Prioridade", "Priority", "Importance"])
+    col_status = _b4_buscar_coluna(df_imp, ["Status", "State", "Show Time As"])
+    col_aviso = _b4_buscar_coluna(df_imp, ["Aviso (min)", "Aviso", "Reminder"])
+    col_wa = _b4_buscar_coluna(df_imp, ["WhatsApp", "Whatsapp", "Telefone"])
+    col_email = _b4_buscar_coluna(df_imp, ["E-mail", "Email", "Organizer"])
+    col_notas = _b4_buscar_coluna(
+        df_imp,
+        [
+            "Notas",
+            "Descrição",
+            "Descricao",
+            "Description",
+            "Body",
+            "Observações",
+            "Observacoes",
+        ],
+    )
+    col_local = _b4_buscar_coluna(df_imp, ["Local", "Location", "Room"])
+
     adicionados = 0
+    chaves_existentes = {
+        (
+            str(c.get("titulo", "")).strip().lower(),
+            str(c.get("data", "")).strip(),
+            str(c.get("hora", "")).strip(),
+        )
+        for c in st.session_state.b4_compromissos
+    }
+
     for idx, row in df_imp.iterrows():
-      titulo = str(
-          row.get("Título", row.get("Titulo", row.get("Compromisso", "")))
-      ).strip()
-      if not titulo or titulo.lower() == "nan":
+      titulo = str(row.get(col_titulo, "")).strip() if col_titulo else ""
+      if not titulo or titulo.lower() in ["nan", "none", "nat"]:
         continue
-      data_val = str(
-          row.get("Data", pd.Timestamp.now().strftime("%Y-%m-%d"))
-      ).strip()
-      hora_val = str(row.get("Hora", "09:00")).strip()[:5]
+
+      val_d = row.get(col_data) if col_data else None
+      val_h = row.get(col_hora) if col_hora and col_hora != col_data else None
+      data_val, hora_val = _b4_separar_data_hora(val_d, val_h)
+
+      chave_item = (titulo.lower(), data_val, hora_val)
+      if chave_item in chaves_existentes:
+        continue
+
+      notas_partes = []
+      if col_notas:
+        n_txt = str(row.get(col_notas, "")).strip()
+        if n_txt and n_txt.lower() not in ["nan", "none"]:
+          notas_partes.append(n_txt)
+      if col_local:
+        l_txt = str(row.get(col_local, "")).strip()
+        if l_txt and l_txt.lower() not in ["nan", "none"]:
+          notas_partes.append(f"Local: {l_txt}")
+
+      cat_val = str(row.get(col_cat, "")).strip() if col_cat else ""
+      if not cat_val or cat_val.lower() in ["nan", "none"]:
+        cat_val = "Reunião" if (col_local or not col_cat) else "Trabalho"
+
+      aviso_raw = row.get(col_aviso, 15) if col_aviso else 15
+      try:
+        aviso_num = int(float(aviso_raw)) if pd.notna(aviso_raw) else 15
+      except Exception:
+        aviso_num = 15
+
       st.session_state.b4_compromissos.append({
-          "id": str(
-              row.get(
-                  "ID", f"IMP-{pd.Timestamp.now().strftime('%H%M%S')}-{idx+1}"
-              )
-          ).strip(),
+          "id": (
+              str(row.get(col_id, "")).strip()
+              if col_id
+              and str(row.get(col_id, "")).strip().lower()
+              not in ["", "nan", "none"]
+              else f"TMS-{pd.Timestamp.now().strftime('%H%M%S')}-{idx+1}"
+          ),
           "data": data_val,
           "hora": hora_val,
           "titulo": titulo,
-          "categoria": (
-              str(row.get("Categoria", "Trabalho")).strip() or "Trabalho"
+          "categoria": cat_val,
+          "prioridade": (
+              str(row.get(col_prio, "Média")).strip()
+              if col_prio
+              and str(row.get(col_prio, "")).strip().lower()
+              not in ["", "nan", "none"]
+              else "Média"
           ),
-          "prioridade": str(row.get("Prioridade", "Média")).strip() or "Média",
-          "status": str(row.get("Status", "Pendente")).strip() or "Pendente",
-          "aviso_min": int(float(row.get("Aviso (min)", 15) or 15)),
+          "status": (
+              str(row.get(col_status, "Pendente")).strip()
+              if col_status
+              and str(row.get(col_status, "")).strip().lower()
+              not in ["", "nan", "none"]
+              else "Pendente"
+          ),
+          "aviso_min": aviso_num,
           "destino_wa": (
-              ""
-              if str(row.get("WhatsApp", "")).lower() == "nan"
-              else str(row.get("WhatsApp", "")).strip()
+              str(row.get(col_wa, "")).strip()
+              if col_wa
+              and str(row.get(col_wa, "")).strip().lower()
+              not in ["", "nan", "none"]
+              else ""
           ),
           "destino_email": (
-              ""
-              if str(row.get("E-mail", "")).lower() == "nan"
-              else str(row.get("E-mail", "")).strip()
+              str(row.get(col_email, "")).strip()
+              if col_email
+              and str(row.get(col_email, "")).strip().lower()
+              not in ["", "nan", "none"]
+              else ""
           ),
-          "notas": (
-              ""
-              if str(row.get("Notas", "")).lower() == "nan"
-              else str(row.get("Notas", "")).strip()
-          ),
+          "notas": " | ".join(notas_partes),
       })
+      chaves_existentes.add(chave_item)
       adicionados += 1
+
     return adicionados, None
   except Exception as e:
     return 0, str(e)
@@ -2778,21 +2952,21 @@ def renderizar_bloco_4_agenda():
           st.rerun()
 
   with aba_ie:
-    st.markdown("#### 📥 Importar Compromissos em Excel (.xlsx)")
+    st.markdown("#### 📥 Importar Compromissos em Excel ou CSV (.xlsx / .csv)")
     arq_agenda_xlsx = st.file_uploader(
-        "Selecione uma planilha Excel (.xlsx) com seus compromissos",
-        type=["xlsx"],
+        "Selecione uma planilha (.xlsx ou .csv) com seus compromissos",
+        type=["xlsx", "csv"],
         key="b4_up_xlsx",
     )
     if arq_agenda_xlsx is not None:
       if st.button(
-          "📥 Processar Importação Excel",
+          "📥 Processar Importação Excel / CSV",
           key="b4_btn_imp_xlsx",
           use_container_width=True,
       ):
         qtd_imp, erro_imp = _b4_importar_compromissos_excel(arq_agenda_xlsx)
         if erro_imp:
-          st.error(f"❌ Erro ao importar Excel: {erro_imp}")
+          st.error(f"❌ Erro ao importar arquivo: {erro_imp}")
         else:
           st.success(f"✅ {qtd_imp} compromisso(s) importado(s) com sucesso!")
           st.rerun()
