@@ -1993,7 +1993,7 @@ def main():
                 "Auditoria de Inventário (5 Etapas)",
                 "Modo Planilha de Conferência",
                 "Gerador de Etiquetas QR Code",
-                "Bloco 4 // Agenda & Automação"
+                "Agenda & Automação"
             ],
             key="radio_modo_operacao"
         )
