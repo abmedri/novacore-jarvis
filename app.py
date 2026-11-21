@@ -18,6 +18,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches as PptxInches, Pt as PptxPt
 import qrcode
+
 # ReportLab para PDFs profissionais com rodapé gráfico personalizado
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape, letter
@@ -60,7 +61,6 @@ def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
             df = pd.read_csv(
                 arquivo_carregado, encoding=enc, sep=",", low_memory=False
             )
-
           df = limpar_colunas_duplicadas(df)
           col_mapping = {}
           for col in df.columns:
@@ -72,7 +72,6 @@ def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
             elif "valor de estoque" in col_lower:
               col_mapping[col] = "Valor de Estoque (R$)"
           df = df.rename(columns=col_mapping)
-
           for col in df.columns:
             if col.lower() not in [
                 "código do produto",
@@ -154,13 +153,11 @@ def calcular_metricas_gerenciais(lista_dfs_tupla, nomes_tupla):
   for idx, df in enumerate(lista_dfs):
     num_cols = df.select_dtypes(include=["number"]).columns.tolist()
     total_skus = len(df)
-
     idx_val = identificar_coluna_ideal(
         num_cols, ["valor de estoque", "valor", "saldo"]
     )
     col_val = num_cols[idx_val] if num_cols else None
     soma_depois = df[col_val].sum() if col_val and col_val in df.columns else 0
-
     idx_qtd = identificar_coluna_ideal(
         num_cols, ["quantidade", "saldo", "estoque", "fisico", "teorico"]
     )
@@ -168,13 +165,20 @@ def calcular_metricas_gerenciais(lista_dfs_tupla, nomes_tupla):
     qtd_pos = (
         df[col_qtd].sum() if col_qtd and col_qtd in df.columns else total_skus
     )
-
     col_ajuste = "Ajuste" if "Ajuste" in df.columns else None
     soma_ajuste_qtd = (
         df[col_ajuste].sum() if col_ajuste and col_ajuste in df.columns else 0
     )
     qtd_antes = qtd_pos - soma_ajuste_qtd
-
+    if col_qtd and col_qtd in df.columns:
+      if col_ajuste and col_ajuste in df.columns:
+        skus_pre_inventario = int(
+            ((df[col_qtd].fillna(0) - df[col_ajuste].fillna(0)) > 0).sum()
+        )
+      else:
+        skus_pre_inventario = int((df[col_qtd].fillna(0) > 0).sum())
+    else:
+      skus_pre_inventario = total_skus
     col_val_aju = (
         "Valor de Ajuste (R$)"
         if "Valor de Ajuste (R$)" in df.columns
@@ -198,7 +202,6 @@ def calcular_metricas_gerenciais(lista_dfs_tupla, nomes_tupla):
     )
     soma_antes = soma_depois - soma_ajuste_val
     val_ajuste_liquido = soma_depois - soma_antes
-
     df_falta = (
         df[df[col_ajuste] < 0]
         if col_ajuste and col_ajuste in df.columns
@@ -214,16 +217,13 @@ def calcular_metricas_gerenciais(lista_dfs_tupla, nomes_tupla):
         if col_ajuste and col_ajuste in df.columns
         else pd.DataFrame()
     )
-
     skus_falta = len(df_falta)
     skus_sobra = len(df_sobra)
     skus_exatos = len(df_exato)
     total_div = skus_falta + skus_sobra
-
     perc_falta_itens = (skus_falta / total_skus * 100) if total_skus > 0 else 0
     perc_sobra_itens = (skus_sobra / total_skus * 100) if total_skus > 0 else 0
     perc_divergencia = (total_div / total_skus * 100) if total_skus > 0 else 0
-
     vol_falta = (
         abs(df_falta[col_ajuste].sum())
         if col_ajuste and not df_falta.empty
@@ -234,7 +234,6 @@ def calcular_metricas_gerenciais(lista_dfs_tupla, nomes_tupla):
     )
     vol_div_total = vol_falta + vol_sobra
     perc_vol_div = (vol_div_total / qtd_antes * 100) if qtd_antes > 0 else 0
-
     val_falta = (
         df_falta[col_val_aju].sum() if col_val_aju and not df_falta.empty else 0
     )
@@ -242,19 +241,17 @@ def calcular_metricas_gerenciais(lista_dfs_tupla, nomes_tupla):
         df_sobra[col_val_aju].sum() if col_val_aju and not df_sobra.empty else 0
     )
     val_div_absoluto = abs(val_falta) + abs(val_sobra)
-
     impacto_sobre_antes_pct = (
         (val_ajuste_liquido / soma_antes * 100) if soma_antes > 0 else 0
     )
-
     acuracia_vol = (skus_exatos / total_skus * 100) if total_skus > 0 else 0
     acuracia_fin = max(
         0.0, min(100.0, 100.0 - abs(impacto_sobre_antes_pct) * 2.5)
     )
-
     resumo_ficheiros.append({
         "nome": nomes_arquivos[idx],
         "total_skus": total_skus,
+        "skus_pre_inventario": skus_pre_inventario,
         "qtd_antes": qtd_antes,
         "qtd_pos": qtd_pos,
         "soma_antes": soma_antes,
@@ -322,24 +319,20 @@ class EtiquetasNumberedCanvas(canvas.Canvas):
 def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
   buffer = io.BytesIO()
   c = canvas.Canvas(buffer, pagesize=A4)
-
   # Medidas exatas do modelo: 2 colunas x 7 linhas = 14 etiquetas por página A4
   margin_top = 38.0
   row_height = 104.0
   col_width = 272.0
   col_lefts = [20.0, 303.0]
-
   w_qr = 96.0
   w_num = 122.0
   w_brasao = 54.0
-
   brasao_reader = None
   if caminho_brasao and os.path.exists(caminho_brasao):
     try:
       brasao_reader = ImageReader(caminho_brasao)
     except Exception:
       brasao_reader = None
-
   total_etiquetas = (fim - inicio) + 1
   total_paginas = (total_etiquetas + 13) // 14
 
@@ -355,33 +348,26 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
 
   for idx, num in enumerate(range(inicio, fim + 1)):
     pos_na_pagina = idx % 14
-
     # Inicia nova página a cada 14 etiquetas (exceto na primeira)
     if idx > 0 and pos_na_pagina == 0:
       c.showPage()
-
     # Desenha o rodapé assim que inicia a página
     if pos_na_pagina == 0:
       pagina_atual = (idx // 14) + 1
       desenhar_rodape(pagina_atual)
-
     current_col = pos_na_pagina // 7
     current_row = pos_na_pagina % 7
-
     x = col_lefts[current_col]
     y = A4[1] - margin_top - ((current_row + 1) * row_height)
-
     x_qr = x
     x_num = x_qr + w_qr
     x_brasao = x_num + w_num
-
     # Bordas externas e divisórias internas
     c.setStrokeColorRGB(0.15, 0.15, 0.15)
     c.setLineWidth(0.8)
     c.rect(x, y, col_width, row_height)
     c.line(x_num, y, x_num, y + row_height)
     c.line(x_brasao, y, x_brasao, y + row_height)
-
     # QR Code em memória apenas com o número formatado (sem prefixo)
     str_num = f"{num:02d}"
     texto_qr = str_num
@@ -394,7 +380,6 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
     qr.add_data(texto_qr)
     qr.make(fit=True)
     img_qr = qr.make_image(fill_color="black", back_color="white")
-
     qr_buf = io.BytesIO()
     img_qr.save(qr_buf, format="PNG")
     qr_buf.seek(0)
@@ -406,7 +391,6 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
         height=row_height - 10,
         preserveAspectRatio=True,
     )
-
     # Número grande e encorpado preenchendo a célula central
     c.setFillColorRGB(0, 0, 0)
     if len(str_num) <= 2:
@@ -418,12 +402,10 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
     else:
       font_size = 42
       y_offset = 15
-
     c.setFont("Helvetica-Bold", font_size)
     c.drawCentredString(
         x_num + (w_num / 2.0), y + (row_height / 2.0) - y_offset, str_num
     )
-
     # Brasão na terceira coluna
     if brasao_reader:
       c.drawImage(
@@ -435,7 +417,6 @@ def gerar_pdf_etiquetas_kmb(inicio, fim, caminho_brasao):
           preserveAspectRatio=True,
           mask="auto",
       )
-
   c.save()
   buffer.seek(0)
   return buffer
@@ -448,7 +429,6 @@ def gerar_planilha_filtrada_kmb(
     df_localizacao, df_estoque, numero_loja_input, tipo_filtro
 ):
   wb = openpyxl.Workbook()
-
   fonte_padrao = Font(name="Arial", size=10)
   fonte_descricao_excel = Font(name="Arial", size=9)
   fonte_negrito = Font(name="Arial", size=10, bold=True)
@@ -459,7 +439,6 @@ def gerar_planilha_filtrada_kmb(
   fill_cinza_claro = PatternFill(
       start_color="D9D9D9", end_color="D9D9D9", fill_type="solid"
   )
-
   # Borda fina preta (#000000) para garantir forte destaque na impressão
   borda_fina = Border(
       left=Side(style="thin", color="000000"),
@@ -473,7 +452,6 @@ def gerar_planilha_filtrada_kmb(
       top=Side(style="medium", color="000000"),
       bottom=Side(style="medium", color="000000"),
   )
-
   col_loc = next(
       (c for c in df_localizacao.columns if "local" in c.lower()),
       df_localizacao.columns[2],
@@ -498,11 +476,9 @@ def gerar_planilha_filtrada_kmb(
       ),
       df_localizacao.columns[5],
   )
-
   locais_por_produto = {}
   soma_comptar_por_produto = {}
   descricoes_comptar = {}
-
   for _, row in df_localizacao.iterrows():
     loc = limpar_nome_local(row.get(col_loc, ""))
     cod = str(row.get(col_cod_loc, "")).strip()
@@ -511,15 +487,12 @@ def gerar_planilha_filtrada_kmb(
       qtd = int(float(row.get(col_qtd_loc, 0)))
     except Exception:
       qtd = 0
-
     if cod not in locais_por_produto:
       locais_por_produto[cod] = []
       soma_comptar_por_produto[cod] = 0
       descricoes_comptar[cod] = desc
-
     locais_por_produto[cod].append((loc, qtd))
     soma_comptar_por_produto[cod] += qtd
-
   col_cod_est = next(
       (c for c in df_estoque.columns if "codigo" in c.lower()), "Codigo"
   )
@@ -529,10 +502,8 @@ def gerar_planilha_filtrada_kmb(
   col_est = next(
       (c for c in df_estoque.columns if "estoque" in c.lower()), "Estoque"
   )
-
   codigos_estoque_set = set(df_estoque[col_cod_est].astype(str).str.strip().values)
   itens_filtrados_temp = []
-
   if tipo_filtro == "SEM_SALDO":
     for cod, locs in locais_por_produto.items():
       if cod not in codigos_estoque_set:
@@ -566,14 +537,12 @@ def gerar_planilha_filtrada_kmb(
         est = int(float(row.get(col_est, 0)))
       except Exception:
         est = 0
-
       locs_prod = locais_por_produto.get(cod, [])
       tem_na_comptar = len(locs_prod) > 0
       soma_comptar_val = (
           soma_comptar_por_produto.get(cod, 0) if tem_na_comptar else 0
       )
       divergencia_val = soma_comptar_val - est
-
       incluir = False
       if tipo_filtro == "TODOS":
         incluir = True
@@ -583,7 +552,6 @@ def gerar_planilha_filtrada_kmb(
       elif tipo_filtro == "SOBRAS":
         if tem_na_comptar and divergencia_val > 0:
           incluir = True
-
       if incluir:
         itens_filtrados_temp.append((
             cod,
@@ -594,13 +562,11 @@ def gerar_planilha_filtrada_kmb(
             divergencia_val,
             locs_prod,
         ))
-
   itens_filtrados_temp.sort(key=lambda x: str(x[1]).strip().upper())
   locais_com_contagem = [
       len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0
   ]
   max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
-
   nome_aba = (
       "Itens Sem Saldo"
       if tipo_filtro == "SEM_SALDO"
@@ -609,24 +575,20 @@ def gerar_planilha_filtrada_kmb(
   ws_saldo = wb.active
   ws_saldo.title = nome_aba
   ws_saldo.views.sheetView[0].showGridLines = True
-
   ws_saldo.page_setup.orientation = ws_saldo.ORIENTATION_LANDSCAPE
   ws_saldo.page_setup.paperSize = ws_saldo.PAPERSIZE_A4
   ws_saldo.sheet_properties.pageSetUpPr.fitToPage = True
   ws_saldo.page_setup.fitToWidth = 1
   ws_saldo.page_setup.fitToHeight = 0
-
   ws_saldo.page_margins.left = 0.2
   ws_saldo.page_margins.right = 0.2
   ws_saldo.page_margins.top = 0.3
   ws_saldo.page_margins.bottom = 0.3
   ws_saldo.page_margins.header = 0.1
   ws_saldo.page_margins.footer = 0.1
-
   ws_saldo.oddFooter.left.text = f"Loja: {numero_loja_input} | Grupo KMB"
   ws_saldo.oddFooter.center.text = "Exatidão • Controle • Eficiência"
   ws_saldo.oddFooter.right.text = "Página &P de &N"
-
   caminho_brasao_timbre = (
       "brasao_sem_fundo.png"
       if os.path.exists("brasao_sem_fundo.png")
@@ -640,44 +602,36 @@ def gerar_planilha_filtrada_kmb(
       ws_saldo.add_image(img_timbre, "A1")
     except Exception:
       pass
-
   ws_saldo["D1"] = "DATA:"
   ws_saldo["D1"].font = fonte_negrito
   ws_saldo["D1"].alignment = Alignment(horizontal="center", vertical="center")
   ws_saldo["D1"].border = borda_destaque
-
   ws_saldo["E1"] = pd.Timestamp.now().strftime("%d/%m/%Y")
   ws_saldo["E1"].font = fonte_padrao
   ws_saldo["E1"].alignment = Alignment(horizontal="center", vertical="center")
   ws_saldo["E1"].border = borda_destaque
-
   ws_saldo["D2"] = "LOJA:"
   ws_saldo["D2"].font = fonte_negrito
   ws_saldo["D2"].alignment = Alignment(horizontal="center", vertical="center")
   ws_saldo["D2"].border = borda_destaque
-
   ws_saldo["E2"] = int(numero_loja_input)
   ws_saldo["E2"].font = fonte_negrito
   ws_saldo["E2"].alignment = Alignment(horizontal="center", vertical="center")
   ws_saldo["E2"].border = borda_destaque
-
   headers_saldo = ["Codigo", "Descrição", "Estoque", "COMPTAR", "DIVERGÊNCIA"]
   for i in range(1, max_locais_encontrados + 1):
     if i == 1:
       headers_saldo.append("CONT. 1")
     else:
       headers_saldo.append(str(int(i)))
-
   for i in range(1, max_locais_encontrados + 1):
     if i == 1:
       headers_saldo.append("Local 1")
     else:
       headers_saldo.append(str(int(i)))
-
   ws_saldo.row_dimensions[1].height = 24
   ws_saldo.row_dimensions[2].height = 20
   ws_saldo.row_dimensions[3].height = 10
-
   ws_saldo.row_dimensions[4].height = 22
   for col_idx, h_text in enumerate(headers_saldo, start=1):
     cell = ws_saldo.cell(
@@ -691,7 +645,6 @@ def gerar_planilha_filtrada_kmb(
   ws_saldo.auto_filter.ref = (
       f"A4:{get_column_letter(len(headers_saldo))}{ws_saldo.max_row}"
   )
-
   for (
       cod,
       desc,
@@ -703,9 +656,7 @@ def gerar_planilha_filtrada_kmb(
   ) in itens_filtrados_temp:
     cel_comptar = soma_comptar_val if tem_na_comptar else 0
     cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
-
     linha_dados = [cod, desc, est, cel_comptar, cel_divergencia]
-
     if tem_na_comptar:
       contagens_vals = []
       for i in range(max_locais_encontrados):
@@ -718,7 +669,6 @@ def gerar_planilha_filtrada_kmb(
             contagens_vals.append(val_num)
         else:
           contagens_vals.append("")
-
       locais_vals = [
           limpar_nome_local(locs_prod[i][0]) if i < len(locs_prod) else ""
           for i in range(max_locais_encontrados)
@@ -729,11 +679,9 @@ def gerar_planilha_filtrada_kmb(
       else:
         contagens_vals = ["0"] + [""] * (max_locais_encontrados - 1)
       locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
-
     linha_dados.extend(contagens_vals)
     linha_dados.extend(locais_vals)
     ws_saldo.append(linha_dados)
-
   for row in ws_saldo.iter_rows(
       min_row=5, max_row=ws_saldo.max_row, min_col=1, max_col=len(headers_saldo)
   ):
@@ -742,23 +690,19 @@ def gerar_planilha_filtrada_kmb(
         cell.font = fonte_descricao_excel
       else:
         cell.font = fonte_padrao
-
       cell.border = borda_fina
       if cell.row >= 5 and cell.column >= 3:
         if isinstance(cell.value, (int, float)):
           cell.number_format = "0"
-
       if cell.column == 5:
         cell.fill = fill_cinza_claro
         cell.font = Font(name="Arial", size=10, bold=True)
-
       if cell.column in [1, 3, 4, 5]:
         cell.alignment = Alignment(horizontal="center", vertical="center")
       elif cell.column == 2:
         cell.alignment = Alignment(horizontal="left", vertical="center")
       else:
         cell.alignment = Alignment(horizontal="center", vertical="center")
-
   for col in ws_saldo.columns:
     max_len = 0
     col_letter = get_column_letter(col[0].column)
@@ -768,7 +712,6 @@ def gerar_planilha_filtrada_kmb(
         if not val_str.startswith("="):
           max_len = max(max_len, len(val_str))
     ws_saldo.column_dimensions[col_letter].width = max(max_len + 2, 7)
-
   buffer = io.BytesIO()
   wb.save(buffer)
   buffer.seek(0)
@@ -800,14 +743,11 @@ class NumberedCanvas(canvas.Canvas):
     self.saveState()
     self.setFont("Helvetica", 7)
     self.setFillColor(colors.HexColor("#64748b"))
-
     largura_pagina, altura_pagina = self._pagesize
     margem = 10
-
     self.setStrokeColor(colors.HexColor("#000000"))
     self.setLineWidth(0.5)
     self.line(margem, 22, largura_pagina - margem, 22)
-
     caminho_brasao = (
         "brasao_sem_fundo.png"
         if os.path.exists("brasao_sem_fundo.png")
@@ -826,12 +766,10 @@ class NumberedCanvas(canvas.Canvas):
         )
       except Exception:
         pass
-
     texto_esquerda = (
         "GRUPO KMB // Auditoria Patrimonial • Exatidão • Controle • Eficiência"
     )
     self.drawString(margem + 50, 10, texto_esquerda)
-
     texto_pagina = f"Página {self._pageNumber} de {page_count}"
     self.drawRightString(largura_pagina - margem, 10, texto_pagina)
     self.restoreState()
@@ -864,11 +802,9 @@ def gerar_pdf_conferencia_kmb(
       ),
       df_localizacao.columns[5],
   )
-
   locais_por_produto = {}
   soma_comptar_por_produto = {}
   descricoes_comptar = {}
-
   for _, row in df_localizacao.iterrows():
     loc = limpar_nome_local(row.get(col_loc, ""))
     cod = str(row.get(col_cod_loc, "")).strip()
@@ -877,14 +813,12 @@ def gerar_pdf_conferencia_kmb(
       qtd = int(float(row.get(col_qtd_loc, 0)))
     except Exception:
       qtd = 0
-
     if cod not in locais_por_produto:
       locais_por_produto[cod] = []
       soma_comptar_por_produto[cod] = 0
       descricoes_comptar[cod] = desc
     locais_por_produto[cod].append((loc, qtd))
     soma_comptar_por_produto[cod] += qtd
-
   col_cod_est = next(
       (c for c in df_estoque.columns if "codigo" in c.lower()), "Codigo"
   )
@@ -895,7 +829,6 @@ def gerar_pdf_conferencia_kmb(
       (c for c in df_estoque.columns if "estoque" in c.lower()), "Estoque"
   )
   codigos_estoque_set = set(df_estoque[col_cod_est].astype(str).str.strip().values)
-
   itens_filtrados_temp = []
   if tipo_filtro == "SEM_SALDO":
     for cod, locs in locais_por_produto.items():
@@ -930,14 +863,12 @@ def gerar_pdf_conferencia_kmb(
         est = int(float(row.get(col_est, 0)))
       except Exception:
         est = 0
-
       locs_prod = locais_por_produto.get(cod, [])
       tem_na_comptar = len(locs_prod) > 0
       soma_comptar_val = (
           soma_comptar_por_produto.get(cod, 0) if tem_na_comptar else 0
       )
       divergencia_val = soma_comptar_val - est
-
       incluir = False
       if tipo_filtro == "TODOS":
         incluir = True
@@ -947,7 +878,6 @@ def gerar_pdf_conferencia_kmb(
       elif tipo_filtro == "SOBRAS":
         if tem_na_comptar and divergencia_val > 0:
           incluir = True
-
       if incluir:
         itens_filtrados_temp.append((
             cod,
@@ -958,13 +888,11 @@ def gerar_pdf_conferencia_kmb(
             divergencia_val,
             locs_prod,
         ))
-
   itens_filtrados_temp.sort(key=lambda x: str(x[1]).strip().upper())
   locais_com_contagem = [
       len(l[6]) for l in itens_filtrados_temp if len(l[6]) > 0
   ]
   max_locais_encontrados = max(locais_com_contagem) if locais_com_contagem else 1
-
   buffer = io.BytesIO()
   doc = SimpleDocTemplate(
       buffer,
@@ -974,7 +902,6 @@ def gerar_pdf_conferencia_kmb(
       topMargin=18,
       bottomMargin=28,
   )
-
   styles = getSampleStyleSheet()
   estilo_titulo = ParagraphStyle(
       "TituloPDF",
@@ -983,7 +910,6 @@ def gerar_pdf_conferencia_kmb(
       fontSize=9,
       textColor=colors.HexColor("#1F4E78"),
   )
-
   estilo_th = ParagraphStyle(
       "TH_Auto",
       fontName="Helvetica-Bold",
@@ -992,7 +918,6 @@ def gerar_pdf_conferencia_kmb(
       textColor=colors.white,
       alignment=1,
   )
-
   estilo_td_codigo = ParagraphStyle(
       "TD_Codigo",
       fontName="Helvetica-Bold",
@@ -1012,7 +937,6 @@ def gerar_pdf_conferencia_kmb(
       firstLineIndent=0,
       rightIndent=0,
   )
-
   estilo_td_negrito_centro = ParagraphStyle(
       "TD_Negrito_Centro",
       fontName="Helvetica-Bold",
@@ -1021,7 +945,6 @@ def gerar_pdf_conferencia_kmb(
       textColor=colors.HexColor("#111827"),
       alignment=1,
   )
-
   story = []
   story.append(
       Paragraph(
@@ -1032,13 +955,11 @@ def gerar_pdf_conferencia_kmb(
       )
   )
   story.append(Spacer(1, 3))
-
   headers_pdf = ["Código", "Descrição", "EST.", "COMP.", "DIVERG."]
   for i in range(1, max_locais_encontrados + 1):
     headers_pdf.append(f"C.{int(i)}" if i == 1 else str(int(i)))
   for i in range(1, max_locais_encontrados + 1):
     headers_pdf.append(f"Loc.{int(i)}" if i == 1 else str(int(i)))
-
   dados_tabela = [[
       Paragraph(
           f"<nobr>{str(h).strip().replace('.0', '').replace(' ', '&nbsp;')}</nobr>",
@@ -1046,9 +967,7 @@ def gerar_pdf_conferencia_kmb(
       )
       for h in headers_pdf
   ]]
-
   max_chars_por_coluna = [0] * (max_locais_encontrados * 2)
-
   for (
       cod,
       desc,
@@ -1060,10 +979,8 @@ def gerar_pdf_conferencia_kmb(
   ) in itens_filtrados_temp:
     cel_comptar = soma_comptar_val if tem_na_comptar else 0
     cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
-
     cod_formatado = str(cod).strip().replace(" ", "&nbsp;")
     desc_limpa = str(desc).strip().replace(" ", "&nbsp;")
-
     linha_celulas = [
         Paragraph(f"<nobr>{cod_formatado}</nobr>", estilo_td_codigo),
         Paragraph(f"<nobr>{desc_limpa}</nobr>", estilo_td_esq),
@@ -1071,7 +988,6 @@ def gerar_pdf_conferencia_kmb(
         Paragraph(f"<nobr>{cel_comptar}</nobr>", estilo_td_negrito_centro),
         Paragraph(f"<nobr>{cel_divergencia}</nobr>", estilo_td_negrito_centro),
     ]
-
     contagens_vals = []
     locais_vals = []
     if tem_na_comptar:
@@ -1084,7 +1000,6 @@ def gerar_pdf_conferencia_kmb(
           max_chars_por_coluna[i] = max(
               max_chars_por_coluna[i], len(val_qtd_str)
           )
-
           nome_loc_original = str(limpar_nome_local(locs_prod[i][0]))
           nome_loc_seguro = nome_loc_original.replace(" ", "&nbsp;")
           locais_vals.append(
@@ -1130,30 +1045,24 @@ def gerar_pdf_conferencia_kmb(
         max_chars_por_coluna[max_locais_encontrados] = max(
             max_chars_por_coluna[max_locais_encontrados], 9
         )
-
     linha_celulas.extend(contagens_vals)
     linha_celulas.extend(locais_vals)
     dados_tabela.append(linha_celulas)
-
   largura_util = 792 - 28
   largura_codigo = 45
-
   max_len_desc = (
       max([len(str(item[1]).strip()) for item in itens_filtrados_temp])
       if itens_filtrados_temp
       else 20
   )
   largura_desc = max(110.0, min(float(max_len_desc * 4.2), 250.0))
-
   largura_est = 28
   largura_comp = 28
   largura_div = 30
   largura_fixa_inicial = (
       largura_codigo + largura_desc + largura_est + largura_comp + largura_div
   )
-
   largura_restante_total = largura_util - largura_fixa_inicial
-
   pesos_colunas = []
   for idx_col, max_c in enumerate(max_chars_por_coluna):
     header_text = (
@@ -1161,7 +1070,6 @@ def gerar_pdf_conferencia_kmb(
     )
     peso = max(max_c, len(header_text), 3)
     pesos_colunas.append(peso)
-
   soma_pesos = sum(pesos_colunas) if sum(pesos_colunas) > 0 else 1
   col_widths = [
       largura_codigo,
@@ -1170,17 +1078,13 @@ def gerar_pdf_conferencia_kmb(
       largura_comp,
       largura_div,
   ]
-
   for peso in pesos_colunas:
     L_calc = (peso / soma_pesos) * largura_restante_total
     col_widths.append(max(L_calc, 18.0))
-
   tabela_pdf = Table(dados_tabela, colWidths=col_widths, repeatRows=1)
-
   idx_col_divergencia = 4
   idx_col_c1 = 5
   idx_col_loc1 = 5 + max_locais_encontrados
-
   tabela_pdf.setStyle(
       TableStyle([
           ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
@@ -1209,7 +1113,6 @@ def gerar_pdf_conferencia_kmb(
           ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#000000")),
       ])
   )
-
   story.append(tabela_pdf)
   doc.build(story, canvasmaker=NumberedCanvas)
   buffer.seek(0)
@@ -1229,7 +1132,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
       topMargin=36,
       bottomMargin=36,
   )
-
   styles = getSampleStyleSheet()
   estilo_titulo = ParagraphStyle(
       "TituloPDF",
@@ -1255,7 +1157,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
       leading=11,
       textColor=colors.HexColor("#334155"),
   )
-
   estilo_secao = ParagraphStyle(
       "SecaoPDF",
       parent=styles["Heading2"],
@@ -1266,7 +1167,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
       spaceBefore=10,
       spaceAfter=4,
   )
-
   estilo_th = ParagraphStyle(
       "TH_PDF",
       fontName="Helvetica-Bold",
@@ -1283,7 +1183,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
       textColor=colors.white,
       alignment=1,
   )
-
   estilo_td_esq = ParagraphStyle(
       "TD_PDF_E",
       fontName="Helvetica",
@@ -1308,7 +1207,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
       textColor=colors.HexColor("#111827"),
       alignment=1,
   )
-
   estilo_balanco_tit = ParagraphStyle(
       "Bal_Tit",
       fontName="Helvetica-Bold",
@@ -1333,7 +1231,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
       textColor=colors.HexColor("#475569"),
       alignment=0,
   )
-
   estilo_parecer = ParagraphStyle(
       "ParecerTxt",
       fontName="Helvetica",
@@ -1341,9 +1238,7 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
       leading=12,
       textColor=colors.HexColor("#334155"),
   )
-
   story = []
-
   story.append(
       Paragraph(
           "<b>GRUPO KMB DIRETORIA EXECUTIVA & AUDITORIA PATRIMONIAL</b>",
@@ -1369,21 +1264,19 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
           spaceAfter=8,
       )
   )
-
   story.append(Paragraph("1. Indicadores de SKUs e Volumetria", estilo_secao))
-
   dados_tabela_ind = [[
       Paragraph("Indicador Operacional", estilo_th),
       Paragraph("Resultado Apurado", estilo_th_center),
       Paragraph("Detalhamento / Referência", estilo_th),
   ]]
-
   linhas_indicadores = [
       (
           "Total SKUs Auditados",
           f"{resumo_unico['total_skus']:,} SKUs",
           (
-              f"Pré: {resumo_unico['qtd_antes']:,.0f} un | Pós:"
+              f"SKUs Pré: {resumo_unico['skus_pre_inventario']:,} | Pré:"
+              f" {resumo_unico['qtd_antes']:,.0f} un | Pós:"
               f" {resumo_unico['qtd_pos']:,.0f} un"
           ),
       ),
@@ -1434,14 +1327,12 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
           "Meta Corporativa: 97,00%",
       ),
   ]
-
   for label, res, det in linhas_indicadores:
     dados_tabela_ind.append([
         Paragraph(label, estilo_td_esq_bold),
         Paragraph(res, estilo_td_centro),
         Paragraph(det, estilo_td_esq),
     ])
-
   tabela_ind_pdf = Table(dados_tabela_ind, colWidths=[150, 140, 250])
   tabela_ind_pdf.setStyle(
       TableStyle([
@@ -1461,21 +1352,17 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
           ),
       ])
   )
-
   story.append(tabela_ind_pdf)
   story.append(Spacer(1, 4))
-
   story.append(
       Paragraph("2. Balanço Patrimonial & Impacto Geral", estilo_secao)
   )
-
   cor_impacto = (
       "#10b981" if resumo_unico["impacto_sobre_antes_pct"] >= 0 else "#ef4444"
   )
   cor_ajuste = (
       "#10b981" if resumo_unico["val_ajuste_liquido"] >= 0 else "#ef4444"
   )
-
   dados_balanco = [
       [
           Paragraph("ESTOQUE ANTES (SISTEMA / TEÓRICO)", estilo_balanco_tit),
@@ -1528,7 +1415,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
           ),
       ],
   ]
-
   tabela_balanco = Table(dados_balanco, colWidths=[270, 270])
   tabela_balanco.setStyle(
       TableStyle([
@@ -1541,12 +1427,9 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
           ("RIGHTPADDING", (0, 0), (-1, -1), 8),
       ])
   )
-
   story.append(tabela_balanco)
   story.append(Spacer(1, 4))
-
   story.append(Paragraph("3. Parecer Técnico de Governança", estilo_secao))
-
   status_acuracia = (
       "atendendo à meta corporativa"
       if resumo_unico["acuracia_vol"] >= 97
@@ -1558,7 +1441,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     ({resumo_unico['impacto_sobre_antes_pct']:.2f}% sobre o saldo teórico inicial). Recomenda-se atuação imediata nas {resumo_unico['skus_falta']} 
     linhas com quebra apontadas (Plano de Ação Prioritário).
     """
-
   tabela_parecer = Table(
       [[Paragraph(texto_parecer.strip(), estilo_parecer)]], colWidths=[540]
   )
@@ -1573,7 +1455,6 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
       ])
   )
   story.append(tabela_parecer)
-
   doc.build(story, canvasmaker=NumberedCanvas)
   buffer.seek(0)
   return buffer
@@ -1587,15 +1468,12 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
       tuple(lista_dfs), tuple(nomes_arquivos)
   )
   wb = openpyxl.Workbook()
-
   ws1 = wb.active
   ws1.title = "Resumo Executivo"
   ws1.views.sheetView[0].showGridLines = True
-
   ws1["A1"] = "⚡ GRUPO KMB // PAINEL DE GOVERNANÇA E AUDITORIA PATRIMONIAL"
   ws1["A1"].font = Font(size=14, bold=True, color="1F4E78")
   ws1.append([])
-
   headers_resumo = [
       "Ficheiro / Unidade",
       "Total SKUs",
@@ -1610,7 +1488,6 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
       "Status",
   ]
   ws1.append(headers_resumo)
-
   for r in resumos:
     status = "CONFORME" if r["acuracia_vol"] >= 97 else "CRÍTICO"
     ws1.append([
@@ -1626,10 +1503,8 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
         f"{r['acuracia_fin']:.2f}%",
         status,
     ])
-
   ws2 = wb.create_sheet(title="Divergências e Zerados")
   ws2.views.sheetView[0].showGridLines = True
-
   headers_detalhe = [
       "Unidade / Ficheiro",
       "Data do Inventário",
@@ -1641,7 +1516,6 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
       "Classificação de Divergência",
   ]
   ws2.append(headers_detalhe)
-
   for idx, df in enumerate(lista_dfs):
     nome_arq = nomes_arquivos[idx]
     col_ajuste = "Ajuste" if "Ajuste" in df.columns else None
@@ -1653,14 +1527,12 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
         ),
         None,
     )
-
     for _, row in df.iterrows():
       ajuste = row[col_ajuste] if col_ajuste and col_ajuste in df.columns else 0
       val_aju = (
           row[col_val_aju] if col_val_aju and col_val_aju in df.columns else 0
       )
       saldo_sis = row.get("Saldo em Estoque", 0)
-
       if ajuste < 0:
         classificacao = "FALTA (QUEBRA)"
       elif ajuste > 0:
@@ -1669,13 +1541,11 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
         classificacao = "ESTOQUE CONGELADO ZERO"
       else:
         classificacao = "CONFORME"
-
       data_inv = str(row.get("Data de Abertura", row.get("Data", "N/A")))
       cod_prod = str(row.get("Código do Produto", row.get("Codigo", "N/A")))
       desc_prod = str(
           row.get("Descrição do Produto", row.get("Descricao", "Item Diversos"))
       )
-
       ws2.append([
           nome_arq,
           data_inv,
@@ -1686,7 +1556,6 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
           val_aju,
           classificacao,
       ])
-
   buffer = io.BytesIO()
   wb.save(buffer)
   buffer.seek(0)
@@ -1698,7 +1567,6 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
       tuple(lista_dfs), tuple(nomes_arquivos)
   )
   doc = docx.Document()
-
   doc.add_heading(
       "⚡ GRUPO KMB // RELATÓRIO EXECUTIVO DE AUDITORIA C-LEVEL", level=1
   )
@@ -1706,15 +1574,15 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
       "Documento oficial consolidado de governança patrimonial, contendo"
       " indicadores de exatidão, controle e eficiência."
   )
-
   doc.add_heading("1. Indicadores Consolidados por Unidade", level=2)
   for r in resumos:
     p = doc.add_paragraph()
     p.add_run("• Unidade / Arquivo: ").bold = True
     p.add_run(f"{r['nome']}\n")
     p.add_run(
-        f"  - Total de SKUs Auditados: {r['total_skus']:,} (Pré:"
-        f" {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un)\n"
+        f"  - Total de SKUs Auditados: {r['total_skus']:,} (SKUs Pré:"
+        f" {r['skus_pre_inventario']:,} | Pré: {r['qtd_antes']:,.0f} un | Pós:"
+        f" {r['qtd_pos']:,.0f} un)\n"
     )
     p.add_run(
         f"  - Produtos com Falta: {r['skus_falta']:,} SKUs"
@@ -1742,12 +1610,10 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
         f"  - Acurácia Volumétrica: {r['acuracia_vol']:.2f}% | Acurácia"
         f" Financeira: {r['acuracia_fin']:.2f}%\n"
     )
-
   doc.add_heading("2. Detalhamento de Divergências Críticas", level=2)
   for idx, df in enumerate(lista_dfs):
     doc.add_paragraph(f"Análise detalhada da base: {nomes_arquivos[idx]}")
     col_ajuste = "Ajuste" if "Ajuste" in df.columns else None
-
     if col_ajuste and col_ajuste in df.columns:
       total_faltas = len(df[df[col_ajuste] < 0])
       total_sobras = len(df[df[col_ajuste] > 0])
@@ -1772,10 +1638,9 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
       " Protocolo J.A.R.V.I.S. / Grupo KMB e refletem com fidelidade a apuração"
       " patrimonial realizada.\n\n"
   )
-
   p_assinatura = doc.add_paragraph()
   p_assinatura.add_run(
-      "____________________________________________________\n"
+      "__________________________________________________\n"
   ).bold = True
   p_assinatura.add_run("Time de Inventário / Auditoria C-Level\n")
   p_assinatura.add_run("Grupo KMB - Exatidão • Controle • Eficiência")
@@ -1790,7 +1655,6 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
       tuple(lista_dfs), tuple(nomes_arquivos)
   )
   buffer = io.BytesIO()
-
   doc_pdf = SimpleDocTemplate(
       buffer,
       pagesize=letter,
@@ -1799,7 +1663,6 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
       topMargin=36,
       bottomMargin=36,
   )
-
   styles = getSampleStyleSheet()
   estilo_titulo = ParagraphStyle(
       "TituloExecutivo",
@@ -1829,7 +1692,6 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
       textColor=colors.HexColor("#334155"),
       spaceAfter=4,
   )
-
   story = []
   story.append(
       Paragraph(
@@ -1853,12 +1715,11 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
           spaceAfter=12,
       )
   )
-
   story.append(Paragraph("1. Indicadores Consolidados por Unidade", estilo_sub))
   for r in resumos:
     texto_unidade = f"""
         <b>• Unidade / Arquivo:</b> {r['nome']}<br/>
-        <b>- Total de SKUs Auditados:</b> {r['total_skus']:,} (Pré: {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un)<br/>
+        <b>- Total de SKUs Auditados:</b> {r['total_skus']:,} (SKUs Pré: {r['skus_pre_inventario']:,} | Pré: {r['qtd_antes']:,.0f} un | Pós: {r['qtd_pos']:,.0f} un)<br/>
         <b>- Produtos com Falta:</b> {r['skus_falta']:,} SKUs ({r['perc_falta_itens']:.2f}%) | Vol: -{r['vol_falta']:,.0f} un | R$ {r['val_falta']:,.2f}<br/>
         <b>- Produtos com Sobra:</b> {r['skus_sobra']:,} SKUs ({r['perc_sobra_itens']:.2f}%) | Vol: +{r['vol_sobra']:,.0f} un | R$ +{r['val_sobra']:,.2f}<br/>
         <b>- Volume Físico Total Divergências:</b> {r['vol_div_total']:,.0f} un ({r['perc_vol_div']:.2f}%) | R$ {r['val_div_absoluto']:,.2f}<br/>
@@ -1868,7 +1729,6 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
         """
     story.append(Paragraph(texto_unidade, estilo_texto))
     story.append(Spacer(1, 4))
-
   story.append(Paragraph("2. Detalhamento de Divergências Críticas", estilo_sub))
   for idx, df in enumerate(lista_dfs):
     col_ajuste = "Ajuste" if "Ajuste" in df.columns else None
@@ -1888,7 +1748,6 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
             """
       story.append(Paragraph(texto_detalhe, estilo_texto))
       story.append(Spacer(1, 4))
-
   story.append(Paragraph("3. Validação e Assinatura C-Level", estilo_sub))
   story.append(
       Paragraph(
@@ -1899,14 +1758,12 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
       )
   )
   story.append(Spacer(1, 15))
-
   texto_assinatura = """
-    <b>____________________________________________________</b><br/>
+    <b>__________________________________________________</b><br/>
     <b>Time de Inventário / Auditoria C-Level</b><br/>
     Grupo KMB - Exatidão • Controle • Eficiência
     """
   story.append(Paragraph(texto_assinatura, estilo_texto))
-
   doc_pdf.build(story, canvasmaker=NumberedCanvas)
   buffer.seek(0)
   return buffer
@@ -1918,7 +1775,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
   )
   prs = Presentation()
   slide_layout = prs.slide_layouts[6]  # em branco
-
   slide1 = prs.slides.add_slide(slide_layout)
   bg1 = slide1.shapes.add_shape(
       MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height
@@ -1926,27 +1782,23 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
   bg1.fill.solid()
   bg1.fill.fore_color.rgb = PptxRGBColor(11, 15, 25)
   bg1.line.fill.background()
-
   tb1 = slide1.shapes.add_textbox(
       PptxInches(1), PptxInches(1.8), PptxInches(11.3), PptxInches(4)
   )
   tf1 = tb1.text_frame
   tf1.word_wrap = True
-
   p1 = tf1.paragraphs[0]
   p1.text = "⚡ GRUPO KMB // DIRETORIA EXECUTIVA"
   p1.font.size = PptxPt(32)
   p1.font.bold = True
   p1.font.color.rgb = PptxRGBColor(0, 242, 254)
   p1.alignment = PP_ALIGN.CENTER
-
   p2 = tf1.add_paragraph()
   p2.text = "Relatório Executivo de Auditoria Patrimonial & Indicadores"
   p2.font.size = PptxPt(20)
   p2.font.color.rgb = PptxRGBColor(243, 244, 246)
   p2.space_before = PptxPt(12)
   p2.alignment = PP_ALIGN.CENTER
-
   p3 = tf1.add_paragraph()
   p3.text = (
       f"Data de Emissão: {pd.Timestamp.now().strftime('%d/%m/%Y')} | Protocolo"
@@ -1956,7 +1808,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
   p3.font.color.rgb = PptxRGBColor(156, 163, 175)
   p3.space_before = PptxPt(25)
   p3.alignment = PP_ALIGN.CENTER
-
   for r in resumos:
     slide2 = prs.slides.add_slide(slide_layout)
     tb_head2 = slide2.shapes.add_textbox(
@@ -1968,7 +1819,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     p_h2.font.size = PptxPt(22)
     p_h2.font.bold = True
     p_h2.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     card_res = slide2.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         PptxInches(0.8),
@@ -1979,20 +1829,20 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     card_res.fill.solid()
     card_res.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
     card_res.line.color.rgb = PptxRGBColor(203, 213, 225)
-
     tf_res = card_res.text_frame
     tf_res.word_wrap = True
     tf_res.margin_left = PptxInches(0.5)
     tf_res.margin_top = PptxInches(0.4)
-
     p_rt = tf_res.paragraphs[0]
     p_rt.text = "🎯 Visão Geral de Governança Patrimonial"
     p_rt.font.size = PptxPt(16)
     p_rt.font.bold = True
     p_rt.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     for l in [
-        f"• Total de SKUs Auditados: {r['total_skus']:,} itens",
+        (
+            f"• Total de SKUs Auditados: {r['total_skus']:,} itens (SKUs Pré:"
+            f" {r['skus_pre_inventario']:,})"
+        ),
         (
             f"• Acuracidade Volumétrica: {r['acuracia_vol']:.2f}% (Meta"
             " Corporativa: 97.00%)"
@@ -2010,7 +1860,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
       pl.font.size = PptxPt(14)
       pl.font.color.rgb = PptxRGBColor(51, 65, 85)
       pl.space_before = PptxPt(12)
-
     slide3 = prs.slides.add_slide(slide_layout)
     tb_head3 = slide3.shapes.add_textbox(
         PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8)
@@ -2021,7 +1870,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     p_h3.font.size = PptxPt(22)
     p_h3.font.bold = True
     p_h3.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     card3_l = slide3.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         PptxInches(0.8),
@@ -2032,20 +1880,18 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     card3_l.fill.solid()
     card3_l.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
     card3_l.line.color.rgb = PptxRGBColor(203, 213, 225)
-
     tf3_l = card3_l.text_frame
     tf3_l.word_wrap = True
     tf3_l.margin_left = PptxInches(0.4)
     tf3_l.margin_top = PptxInches(0.4)
-
     p3lt = tf3_l.paragraphs[0]
     p3lt.text = "📦 Composição de SKUs"
     p3lt.font.size = PptxPt(15)
     p3lt.font.bold = True
     p3lt.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     for it in [
         f"• Total SKUs: {r['total_skus']:,}",
+        f"• SKUs Pré-Inventário: {r['skus_pre_inventario']:,}",
         (
             f"• Produtos com Falta: {r['skus_falta']:,}"
             f" ({r['perc_falta_itens']:.2f}%)"
@@ -2061,7 +1907,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
       pt.font.size = PptxPt(13)
       pt.font.color.rgb = PptxRGBColor(51, 65, 85)
       pt.space_before = PptxPt(10)
-
     card3_r = slide3.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         PptxInches(6.6),
@@ -2072,18 +1917,15 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     card3_r.fill.solid()
     card3_r.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
     card3_r.line.color.rgb = PptxRGBColor(203, 213, 225)
-
     tf3_r = card3_r.text_frame
     tf3_r.word_wrap = True
     tf3_r.margin_left = PptxInches(0.4)
     tf3_r.margin_top = PptxInches(0.4)
-
     p3rt = tf3_r.paragraphs[0]
     p3rt.text = "⚖️ Volume Físico Absoluto"
     p3rt.font.size = PptxPt(15)
     p3rt.font.bold = True
     p3rt.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     for it in [
         f"• Quantidade Antes (Pré): {r['qtd_antes']:,.0f} un",
         f"• Quantidade Depois (Pós): {r['qtd_pos']:,.0f} un",
@@ -2095,7 +1937,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
       pt.font.size = PptxPt(13)
       pt.font.color.rgb = PptxRGBColor(51, 65, 85)
       pt.space_before = PptxPt(10)
-
     slide4 = prs.slides.add_slide(slide_layout)
     tb_head4 = slide4.shapes.add_textbox(
         PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8)
@@ -2106,7 +1947,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     p_h4.font.size = PptxPt(22)
     p_h4.font.bold = True
     p_h4.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     card4 = slide4.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         PptxInches(0.8),
@@ -2117,18 +1957,15 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     card4.fill.solid()
     card4.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
     card4.line.color.rgb = PptxRGBColor(203, 213, 225)
-
     tf4 = card4.text_frame
     tf4.word_wrap = True
     tf4.margin_left = PptxInches(0.5)
     tf4.margin_top = PptxInches(0.4)
-
     p4t = tf4.paragraphs[0]
     p4t.text = "📈 Demonstração Financeira Consolidada"
     p4t.font.size = PptxPt(16)
     p4t.font.bold = True
     p4t.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     for it in [
         f"• Estoque Teórico (Antes): R$ {r['soma_antes']:,.2f}",
         f"• Estoque Físico Auditado (Depois): R$ {r['soma_depois']:,.2f}",
@@ -2142,7 +1979,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
       pt.font.size = PptxPt(13.5)
       pt.font.color.rgb = PptxRGBColor(51, 65, 85)
       pt.space_before = PptxPt(10)
-
     slide5 = prs.slides.add_slide(slide_layout)
     tb_head5 = slide5.shapes.add_textbox(
         PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8)
@@ -2153,7 +1989,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     p_h5.font.size = PptxPt(22)
     p_h5.font.bold = True
     p_h5.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     card5 = slide5.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         PptxInches(0.8),
@@ -2164,18 +1999,15 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     card5.fill.solid()
     card5.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
     card5.line.color.rgb = PptxRGBColor(203, 213, 225)
-
     tf5 = card5.text_frame
     tf5.word_wrap = True
     tf5.margin_left = PptxInches(0.5)
     tf5.margin_top = PptxInches(0.4)
-
     p5t = tf5.paragraphs[0]
     p5t.text = "⚠️ Diagnóstico Operacional C-Level"
     p5t.font.size = PptxPt(16)
     p5t.font.bold = True
     p5t.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     for it in [
         f"• SKUs com Quebra Crítica (Falta): {r['skus_falta']:,} produtos",
         f"• Volume Financeiro de Faltas: R$ {r['val_falta']:,.2f}",
@@ -2191,7 +2023,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
       pt.font.size = PptxPt(13.5)
       pt.font.color.rgb = PptxRGBColor(51, 65, 85)
       pt.space_before = PptxPt(12)
-
     slide6 = prs.slides.add_slide(slide_layout)
     tb_head6 = slide6.shapes.add_textbox(
         PptxInches(0.8), PptxInches(0.5), PptxInches(11.5), PptxInches(0.8)
@@ -2202,7 +2033,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     p_h6.font.size = PptxPt(22)
     p_h6.font.bold = True
     p_h6.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     card6 = slide6.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         PptxInches(0.8),
@@ -2213,18 +2043,15 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
     card6.fill.solid()
     card6.fill.fore_color.rgb = PptxRGBColor(248, 250, 252)
     card6.line.color.rgb = PptxRGBColor(203, 213, 225)
-
     tf6 = card6.text_frame
     tf6.word_wrap = True
     tf6.margin_left = PptxInches(0.5)
     tf6.margin_top = PptxInches(0.4)
-
     p6t = tf6.paragraphs[0]
     p6t.text = "🛡️ Validação & Diretrizes Estratégicas"
     p6t.font.size = PptxPt(16)
     p6t.font.bold = True
     p6t.font.color.rgb = PptxRGBColor(31, 78, 120)
-
     for it in [
         (
             "1. Auditoria Eletrônica Validada via Protocolo J.A.R.V.I.S. /"
@@ -2238,7 +2065,7 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
             "3. Implantação de rondas preventivas nos setores com maior índice"
             " de divergência."
         ),
-        "____________________________________________________",
+        "__________________________________________________",
         (
             "Time de Inventário / Auditoria C-Level • Exatidão • Controle •"
             " Eficiência"
@@ -2249,7 +2076,6 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
       pt.font.size = PptxPt(13)
       pt.font.color.rgb = PptxRGBColor(51, 65, 85)
       pt.space_before = PptxPt(10)
-
   buffer = io.BytesIO()
   prs.save(buffer)
   buffer.seek(0)
@@ -2319,7 +2145,6 @@ def _b4_gerar_excel_agenda(df_agenda, nome_aba="Agenda"):
   ws = wb.active
   ws.title = nome_aba[:31]
   ws.views.sheetView[0].showGridLines = True
-
   fonte_cab = Font(name="Arial", size=10, bold=True, color="FFFFFF")
   fill_cab = PatternFill(
       start_color="1F4E78", end_color="1F4E78", fill_type="solid"
@@ -2331,7 +2156,6 @@ def _b4_gerar_excel_agenda(df_agenda, nome_aba="Agenda"):
       top=Side(style="thin", color="000000"),
       bottom=Side(style="thin", color="000000"),
   )
-
   colunas = [
       "ID",
       "Data",
@@ -2352,10 +2176,8 @@ def _b4_gerar_excel_agenda(df_agenda, nome_aba="Agenda"):
     c.fill = fill_cab
     c.alignment = Alignment(horizontal="center", vertical="center")
     c.border = borda
-
   for _, r in df_agenda.iterrows():
     ws.append([str(r.get(col, "")) for col in colunas])
-
   for row in ws.iter_rows(
       min_row=2, max_row=ws.max_row, min_col=1, max_col=len(colunas)
   ):
@@ -2366,12 +2188,10 @@ def _b4_gerar_excel_agenda(df_agenda, nome_aba="Agenda"):
           horizontal="left" if cell.column in [4, 11] else "center",
           vertical="center",
       )
-
   for col in ws.columns:
     col_letter = get_column_letter(col[0].column)
     max_len = max([len(str(cell.value or "")) for cell in col] + [8])
     ws.column_dimensions[col_letter].width = min(max_len + 3, 45)
-
   buf = io.BytesIO()
   wb.save(buf)
   buf.seek(0)
@@ -2417,7 +2237,6 @@ def _b4_gerar_pdf_agenda(df_agenda, titulo_relatorio):
       textColor=colors.HexColor("#111827"),
       alignment=1,
   )
-
   story = [
       Paragraph(
           f"<b>GRUPO KMB // AGENDA INTERATIVA — {titulo_relatorio}</b>",
@@ -2429,7 +2248,6 @@ def _b4_gerar_pdf_agenda(df_agenda, titulo_relatorio):
       ),
       Spacer(1, 8),
   ]
-
   headers = [
       "Data",
       "Hora",
@@ -2441,7 +2259,6 @@ def _b4_gerar_pdf_agenda(df_agenda, titulo_relatorio):
       "Observações",
   ]
   tabela_dados = [[Paragraph(h, estilo_th) for h in headers]]
-
   for _, r in df_agenda.iterrows():
     tabela_dados.append([
         Paragraph(str(r.get("Data", "")), estilo_td_c),
@@ -2453,7 +2270,6 @@ def _b4_gerar_pdf_agenda(df_agenda, titulo_relatorio):
         Paragraph(f"{r.get('Aviso (min)', 15)} min", estilo_td_c),
         Paragraph(str(r.get("Notas", "")), estilo_td),
     ])
-
   tbl = Table(
       tabela_dados,
       colWidths=[68, 48, 185, 75, 65, 75, 50, 186],
@@ -2483,23 +2299,17 @@ def _b4_gerar_pdf_agenda(df_agenda, titulo_relatorio):
 def _b4_separar_data_hora(val_data, val_hora=None):
   hoje_padrao = pd.Timestamp.now().strftime("%Y-%m-%d")
   hora_padrao = "09:00"
-
   texto_data = "" if pd.isna(val_data) else str(val_data).strip()
   texto_hora = "" if pd.isna(val_hora) else str(val_hora).strip()
-
   if not texto_data and not texto_hora:
     return hoje_padrao, hora_padrao
-
   combinado = f"{texto_data} {texto_hora}".strip()
   dt_parsed = pd.to_datetime(combinado, dayfirst=True, errors="coerce")
-
   if pd.isna(dt_parsed) and texto_data:
     dt_parsed = pd.to_datetime(texto_data, dayfirst=True, errors="coerce")
-
   data_final = (
       dt_parsed.strftime("%Y-%m-%d") if not pd.isna(dt_parsed) else hoje_padrao
   )
-
   if texto_hora:
     hora_dt = pd.to_datetime(texto_hora, errors="coerce")
     if not pd.isna(hora_dt):
@@ -2512,7 +2322,6 @@ def _b4_separar_data_hora(val_data, val_hora=None):
     hora_final = dt_parsed.strftime("%H:%M")
   else:
     hora_final = hora_padrao
-
   return data_final, hora_final
 
 
@@ -2533,7 +2342,6 @@ def _b4_importar_compromissos_excel(arquivo_upload):
   try:
     nome_arq = str(getattr(arquivo_upload, "name", "")).lower()
     raw_bytes = arquivo_upload.getvalue()
-
     if nome_arq.endswith(".csv"):
       df_imp = None
       for enc in ["utf-8-sig", "utf-8", "latin-1", "cp1252"]:
@@ -2551,9 +2359,7 @@ def _b4_importar_compromissos_excel(arquivo_upload):
         return 0, "Não foi possível ler o arquivo CSV exportado."
     else:
       df_imp = pd.read_excel(io.BytesIO(raw_bytes))
-
     df_imp.columns = [str(c).strip() for c in df_imp.columns]
-
     col_id = _b4_buscar_coluna(df_imp, ["ID"])
     col_titulo = _b4_buscar_coluna(
         df_imp,
@@ -2611,7 +2417,6 @@ def _b4_importar_compromissos_excel(arquivo_upload):
         ],
     )
     col_local = _b4_buscar_coluna(df_imp, ["Local", "Location", "Room"])
-
     adicionados = 0
     chaves_existentes = {
         (
@@ -2621,20 +2426,16 @@ def _b4_importar_compromissos_excel(arquivo_upload):
         )
         for c in st.session_state.b4_compromissos
     }
-
     for idx, row in df_imp.iterrows():
       titulo = str(row.get(col_titulo, "")).strip() if col_titulo else ""
       if not titulo or titulo.lower() in ["nan", "none", "nat"]:
         continue
-
       val_d = row.get(col_data) if col_data else None
       val_h = row.get(col_hora) if col_hora and col_hora != col_data else None
       data_val, hora_val = _b4_separar_data_hora(val_d, val_h)
-
       chave_item = (titulo.lower(), data_val, hora_val)
       if chave_item in chaves_existentes:
         continue
-
       notas_partes = []
       if col_notas:
         n_txt = str(row.get(col_notas, "")).strip()
@@ -2644,17 +2445,14 @@ def _b4_importar_compromissos_excel(arquivo_upload):
         l_txt = str(row.get(col_local, "")).strip()
         if l_txt and l_txt.lower() not in ["nan", "none"]:
           notas_partes.append(f"Local: {l_txt}")
-
       cat_val = str(row.get(col_cat, "")).strip() if col_cat else ""
       if not cat_val or cat_val.lower() in ["nan", "none"]:
         cat_val = "Reunião" if (col_local or not col_cat) else "Trabalho"
-
       aviso_raw = row.get(col_aviso, 15) if col_aviso else 15
       try:
         aviso_num = int(float(aviso_raw)) if pd.notna(aviso_raw) else 15
       except Exception:
         aviso_num = 15
-
       st.session_state.b4_compromissos.append({
           "id": (
               str(row.get(col_id, "")).strip()
@@ -2700,7 +2498,6 @@ def _b4_importar_compromissos_excel(arquivo_upload):
       })
       chaves_existentes.add(chave_item)
       adicionados += 1
-
     return adicionados, None
   except Exception as e:
     return 0, str(e)
@@ -2728,17 +2525,14 @@ def _b4_verificar_avisos_automaticos(lista_comp):
 
 def renderizar_bloco_4_agenda():
   _b4_garantir_estado_agenda()
-
   st.markdown("### 🗓️ AGENDA INTERATIVA DIÁRIA & AUTOMAÇÕES")
   st.markdown(
       "Organize sua agenda diária, receba avisos automáticos de compromissos,"
       " dispare por WhatsApp/E-mail e importe/exporte em Excel ou PDF."
   )
-
   agora_dt = pd.Timestamp.now()
   hoje_str = agora_dt.strftime("%Y-%m-%d")
   todos_comp = st.session_state.b4_compromissos
-
   alertas = _b4_verificar_avisos_automaticos(todos_comp)
   if alertas:
     for item_alerta, diff_min in alertas:
@@ -2767,24 +2561,20 @@ def renderizar_bloco_4_agenda():
             f"[{agora_dt.strftime('%d/%m/%Y %H:%M:%S')}] Aviso automático"
             f" disparado: {item_alerta['titulo']} ({item_alerta['hora']})",
         )
-
   comp_hoje = [c for c in todos_comp if c.get("data") == hoje_str]
   pendentes_hoje = [c for c in comp_hoje if c.get("status") != "Concluído"]
   concluidos_hoje = [c for c in comp_hoje if c.get("status") == "Concluído"]
-
   m1, m2, m3, m4 = st.columns(4)
   m1.metric("Compromissos Hoje", len(comp_hoje))
   m2.metric("Pendentes Hoje", len(pendentes_hoje))
   m3.metric("Concluídos Hoje", len(concluidos_hoje))
   m4.metric("Total na Agenda", len(todos_comp))
-
   aba_dia, aba_novo, aba_ie, aba_auto = st.tabs([
       "📋 Agenda & Filtro por Data",
       "➕ Novo Compromisso",
       "📥📤 Excel & PDF",
       "⚙️ Automação (WhatsApp / E-mail)",
   ])
-
   with aba_dia:
     f1, f2, f3 = st.columns([1.2, 1.2, 1.6])
     with f1:
@@ -2803,7 +2593,6 @@ def renderizar_bloco_4_agenda():
           placeholder="Ex: Auditoria, Urgente, Confirmado...",
           key="b4_busca_texto",
       )
-
     data_filtro_str = data_filtro.strftime("%Y-%m-%d")
     lista_filtrada = []
     for c in todos_comp:
@@ -2821,11 +2610,9 @@ def renderizar_bloco_4_agenda():
         if termo not in alvo:
           continue
       lista_filtrada.append(c)
-
     lista_filtrada.sort(
         key=lambda x: (str(x.get("data", "")), str(x.get("hora", "")))
     )
-
     if not lista_filtrada:
       st.info("Nenhum compromisso encontrado para o filtro selecionado.")
     else:
@@ -2863,7 +2650,6 @@ def renderizar_bloco_4_agenda():
                 if real_c["id"] == comp["id"]:
                   real_c["status"] = novo_status
               st.rerun()
-
             if st.button(
                 "🗑️ Remover",
                 key=f"b4_del_{comp['id']}_{idx_item}",
@@ -2875,7 +2661,6 @@ def renderizar_bloco_4_agenda():
                   if real_c["id"] != comp["id"]
               ]
               st.rerun()
-
   with aba_novo:
     with st.form("b4_form_novo_compromisso", clear_on_submit=True):
       fc1, fc2, fc3 = st.columns(3)
@@ -2893,12 +2678,10 @@ def renderizar_bloco_4_agenda():
             value=15,
             step=5,
         )
-
       n_titulo = st.text_input(
           "Título do Compromisso *",
           placeholder="Ex: Reunião de alinhamento com gerência",
       )
-
       fc4, fc5, fc6 = st.columns(3)
       with fc4:
         n_categoria = st.selectbox(
@@ -2911,7 +2694,6 @@ def renderizar_bloco_4_agenda():
         n_status = st.selectbox(
             "Status Inicial", ["Pendente", "Confirmado", "Concluído", "Adiado"]
         )
-
       fc7, fc8 = st.columns(2)
       with fc7:
         n_wa = st.text_input(
@@ -2921,7 +2703,6 @@ def renderizar_bloco_4_agenda():
         n_email = st.text_input(
             "E-mail para Envio (opcional)", placeholder="Ex: gestor@empresa.com"
         )
-
       n_notas = st.text_area(
           "Observações / Checklist",
           placeholder="Detalhes importantes do compromisso...",
@@ -2929,7 +2710,6 @@ def renderizar_bloco_4_agenda():
       enviado = st.form_submit_button(
           "💾 Salvar Compromisso na Agenda", use_container_width=True
       )
-
       if enviado:
         if not n_titulo.strip():
           st.error("❌ Informe o título do compromisso.")
@@ -2950,7 +2730,6 @@ def renderizar_bloco_4_agenda():
           })
           st.success("✅ Compromisso adicionado à agenda!")
           st.rerun()
-
   with aba_ie:
     st.markdown("#### 📥 Importar Compromissos em Excel ou CSV (.xlsx / .csv)")
     arq_agenda_xlsx = st.file_uploader(
@@ -2970,7 +2749,6 @@ def renderizar_bloco_4_agenda():
         else:
           st.success(f"✅ {qtd_imp} compromisso(s) importado(s) com sucesso!")
           st.rerun()
-
     st.markdown("---")
     st.markdown(
         "#### 📤 Exportar Agenda em Excel ou PDF (Por Data ou Agenda Inteira)"
@@ -2989,7 +2767,6 @@ def renderizar_bloco_4_agenda():
           value=agora_dt.date(),
           key="b4_data_exportacao",
       )
-
     data_exp_str = data_exp.strftime("%Y-%m-%d")
     if escopo_exp == "Data Selecionada":
       dados_exp = [c for c in todos_comp if c.get("data") == data_exp_str]
@@ -2999,7 +2776,6 @@ def renderizar_bloco_4_agenda():
       dados_exp = list(todos_comp)
       rotulo_exp = "Agenda_Inteira"
       titulo_pdf_exp = "AGENDA INTEIRA"
-
     dados_exp.sort(
         key=lambda x: (str(x.get("data", "")), str(x.get("hora", "")))
     )
@@ -3019,7 +2795,6 @@ def renderizar_bloco_4_agenda():
         }
         for d in dados_exp
     ])
-
     ex_b1, ex_b2 = st.columns(2)
     with ex_b1:
       buf_xl_agenda = _b4_gerar_excel_agenda(df_exp, nome_aba=rotulo_exp)
@@ -3043,7 +2818,6 @@ def renderizar_bloco_4_agenda():
           use_container_width=True,
           key="b4_dl_pdf",
       )
-
   with aba_auto:
     st.markdown("#### 📲 Envio por WhatsApp e E-mail + Automação")
     auto_c1, auto_c2 = st.columns(2)
@@ -3060,7 +2834,6 @@ def renderizar_bloco_4_agenda():
           placeholder="Ex: 5511999999999",
           key="b4_numero_wa",
       )
-
     lista_envio = (
         comp_hoje if escopo_envio == "Compromissos de Hoje" else todos_comp
     )
@@ -3071,14 +2844,12 @@ def renderizar_bloco_4_agenda():
     texto_msg = _b4_formatar_texto_agenda(
         lista_envio, titulo_secao=escopo_envio.upper()
     )
-
     st.text_area(
         "Prévia da Mensagem Formatada:",
         value=texto_msg,
         height=160,
         key="b4_previa_msg",
     )
-
     import urllib.parse
 
     fone_limpo = "".join(ch for ch in numero_wa if ch.isdigit())
@@ -3088,7 +2859,6 @@ def renderizar_bloco_4_agenda():
         if fone_limpo
         else f"https://wa.me/?text={msg_codificada}"
     )
-
     env_c1, env_c2, env_c3 = st.columns(3)
     with env_c1:
       st.link_button(
@@ -3152,7 +2922,6 @@ def renderizar_bloco_4_agenda():
               )
           except Exception as e:
             st.error(f"❌ Falha ao disparar automação: {e}")
-
     if st.session_state.b4_log_automacoes:
       st.markdown("---")
       st.markdown("##### 📜 Registro de Avisos & Automações")
@@ -3164,12 +2933,9 @@ def main():
   st.set_page_config(
       page_title="GRUPO KMB // TIME DE INVENTÁRIO", page_icon="⚡", layout="wide"
   )
-
   SENHA_MESTRE = st.secrets.get("SENHA_MESTRE", "novacore2026")
-
   if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
-
   caminho_logo_tela = (
       "brasao_sem_fundo.png"
       if os.path.exists("brasao_sem_fundo.png")
@@ -3184,7 +2950,6 @@ def main():
         """,
         unsafe_allow_html=True,
     )
-
     col_l1, col_l2, col_l3 = st.columns([1, 1.5, 1])
     with col_l2:
       st.markdown("<br><br>", unsafe_allow_html=True)
@@ -3192,12 +2957,10 @@ def main():
         st.image(caminho_logo_tela, use_container_width=True)
       else:
         st.warning("⚠️ Brasão não encontrado na pasta.")
-
       st.markdown("## ⚡ TIME DE INVENTÁRIO // AUTENTICAÇÃO")
       st.markdown(
           "Insira a senha de acesso executivo para desbloquear o sistema."
       )
-
       senha_digitada = st.text_input(
           "Senha de Acesso", type="password", key="input_senha"
       )
@@ -3208,7 +2971,6 @@ def main():
         else:
           st.error("❌ Senha incorreta. Acesso negado.")
     return
-
   st.markdown(
       """
     <style>
@@ -3223,14 +2985,12 @@ def main():
     """,
       unsafe_allow_html=True,
   )
-
   with st.sidebar:
     if caminho_logo_tela:
       st.image(caminho_logo_tela, use_container_width=True)
     st.markdown("### **GRUPO KMB**")
     st.markdown("*Exatidão • Controle • Eficiência*")
     st.markdown("---")
-
     modo_operacao = st.radio(
         "Modo de Operação:",
         [
@@ -3241,12 +3001,10 @@ def main():
         ],
         key="radio_modo_operacao",
     )
-
     st.markdown("---")
     if st.button("🔒 Encerrar Sessão (Sair)", use_container_width=True):
       st.session_state.autenticado = False
       st.rerun()
-
   st.markdown(
       """
     <div class="main-header">
@@ -3256,11 +3014,9 @@ def main():
     """,
       unsafe_allow_html=True,
   )
-
   if modo_operacao == "Agenda & Automação":
     renderizar_bloco_4_agenda()
     return
-
   if modo_operacao == "Gerador de Etiquetas QR Code":
     st.markdown(
         "### 🏷️ GERADOR DE ETIQUETAS QR CODE // PADRÃO A4 (14 POR PÁGINA)"
@@ -3269,7 +3025,6 @@ def main():
         "Gere etiquetas com QR Code (prefixo **KMB**), numeração encorpada e"
         " brasão oficial prontas para impressão em folha A4."
     )
-
     col_etq1, col_etq2 = st.columns(2)
     with col_etq1:
       num_inicio = st.number_input(
@@ -3289,7 +3044,6 @@ def main():
           step=1,
           key="etq_fim",
       )
-
     if num_inicio > num_fim:
       st.error(
           "❌ O número inicial ('Do número') não pode ser maior que o número"
@@ -3302,7 +3056,6 @@ def main():
           f"📊 Serão geradas **{total_etiquetas} etiquetas** distribuídas em"
           f" **{total_paginas} página(s) A4** (2 colunas × 7 linhas)."
       )
-
       if st.button("⚙️ Gerar PDF de Etiquetas", use_container_width=True):
         with st.spinner("Gerando etiquetas em alta definição..."):
           pdf_etiquetas_buf = gerar_pdf_etiquetas_kmb(
@@ -3314,7 +3067,6 @@ def main():
           st.session_state["pdf_etiquetas_nome"] = (
               f"Etiquetas_KMB_{int(num_inicio):02d}_a_{int(num_fim):02d}.pdf"
           )
-
       if "pdf_etiquetas_pronto" in st.session_state:
         st.success(
             f"✅ Arquivo **{st.session_state['pdf_etiquetas_nome']}** pronto"
@@ -3328,7 +3080,6 @@ def main():
             use_container_width=True,
         )
     return
-
   if modo_operacao == "Modo Planilha de Conferência":
     st.markdown("### 📋 MODO PLANILHA DE CONFERÊNCIA // GERAÇÃO AUTOMATIZADA")
     st.markdown(
@@ -3336,7 +3087,6 @@ def main():
         " listas com todas as colunas preservadas em linha única (ordem"
         " alfabética pela descrição):"
     )
-
     numero_loja_texto = st.text_input(
         "Número da Loja (ex: 13016 ou 17315)",
         value="",
@@ -3344,10 +3094,8 @@ def main():
         max_chars=5,
         key="numero_loja_texto_conferencia",
     )
-
     numero_loja_limpo = numero_loja_texto.strip()
     loja_valida = numero_loja_limpo.isdigit() and int(numero_loja_limpo) >= 1
-
     if not loja_valida:
       if numero_loja_limpo != "":
         st.warning(
@@ -3360,9 +3108,7 @@ def main():
             " arquivos."
         )
       return
-
     numero_loja_ui = int(numero_loja_limpo)
-
     col_up1, col_up2 = st.columns(2)
     with col_up1:
       arq_loc = st.file_uploader(
@@ -3376,7 +3122,6 @@ def main():
           type=["csv", "xlsx", "xls"],
           key="up_est",
       )
-
     if arq_loc and arq_est:
       df_loc_temp, msg1 = processar_arquivo_upload(
           arq_loc.getvalue(), arq_loc.name
@@ -3384,28 +3129,22 @@ def main():
       df_est_temp, msg2 = processar_arquivo_upload(
           arq_est.getvalue(), arq_est.name
       )
-
       if df_loc_temp is not None and df_est_temp is not None:
         st.success("✅ Arquivos carregados e validados com sucesso!")
-
         st.markdown("---")
         st.markdown("### 👁️ Pré-visualização na Tela")
-
         buf_preview = gerar_planilha_filtrada_kmb(
             df_loc_temp, df_est_temp, numero_loja_ui, "TODOS"
         )
-
         df_preview_exibir = pd.read_excel(
             buf_preview, sheet_name=0, skiprows=3, dtype=str
         ).fillna("")
-
         cols_vistas = {}
         novas_colunas = []
         for c in df_preview_exibir.columns:
           c_str = str(c).strip()
           if "." in c_str and c_str.split(".")[0].isdigit():
             c_str = c_str.split(".")[0]
-
           if c_str in cols_vistas:
             cols_vistas[c_str] += 1
             novas_colunas.append(f"{c_str}_{cols_vistas[c_str]}")
@@ -3413,17 +3152,12 @@ def main():
             cols_vistas[c_str] = 0
             novas_colunas.append(c_str)
         df_preview_exibir.columns = novas_colunas
-
         for col in df_preview_exibir.columns:
           if "Descrição" not in col:
             df_preview_exibir[col] = df_preview_exibir[col].apply(
-                lambda x: x[:-2]
-                if isinstance(x, str) and x.endswith(".0")
-                else x
+                lambda x: x[:-2] if isinstance(x, str) and x.endswith(".0") else x
             )
-
         st.dataframe(df_preview_exibir, use_container_width=True, height=420)
-
         st.download_button(
             label="📥 Baixar Pré-visualização em Excel (.xlsx)",
             data=buf_preview,
@@ -3431,13 +3165,11 @@ def main():
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
-
         st.markdown("---")
         st.markdown(
             "### 📥 1. Listas de Conferência em Excel (Ordem Alfabética)"
         )
         c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
-
         with c_imp1:
           buf_zerados = gerar_planilha_filtrada_kmb(
               df_loc_temp, df_est_temp, numero_loja_ui, "ZERADOS"
@@ -3482,7 +3214,6 @@ def main():
               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
               use_container_width=True,
           )
-
         data_atual_str = pd.Timestamp.now().strftime("%d.%m.%Y")
         st.markdown("---")
         st.markdown(
@@ -3490,7 +3221,6 @@ def main():
             " Quebras + Brasão)"
         )
         c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
-
         with c_pdf1:
           pdf_zerados = gerar_pdf_conferencia_kmb(
               df_loc_temp, df_est_temp, numero_loja_ui, "ZERADOS"
@@ -3538,14 +3268,12 @@ def main():
       else:
         st.error("❌ Erro ao processar os arquivos.")
     return
-
   arquivos_submetidos = st.file_uploader(
       "Carregue o arquivo oficial de inventário (ex: 13372.07.11.2026.csv) ou"
       " múltiplos arquivos",
       type=["csv", "xlsx", "xls"],
       accept_multiple_files=True,
   )
-
   if arquivos_submetidos:
     lista_dfs = []
     nomes_arquivos = []
@@ -3554,31 +3282,31 @@ def main():
       if df_temp is not None:
         lista_dfs.append(df_temp)
         nomes_arquivos.append(arq.name)
-
     if lista_dfs:
       if len(lista_dfs) == 1:
         df_filtrado = lista_dfs[0]
         num_cols = df_filtrado.select_dtypes(include=["number"]).columns.tolist()
         cat_cols = df_filtrado.select_dtypes(include=["object"]).columns.tolist()
         all_cols = df_filtrado.columns.tolist()
-
         resumo_unico = calcular_metricas_gerenciais(
             tuple(lista_dfs), tuple(nomes_arquivos)
         )[0]
-
         st.markdown(
             "### 📌 ETAPA 1: Indicadores Executivos & Parecer Técnico"
         )
         st.markdown("<br>", unsafe_allow_html=True)
-
         c1, c2 = st.columns(2)
         with c1:
           st.markdown(
               formatar_kpi_html(
                   "Total SKUs Auditados",
-                  f"{resumo_unico['total_skus']:,}",
                   (
-                      f"Pré: {resumo_unico['qtd_antes']:,.0f} un | Pós:"
+                      f"{resumo_unico['total_skus']:,} (Pré:"
+                      f" {resumo_unico['skus_pre_inventario']:,})"
+                  ),
+                  (
+                      f"SKUs Pré: {resumo_unico['skus_pre_inventario']:,} | Pré:"
+                      f" {resumo_unico['qtd_antes']:,.0f} un | Pós:"
                       f" {resumo_unico['qtd_pos']:,.0f} un"
                   ),
                   eh_positivo=True,
@@ -3653,7 +3381,6 @@ def main():
               ),
               unsafe_allow_html=True,
           )
-
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("##### 💰 Balanço Patrimonial & Impacto Geral")
         col_kpi1, col_kpi2 = st.columns(2)
@@ -3700,7 +3427,6 @@ def main():
               ),
               unsafe_allow_html=True,
           )
-
         buf_pdf_indicadores = gerar_pdf_indicadores_tela(
             resumo_unico, nomes_arquivos[0]
         )
@@ -3714,7 +3440,6 @@ def main():
             use_container_width=True,
         )
         st.markdown("---")
-
         with st.expander(
             "🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)",
             expanded=True,
@@ -3754,13 +3479,11 @@ def main():
                   index=0,
                   key="abc_filtro_classe",
               )
-
             df_abc = df_filtrado.sort_values(
                 by=eixo_y_escolhido, ascending=False
             ).copy()
             df_abc["Soma_Acumulada"] = df_abc[eixo_y_escolhido].cumsum()
             soma_total = df_abc[eixo_y_escolhido].sum()
-
             if soma_total > 0:
               df_abc["%_Acumulado"] = (
                   df_abc["Soma_Acumulada"] / soma_total
@@ -3770,14 +3493,12 @@ def main():
                   if p <= 80
                   else ("Classe B (95%)" if p <= 95 else "Classe C (100%)")
               )
-
               if filtro_classe_abc != "Todas as Classes (Geral)":
                 df_abc_filtrado = df_abc[
                     df_abc["Classe_ABC"] == filtro_classe_abc
                 ].copy()
               else:
                 df_abc_filtrado = df_abc.copy()
-
               df_plot = df_abc_filtrado.head(50).copy()
               if not df_plot.empty:
                 fig_abc = go.Figure()
@@ -3821,7 +3542,6 @@ def main():
                     ),
                 )
                 st.plotly_chart(fig_abc, use_container_width=True)
-
         with st.expander(
             "🚨 ETAPA 3: Matriz de Criticidade & Discrepância Financeira",
             expanded=False,
@@ -3840,7 +3560,6 @@ def main():
                 if idx_val_div < len(num_cols)
                 else num_cols[0]
             )
-
             df_critico = df_filtrado.copy()
             df_critico["Impacto_Absoluto"] = df_critico[col_val_div].abs()
             df_critico = df_critico.sort_values(
@@ -3862,7 +3581,6 @@ def main():
                   height=480,
               )
               st.plotly_chart(fig_critico, use_container_width=True)
-
         with st.expander(
             "🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto",
             expanded=False,
@@ -3906,7 +3624,6 @@ def main():
                 height=420,
             )
             st.plotly_chart(fig_risco, use_container_width=True)
-
         with st.expander(
             "⚡ ETAPA 5: CENTRO DE COMANDO C-LEVEL (PRESCRITIVO &"
             " OPERACIONAL)",
@@ -3933,7 +3650,6 @@ def main():
           col_ajuste_e5 = (
               "Ajuste" if "Ajuste" in df_filtrado.columns else "Ajuste"
           )
-
           df_causa = df_filtrado.copy()
 
           def classificar_causa(row):
@@ -4030,7 +3746,6 @@ def main():
         resumos = calcular_metricas_gerenciais(
             tuple(lista_dfs), tuple(nomes_arquivos)
         )
-
         col_cards = st.columns(len(lista_dfs))
         for idx, r in enumerate(resumos):
           with col_cards[idx]:
@@ -4039,9 +3754,10 @@ def main():
               st.markdown(
                   formatar_kpi_html(
                       "Total SKUs Auditados",
-                      f"{r['total_skus']:,}",
+                      f"{r['total_skus']:,} (Pré: {r['skus_pre_inventario']:,})",
                       (
-                          f"Pré: {r['qtd_antes']:,.0f} un | Pós:"
+                          f"SKUs Pré: {r['skus_pre_inventario']:,} | Pré:"
+                          f" {r['qtd_antes']:,.0f} un | Pós:"
                           f" {r['qtd_pos']:,.0f} un"
                       ),
                       eh_positivo=True,
@@ -4115,7 +3831,6 @@ def main():
                   ),
                   unsafe_allow_html=True,
               )
-
               st.markdown("##### 💰 Balanço Patrimonial")
               st.markdown(
                   formatar_kpi_html(
@@ -4157,7 +3872,6 @@ def main():
               )
         st.markdown("---")
         st.subheader("📊 Gráficos Consolidados")
-
         df_resumo_geral = pd.DataFrame([
             {
                 "Ficheiro": r["nome"],
@@ -4171,7 +3885,6 @@ def main():
             }
             for r in resumos
         ])
-
         gc1, gc2 = st.columns(2)
         with gc1:
           fig_val = px.bar(
@@ -4192,7 +3905,6 @@ def main():
               title="Impacto Geral em Percentual",
           )
           st.plotly_chart(fig_aj, use_container_width=True)
-
       st.markdown("---")
       st.subheader("📥 Central de Relatórios Executivos C-Level")
       col_e1, col_e2, col_e3, col_e4 = st.columns(4)
