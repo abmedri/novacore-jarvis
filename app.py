@@ -3337,13 +3337,31 @@ def main():
         " alfabética pela descrição):"
     )
 
-    numero_loja_ui = st.number_input(
+    numero_loja_texto = st.text_input(
         "Número da Loja (ex: 13016 ou 17315)",
-        min_value=1,
-        max_value=99999,
-        value=0,
-        step=1,
+        value="",
+        placeholder="Digite apenas números...",
+        max_chars=5,
+        key="numero_loja_texto_conferencia",
     )
+
+    numero_loja_limpo = numero_loja_texto.strip()
+    loja_valida = numero_loja_limpo.isdigit() and int(numero_loja_limpo) >= 1
+
+    if not loja_valida:
+      if numero_loja_limpo != "":
+        st.warning(
+            "⚠️ Digite um número de loja válido (apenas números, maior que"
+            " zero)."
+        )
+      else:
+        st.info(
+            "ℹ️ Informe o número da loja acima para liberar o envio dos"
+            " arquivos."
+        )
+      return
+
+    numero_loja_ui = int(numero_loja_limpo)
 
     col_up1, col_up2 = st.columns(2)
     with col_up1:
@@ -3879,11 +3897,7 @@ def main():
                 y=col_val_aju_etapa4,
                 title="Balanço Líquido de Divergências por Categoria (R$)",
                 template="plotly_dark",
-                color=(
-                    col_val_aju_etayo4
-                    if "col_val_aju_etayo4" in locals()
-                    else col_val_aju_etapa4
-                ),
+                color=col_val_aju_etapa4,
                 color_continuous_scale=["#ef4444", "#3b82f6", "#10b981"],
             )
             fig_risco.update_layout(
