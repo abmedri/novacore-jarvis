@@ -1624,7 +1624,7 @@ def _b4_verificar_avisos_automaticos(lista_comp):
 def renderizar_bloco_4_agenda():
     _b4_garantir_estado_agenda()
 
-    st.markdown("### 🗓️ AGENDA INTERATIVA DIÁRIA & AUTOMAÇÕES")
+    st.markdown("### 🗓️ BLOCO 4 // AGENDA INTERATIVA DIÁRIA & AUTOMAÇÕES")
     st.markdown("Organize sua agenda diária, receba avisos automáticos de compromissos, dispare por WhatsApp/E-mail e importe/exporte em Excel ou PDF.")
 
     agora_dt = pd.Timestamp.now()
@@ -1993,7 +1993,7 @@ def main():
                 "Auditoria de Inventário (5 Etapas)",
                 "Modo Planilha de Conferência",
                 "Gerador de Etiquetas QR Code",
-                "Agenda & Automação"
+                "Bloco 4 // Agenda & Automação"
             ],
             key="radio_modo_operacao"
         )
@@ -2343,4 +2343,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
