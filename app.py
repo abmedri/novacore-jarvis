@@ -3060,7 +3060,7 @@ def main():
     modo_operacao = st.radio(
         "Modo de Operação:",
         [
-            "Auditoria de Inventário (5 Etapas)",
+            "Auditoria de Inventário",
             "Modo Planilha de Conferência",
             "Gerador de Etiquetas QR Code",
             "Agenda & Automação",
