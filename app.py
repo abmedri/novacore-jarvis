@@ -2085,9 +2085,17 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
 # ====================================================================================
 # BLOCO 4: AGENDA INTERATIVA DIÁRIA & AUTOMAÇÕES (WHATSAPP, E-MAIL, EXCEL, PDF)
 # ====================================================================================
+def _b4_agora_br():
+  try:
+    return pd.Timestamp.now(tz="America/Sao_Paulo").tz_localize(None)
+  except Exception:
+    return pd.Timestamp.now()
+
+
 def _b4_garantir_estado_agenda():
+  agora_br = _b4_agora_br()
   if "b4_compromissos" not in st.session_state:
-    hoje_str = pd.Timestamp.now().strftime("%Y-%m-%d")
+    hoje_str = agora_br.strftime("%Y-%m-%d")
     st.session_state.b4_compromissos = [
         {
             "id": "EVT-101",
@@ -2116,6 +2124,12 @@ def _b4_garantir_estado_agenda():
             "notas": "Exportar PDF/Excel e disparar resumo para liderança.",
         },
     ]
+  if "b4_novo_data" not in st.session_state:
+    st.session_state.b4_novo_data = agora_br.date()
+  if "b4_novo_hora" not in st.session_state:
+    st.session_state.b4_novo_hora = agora_br.time().replace(
+        second=0, microsecond=0
+    )
   if "b4_avisos_disparados" not in st.session_state:
     st.session_state.b4_avisos_disparados = []
   if "b4_log_automacoes" not in st.session_state:
@@ -2199,6 +2213,7 @@ def _b4_gerar_excel_agenda(df_agenda, nome_aba="Agenda"):
 
 
 def _b4_gerar_pdf_agenda(df_agenda, titulo_relatorio):
+  agora_br = _b4_agora_br()
   buf = io.BytesIO()
   doc = SimpleDocTemplate(
       buf,
@@ -2243,7 +2258,7 @@ def _b4_gerar_pdf_agenda(df_agenda, titulo_relatorio):
           estilo_tit,
       ),
       Paragraph(
-          f"Emitido em: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}",
+          f"Emitido em: {agora_br.strftime('%d/%m/%Y %H:%M')}",
           styles["Normal"],
       ),
       Spacer(1, 8),
@@ -2297,7 +2312,8 @@ def _b4_gerar_pdf_agenda(df_agenda, titulo_relatorio):
 
 
 def _b4_separar_data_hora(val_data, val_hora=None):
-  hoje_padrao = pd.Timestamp.now().strftime("%Y-%m-%d")
+  agora_br = _b4_agora_br()
+  hoje_padrao = agora_br.strftime("%Y-%m-%d")
   hora_padrao = "09:00"
   texto_data = "" if pd.isna(val_data) else str(val_data).strip()
   texto_hora = "" if pd.isna(val_hora) else str(val_hora).strip()
@@ -2339,6 +2355,7 @@ def _b4_buscar_coluna(df, candidatos):
 
 
 def _b4_importar_compromissos_excel(arquivo_upload):
+  agora_br = _b4_agora_br()
   try:
     nome_arq = str(getattr(arquivo_upload, "name", "")).lower()
     raw_bytes = arquivo_upload.getvalue()
@@ -2459,7 +2476,7 @@ def _b4_importar_compromissos_excel(arquivo_upload):
               if col_id
               and str(row.get(col_id, "")).strip().lower()
               not in ["", "nan", "none"]
-              else f"TMS-{pd.Timestamp.now().strftime('%H%M%S')}-{idx+1}"
+              else f"TMS-{agora_br.strftime('%H%M%S')}-{idx+1}"
           ),
           "data": data_val,
           "hora": hora_val,
@@ -2504,7 +2521,7 @@ def _b4_importar_compromissos_excel(arquivo_upload):
 
 
 def _b4_verificar_avisos_automaticos(lista_comp):
-  agora = pd.Timestamp.now()
+  agora = _b4_agora_br()
   hoje_str = agora.strftime("%Y-%m-%d")
   minutos_agora = agora.hour * 60 + agora.minute
   alertas_ativos = []
@@ -2530,7 +2547,7 @@ def renderizar_bloco_4_agenda():
       "Organize sua agenda diária, receba avisos automáticos de compromissos,"
       " dispare por WhatsApp/E-mail e importe/exporte em Excel ou PDF."
   )
-  agora_dt = pd.Timestamp.now()
+  agora_dt = _b4_agora_br()
   hoje_str = agora_dt.strftime("%Y-%m-%d")
   todos_comp = st.session_state.b4_compromissos
   alertas = _b4_verificar_avisos_automaticos(todos_comp)
@@ -2665,11 +2682,9 @@ def renderizar_bloco_4_agenda():
     with st.form("b4_form_novo_compromisso", clear_on_submit=True):
       fc1, fc2, fc3 = st.columns(3)
       with fc1:
-        n_data = st.date_input("Data", value=agora_dt.date())
+        n_data = st.date_input("Data", value=st.session_state.b4_novo_data)
       with fc2:
-        n_hora = st.time_input(
-            "Hora", value=agora_dt.time().replace(second=0, microsecond=0)
-        )
+        n_hora = st.time_input("Hora", value=st.session_state.b4_novo_hora)
       with fc3:
         n_aviso = st.number_input(
             "Aviso Automático (min antes)",
@@ -2714,11 +2729,13 @@ def renderizar_bloco_4_agenda():
         if not n_titulo.strip():
           st.error("❌ Informe o título do compromisso.")
         else:
-          novo_id = f"EVT-{pd.Timestamp.now().strftime('%Y%m%d%H%M%S')}"
+          data_exata = n_data.strftime("%Y-%m-%d")
+          hora_exata = n_hora.strftime("%H:%M")
+          novo_id = f"EVT-{agora_dt.strftime('%Y%m%d%H%M%S')}"
           st.session_state.b4_compromissos.append({
               "id": novo_id,
-              "data": n_data.strftime("%Y-%m-%d"),
-              "hora": n_hora.strftime("%H:%M"),
+              "data": data_exata,
+              "hora": hora_exata,
               "titulo": n_titulo.strip(),
               "categoria": n_categoria,
               "prioridade": n_prioridade,
@@ -2728,7 +2745,15 @@ def renderizar_bloco_4_agenda():
               "destino_email": n_email.strip(),
               "notas": n_notas.strip(),
           })
-          st.success("✅ Compromisso adicionado à agenda!")
+          st.session_state.b4_novo_data = n_data
+          st.session_state.b4_novo_hora = n_hora.replace(
+              second=0, microsecond=0
+          )
+          st.session_state["b4_data_filtro"] = n_data
+          st.success(
+              f"✅ Compromisso salvo para {n_data.strftime('%d/%m/%Y')} às"
+              f" {hora_exata}!"
+          )
           st.rerun()
   with aba_ie:
     st.markdown("#### 📥 Importar Compromissos em Excel ou CSV (.xlsx / .csv)")
@@ -2917,7 +2942,7 @@ def renderizar_bloco_4_agenda():
               st.success(f"✅ Automação disparada! Status HTTP: {resp.status}")
               st.session_state.b4_log_automacoes.insert(
                   0,
-                  f"[{pd.Timestamp.now().strftime('%d/%m/%Y %H:%M:%S')}]"
+                  f"[{_b4_agora_br().strftime('%d/%m/%Y %H:%M:%S')}]"
                   f" Webhook disparado ({escopo_envio}) -> HTTP {resp.status}",
               )
           except Exception as e:
