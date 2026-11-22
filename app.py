@@ -2130,6 +2130,8 @@ def _b4_garantir_estado_agenda():
     st.session_state.b4_novo_hora = agora_br.time().replace(
         second=0, microsecond=0
     )
+  if "b4_data_filtro" not in st.session_state:
+    st.session_state.b4_data_filtro = agora_br.date()
   if "b4_avisos_disparados" not in st.session_state:
     st.session_state.b4_avisos_disparados = []
   if "b4_log_automacoes" not in st.session_state:
@@ -2542,6 +2544,10 @@ def _b4_verificar_avisos_automaticos(lista_comp):
 
 def renderizar_bloco_4_agenda():
   _b4_garantir_estado_agenda()
+  if "b4_filtro_data_alvo" in st.session_state:
+    st.session_state["b4_data_filtro"] = st.session_state.pop(
+        "b4_filtro_data_alvo"
+    )
   st.markdown("### 🗓️ AGENDA INTERATIVA DIÁRIA & AUTOMAÇÕES")
   st.markdown(
       "Organize sua agenda diária, receba avisos automáticos de compromissos,"
@@ -2601,9 +2607,7 @@ def renderizar_bloco_4_agenda():
           key="b4_escopo_agenda",
       )
     with f2:
-      data_filtro = st.date_input(
-          "Data de Referência:", value=agora_dt.date(), key="b4_data_filtro"
-      )
+      data_filtro = st.date_input("Data de Referência:", key="b4_data_filtro")
     with f3:
       busca_texto = st.text_input(
           "Buscar por título, categoria ou status:",
@@ -2749,7 +2753,7 @@ def renderizar_bloco_4_agenda():
           st.session_state.b4_novo_hora = n_hora.replace(
               second=0, microsecond=0
           )
-          st.session_state["b4_data_filtro"] = n_data
+          st.session_state.b4_filtro_data_alvo = n_data
           st.success(
               f"✅ Compromisso salvo para {n_data.strftime('%d/%m/%Y')} às"
               f" {hora_exata}!"
