@@ -2959,7 +2959,7 @@ def renderizar_bloco_4_agenda():
 
 
 # ====================================================================================
-# BLOCO 5: RELATÓRIO PÓS-INVENTÁRIO / JUSTIFICATIVAS DE PERDAS E SOBRAS (GRUPO KMB)
+# BLOCO 5: RELATÓRIO PÓS-INVENTÁRIO // COMPARATIVO COM INVENTÁRIO ANTERIOR (GRUPO KMB)
 # ====================================================================================
 def _b5_limpar_codigo(val):
   if pd.isna(val):
@@ -2998,241 +2998,258 @@ def _b5_buscar_col(df, palavras_chave):
   return None
 
 
+def _b5_conv_num(serie):
+  s = (
+      serie.astype(str)
+      .str.replace("R$", "", regex=False)
+      .str.replace(" ", "", regex=False)
+  )
+  s = s.apply(
+      lambda x: x.replace(".", "").replace(",", ".")
+      if ("," in x and "." in x)
+      else (x.replace(",", ".") if "," in x else x)
+  )
+  return pd.to_numeric(s, errors="coerce").fillna(0.0)
+
+
 def _b5_garantir_estado():
   if "b5_dados_processados" not in st.session_state:
     st.session_state.b5_dados_processados = {}
 
 
-def _b5_processar_bases_justificativa(
-    df_inv_raw, df_rec_raw, df_dev_raw, df_trans_raw
-):
-  df_inv = limpar_colunas_duplicadas(df_inv_raw.copy())
-  col_cod_inv = _b5_buscar_col(
-      df_inv, ["código do produto", "codigo do produto", "código", "codigo"]
+def _b5_processar_comparativo_anterior(df_atual_raw, df_ant_raw):
+  df_atual = limpar_colunas_duplicadas(df_atual_raw.copy())
+  col_cod_at = _b5_buscar_col(
+      df_atual, ["código do produto", "codigo do produto", "código", "codigo"]
   )
-  col_desc_inv = _b5_buscar_col(
-      df_inv, ["descrição do produto", "descricao do produto", "descrição", "descricao"]
+  col_desc_at = _b5_buscar_col(
+      df_atual,
+      ["descrição do produto", "descricao do produto", "descrição", "descricao"],
   )
-  col_ajuste = _b5_buscar_col(df_inv, ["ajuste"])
-  col_saldo_inv = _b5_buscar_col(
-      df_inv, ["saldo em estoque", "saldo", "estoque"]
+  col_ajuste_at = _b5_buscar_col(df_atual, ["ajuste"])
+  col_saldo_at = _b5_buscar_col(
+      df_atual, ["saldo em estoque", "saldo", "estoque"]
   )
-  col_custo = _b5_buscar_col(df_inv, ["custo"])
-  col_val_ajuste = _b5_buscar_col(
-      df_inv, ["valor de ajuste", "valor ajuste"]
+  col_custo_at = _b5_buscar_col(df_atual, ["custo"])
+  col_val_aj_at = _b5_buscar_col(
+      df_atual, ["valor de ajuste", "valor ajuste"]
   )
-  col_loja_inv = _b5_buscar_col(df_inv, ["loja"])
-  col_data_inv = _b5_buscar_col(
-      df_inv, ["data de abertura", "data de finalização", "data"]
+  col_loja_at = _b5_buscar_col(df_atual, ["loja"])
+  col_data_at = _b5_buscar_col(
+      df_atual, ["data de abertura", "data de finalização", "data"]
   )
 
-  if not col_cod_inv or not col_ajuste:
+  if not col_cod_at or not col_ajuste_at:
     raise ValueError(
-        "A planilha principal de Inventário precisa ter as colunas 'Código' e"
-        " 'Ajuste'."
+        "O arquivo principal do inventário precisa conter as colunas de"
+        " Código e Ajuste."
     )
 
-  df_inv["_COD_"] = df_inv[col_cod_inv].apply(_b5_limpar_codigo)
-  df_inv["_DESC_"] = (
-      df_inv[col_desc_inv].astype(str).str.strip()
-      if col_desc_inv
+  df_atual["_COD_"] = df_atual[col_cod_at].apply(_b5_limpar_codigo)
+  df_atual["_DESC_"] = (
+      df_atual[col_desc_at].astype(str).str.strip()
+      if col_desc_at
       else "Produto sem descrição"
   )
-
-  def _conv_num(serie):
-    s = (
-        serie.astype(str)
-        .str.replace("R$", "", regex=False)
-        .str.replace(" ", "", regex=False)
-    )
-    # Se contiver vírgula como decimal brasileiro
-    s = s.apply(
-        lambda x: x.replace(".", "").replace(",", ".")
-        if ("," in x and "." in x)
-        else (x.replace(",", ".") if "," in x else x)
-    )
-    return pd.to_numeric(s, errors="coerce").fillna(0.0)
-
-  df_inv["_AJUSTE_"] = _conv_num(df_inv[col_ajuste])
-  df_inv["_SALDO_SIS_"] = (
-      _conv_num(df_inv[col_saldo_inv]) if col_saldo_inv else 0.0
+  df_atual["_AJUSTE_AT_"] = _b5_conv_num(df_atual[col_ajuste_at])
+  df_atual["_SALDO_AT_"] = (
+      _b5_conv_num(df_atual[col_saldo_at]) if col_saldo_at else 0.0
   )
-  df_inv["_CUSTO_"] = _conv_num(df_inv[col_custo]) if col_custo else 0.0
-  if col_val_ajuste:
-    df_inv["_VAL_AJUSTE_"] = _conv_num(df_inv[col_val_ajuste])
+  df_atual["_CUSTO_AT_"] = (
+      _b5_conv_num(df_atual[col_custo_at]) if col_custo_at else 0.0
+  )
+  if col_val_aj_at:
+    df_atual["_VAL_AJ_AT_"] = _b5_conv_num(df_atual[col_val_aj_at])
   else:
-    df_inv["_VAL_AJUSTE_"] = df_inv["_AJUSTE_"] * df_inv["_CUSTO_"]
+    df_atual["_VAL_AJ_AT_"] = df_atual["_AJUSTE_AT_"] * df_atual["_CUSTO_AT_"]
 
   loja_detectada = (
-      str(df_inv[col_loja_inv].dropna().iloc[0]).strip()
-      if col_loja_inv and not df_inv[col_loja_inv].dropna().empty
+      str(df_atual[col_loja_at].dropna().iloc[0]).strip()
+      if col_loja_at and not df_atual[col_loja_at].dropna().empty
       else "N/I"
   )
-  data_detectada = (
-      str(df_inv[col_data_inv].dropna().iloc[0]).strip()
-      if col_data_inv and not df_inv[col_data_inv].dropna().empty
+  data_atual_det = (
+      str(df_atual[col_data_at].dropna().iloc[0]).strip()
+      if col_data_at and not df_atual[col_data_at].dropna().empty
       else pd.Timestamp.now().strftime("%d/%m/%Y")
   )
 
-  # Mapear Recebimentos / NFs / XML (se fornecido)
-  mapa_rec = {}
-  if df_rec_raw is not None:
-    df_rec = limpar_colunas_duplicadas(df_rec_raw.copy())
-    c_cod_r = _b5_buscar_col(
-        df_rec, ["código", "codigo", "cod", "produto", "item"]
+  mapa_ant = {}
+  data_ant_det = "N/I"
+  if df_ant_raw is not None:
+    df_ant = limpar_colunas_duplicadas(df_ant_raw.copy())
+    col_cod_an = _b5_buscar_col(
+        df_ant, ["código do produto", "codigo do produto", "código", "codigo"]
     )
-    c_qtd_r = _b5_buscar_col(
-        df_rec, ["qtd", "quantidade", "volume", "entrada"]
+    col_aj_an = _b5_buscar_col(df_ant, ["ajuste"])
+    col_val_aj_an = _b5_buscar_col(
+        df_ant, ["valor de ajuste", "valor ajuste"]
     )
-    c_doc_r = _b5_buscar_col(
-        df_rec, ["nf", "nota", "documento", "xml", "chave", "número", "numero"]
+    col_custo_an = _b5_buscar_col(df_ant, ["custo"])
+    col_saldo_an = _b5_buscar_col(
+        df_ant, ["saldo em estoque", "saldo", "estoque"]
     )
-    c_dat_r = _b5_buscar_col(df_rec, ["data", "emissão", "emissao", "entrada"])
-    if c_cod_r:
-      for _, r in df_rec.iterrows():
-        cod = _b5_limpar_codigo(r.get(c_cod_r))
-        if not cod:
-          continue
-        qtd = _conv_num(pd.Series([r.get(c_qtd_r, 0)])).iloc[0] if c_qtd_r else 0
-        doc = str(r.get(c_doc_r, "")).strip() if c_doc_r else ""
-        dat = str(r.get(c_dat_r, "")).strip() if c_dat_r else ""
-        mapa_rec.setdefault(cod, []).append(
-            f"NF/Doc: {doc or 'S/N'} ({qtd:g} un - {dat or 'S/D'})"
-        )
+    col_data_an = _b5_buscar_col(
+        df_ant, ["data de abertura", "data de finalização", "data"]
+    )
+    if col_data_an and not df_ant[col_data_an].dropna().empty:
+      data_ant_det = str(df_ant[col_data_an].dropna().iloc[0]).strip()
 
-  # Mapear Devoluções / Trocas / Avarias (se fornecido)
-  mapa_dev = {}
-  if df_dev_raw is not None:
-    df_dev = limpar_colunas_duplicadas(df_dev_raw.copy())
-    c_cod_d = _b5_buscar_col(
-        df_dev, ["código", "codigo", "cod", "produto", "item"]
-    )
-    c_qtd_d = _b5_buscar_col(df_dev, ["qtd", "quantidade", "volume"])
-    c_mot_d = _b5_buscar_col(
-        df_dev, ["motivo", "tipo", "observação", "observacao", "status", "ocorrência"]
-    )
-    if c_cod_d:
-      for _, r in df_dev.iterrows():
-        cod = _b5_limpar_codigo(r.get(c_cod_d))
-        if not cod:
-          continue
-        qtd = _conv_num(pd.Series([r.get(c_qtd_d, 0)])).iloc[0] if c_qtd_d else 0
-        mot = str(r.get(c_mot_d, "")).strip() if c_mot_d else "Devolução/Avaria"
-        mapa_dev.setdefault(cod, []).append(f"{mot} ({qtd:g} un)")
+    if col_cod_an:
+      df_ant["_COD_"] = df_ant[col_cod_an].apply(_b5_limpar_codigo)
+      df_ant["_AJ_AN_"] = (
+          _b5_conv_num(df_ant[col_aj_an]) if col_aj_an else 0.0
+      )
+      df_ant["_CUSTO_AN_"] = (
+          _b5_conv_num(df_ant[col_custo_an]) if col_custo_an else 0.0
+      )
+      if col_val_aj_an:
+        df_ant["_VAL_AJ_AN_"] = _b5_conv_num(df_ant[col_val_aj_an])
+      else:
+        df_ant["_VAL_AJ_AN_"] = df_ant["_AJ_AN_"] * df_ant["_CUSTO_AN_"]
+      df_ant["_SALDO_AN_"] = (
+          _b5_conv_num(df_ant[col_saldo_an]) if col_saldo_an else 0.0
+      )
 
-  # Mapear Transferências entre Lojas / CD (se fornecido)
-  mapa_trans = {}
-  if df_trans_raw is not None:
-    df_tr = limpar_colunas_duplicadas(df_trans_raw.copy())
-    c_cod_t = _b5_buscar_col(
-        df_tr, ["código", "codigo", "cod", "produto", "item"]
-    )
-    c_qtd_t = _b5_buscar_col(df_tr, ["qtd", "quantidade", "volume"])
-    c_ori_t = _b5_buscar_col(
-        df_tr, ["origem", "destino", "loja", "filial", "documento", "romaneio"]
-    )
-    if c_cod_t:
-      for _, r in df_tr.iterrows():
-        cod = _b5_limpar_codigo(r.get(c_cod_t))
-        if not cod:
+      for _, r_an in df_ant.iterrows():
+        c_an = r_an["_COD_"]
+        if not c_an:
           continue
-        qtd = _conv_num(pd.Series([r.get(c_qtd_t, 0)])).iloc[0] if c_qtd_t else 0
-        ori = str(r.get(c_ori_t, "")).strip() if c_ori_t else "Mov. Transferência"
-        mapa_trans.setdefault(cod, []).append(f"{ori} ({qtd:g} un)")
+        if c_an not in mapa_ant:
+          mapa_ant[c_an] = {
+              "ajuste_ant": r_an["_AJ_AN_"],
+              "val_aj_ant": r_an["_VAL_AJ_AN_"],
+              "saldo_ant": r_an["_SALDO_AN_"],
+          }
+        else:
+          mapa_ant[c_an]["ajuste_ant"] += r_an["_AJ_AN_"]
+          mapa_ant[c_an]["val_aj_ant"] += r_an["_VAL_AJ_AN_"]
+          mapa_ant[c_an]["saldo_ant"] += r_an["_SALDO_AN_"]
 
-  # Filtrar apenas itens divergentes (Ajuste != 0)
-  df_div = df_inv[df_inv["_AJUSTE_"] != 0].copy()
-  df_div["_ABS_VAL_"] = df_div["_VAL_AJUSTE_"].abs()
+  df_div = df_atual[df_atual["_AJUSTE_AT_"] != 0].copy()
+  df_div["_ABS_VAL_"] = df_div["_VAL_AJ_AT_"].abs()
   df_div = df_div.sort_values(by="_ABS_VAL_", ascending=False)
 
   registros = []
+  reincidentes_qtd = 0
   for _, row in df_div.iterrows():
     cod = row["_COD_"]
     desc = row["_DESC_"]
-    ajuste = row["_AJUSTE_"]
-    saldo_sis = row["_SALDO_SIS_"]
-    saldo_fis = saldo_sis + ajuste
-    val_aj = row["_VAL_AJUSTE_"]
-    tipo_div = "FALTA (PERDA)" if ajuste < 0 else "SOBRA"
+    aj_at = row["_AJUSTE_AT_"]
+    val_at = row["_VAL_AJ_AT_"]
+    saldo_at = row["_SALDO_AT_"]
+    tipo_at = "FALTA (PERDA)" if aj_at < 0 else "SOBRA"
 
-    evidencias = []
-    hipotese = ""
-    acao_recomendada = ""
-
-    if cod in mapa_rec:
-      evidencias.append("Recebimento/NF: " + "; ".join(mapa_rec[cod][:2]))
-    if cod in mapa_dev:
-      evidencias.append("Devolução/Avaria: " + "; ".join(mapa_dev[cod][:2]))
-    if cod in mapa_trans:
-      evidencias.append("Transferência: " + "; ".join(mapa_trans[cod][:2]))
-
-    if ajuste < 0:
-      if cod in mapa_trans:
-        hipotese = "Possível saída/transferência não baixada ou pendência de romaneio entre lojas."
-        acao_recomendada = "Conferir romaneio de transferência e aceite no destino."
-      elif cod in mapa_dev:
-        hipotese = "Quebra/avaria ou devolução pendente de baixa sistêmica."
-        acao_recomendada = "Validar área de avarias e lançar nota de devolução/perda."
-      elif cod in mapa_rec:
-        hipotese = "Divergência na conferência física de recebimento (NF lançada a maior)."
-        acao_recomendada = "Auditar canhoto/XML da NF e acionar fornecedor/transportadora."
-      elif abs(ajuste) in [6, 12, 24, 36]:
-        hipotese = "Erro de fator de conversão / caixa fechada na movimentação ou venda."
-        acao_recomendada = "Revisar cadastro de embalagem (EMB) e últimas vendas PDV."
-      elif abs(val_aj) >= 200:
-        hipotese = "Perda crítica de alto valor (extravio, furto ou falha grave de expedição)."
-        acao_recomendada = "Abrir sindicância interna, revisar CFTV e movimentações recentes."
+    info_an = mapa_ant.get(cod)
+    if info_an is not None:
+      aj_an = info_an["ajuste_ant"]
+      val_an = info_an["val_aj_ant"]
+      if aj_an < 0:
+        hist_str = f"Falta anterior ({aj_an:g} un | R$ {val_an:,.2f})"
+      elif aj_an > 0:
+        hist_str = f"Sobra anterior (+{aj_an:g} un | R$ +{val_an:,.2f})"
       else:
-        hipotese = "Quebra operacional / falha de registro no PDV ou separação."
-        acao_recomendada = "Realizar recontagem direcionada no endereço e ajustar saldo."
+        hist_str = "Sem divergência no anterior (0 un)"
     else:
-      if cod in mapa_rec:
-        hipotese = "Mercadoria recebida fisicamente sem entrada fiscal/sistêmica concluída."
-        acao_recomendada = "Verificar NFs pendentes de lançamento no ERP."
-      elif cod in mapa_trans:
-        hipotese = "Transferência recebida fisicamente sem confirmação de entrada."
-        acao_recomendada = "Confirmar recebimento de transferência no sistema."
-      elif abs(ajuste) in [6, 12, 24, 36]:
-        hipotese = "Erro de multiplicador de caixa na contagem anterior ou entrada."
-        acao_recomendada = "Conferir fator de embalagem e validar saldo físico."
-      else:
-        hipotese = "Sobra operacional (possível inversão de código semelhante na venda/entrada)."
-        acao_recomendada = "Checar itens correlatos/mesma família com falta equivalente."
+      aj_an = 0.0
+      val_an = 0.0
+      hist_str = "Não constava / Sem divergência no anterior"
+
+    if aj_at < 0 and aj_an < 0:
+      reincidentes_qtd += 1
+      hipotese = (
+          "Reincidência de falta em relação ao inventário anterior — falha"
+          " crônica de controle, registro ou extravio contínuo."
+      )
+      acao = (
+          "Auditar histórico de movimentações entre inventários, revisar"
+          " endereço/exposição e aplicar contagem cíclica."
+      )
+    elif aj_at > 0 and aj_an > 0:
+      reincidentes_qtd += 1
+      hipotese = (
+          "Reincidência de sobra em relação ao inventário anterior — possível"
+          " falha recorrente de entrada, embalagem ou código correlato."
+      )
+      acao = (
+          "Conferir fator de embalagem, itens de mesma família e registros de"
+          " entrada desde o último inventário."
+      )
+    elif (aj_at < 0 and aj_an > 0) or (aj_at > 0 and aj_an < 0):
+      hipotese = (
+          "Inversão de divergência frente ao inventário anterior (sobra virou"
+          " falta ou vice-versa) — possível compensação/erro de contagem."
+      )
+      acao = (
+          "Realizar recontagem física conferida e auditar ajustes do"
+          " inventário anterior."
+      )
+    elif abs(aj_at) in [6, 12, 24, 36]:
+      hipotese = (
+          "Divergência em múltiplo de caixa fechada — possível erro de"
+          " embalagem ou movimentação por caixa."
+      )
+      acao = "Conferir cadastro de embalagem (EMB) e contagem por caixa."
+    elif abs(val_at) >= 200 and aj_at < 0:
+      hipotese = (
+          "Perda financeira relevante no inventário atual — avaliar extravio,"
+          " quebra ou falha de movimentação."
+      )
+      acao = (
+          "Priorizar investigação do item, recontagem e validação pela"
+          " gerência da loja."
+      )
+    else:
+      hipotese = (
+          "Divergência pontual apurada no inventário atual frente ao"
+          " histórico anterior."
+      )
+      acao = (
+          "Realizar recontagem do saldo físico e registrar justificativa da"
+          " operação."
+      )
 
     registros.append({
         "Código": cod,
         "Descrição": desc,
-        "Tipo": tipo_div,
-        "Saldo Sistema": saldo_sis,
-        "Contagem Física": saldo_fis,
-        "Ajuste (Qtd)": ajuste,
-        "Valor Ajuste (R$)": val_aj,
-        "Evidências Cruzadas": " | ".join(evidencias) if evidencias else "Sem vínculo externo nas bases",
-        "Hipótese / Causa Provável": hipotese,
-        "Justificativa / Parecer da Loja": hipotese,
-        "Ação Corretiva": acao_recomendada,
-        "Status Justificativa": "Pendente Validação",
+        "Tipo Atual": tipo_at,
+        "Saldo Atual": saldo_at,
+        "Ajuste Atual (Qtd)": aj_at,
+        "Valor Ajuste Atual (R$)": val_at,
+        "Histórico Inventário Anterior": hist_str,
+        "Ajuste Anterior (Qtd)": aj_an,
+        "Valor Ajuste Anterior (R$)": val_an,
+        "Variação Valor (R$)": val_at - val_an,
+        "Diagnóstico / Justificativa": hipotese,
+        "Ação Corretiva": acao,
+        "Status": "Pendente Validação",
     })
 
   df_resultado = pd.DataFrame(registros)
   return {
       "df_resultado": df_resultado,
       "loja": loja_detectada,
-      "data": data_detectada,
-      "total_skus_inv": len(df_inv),
+      "data_atual": data_atual_det,
+      "data_anterior": data_ant_det,
+      "total_skus_inv": len(df_atual),
       "total_divergentes": len(df_resultado),
-      "qtd_faltas": int((df_div["_AJUSTE_"] < 0).sum()),
-      "qtd_sobras": int((df_div["_AJUSTE_"] > 0).sum()),
-      "val_faltas": float(df_div[df_div["_AJUSTE_"] < 0]["_VAL_AJUSTE_"].sum()),
-      "val_sobras": float(df_div[df_div["_AJUSTE_"] > 0]["_VAL_AJUSTE_"].sum()),
-      "val_liquido": float(df_div["_VAL_AJUSTE_"].sum()),
+      "reincidentes_qtd": reincidentes_qtd,
+      "qtd_faltas": int((df_div["_AJUSTE_AT_"] < 0).sum()),
+      "qtd_sobras": int((df_div["_AJUSTE_AT_"] > 0).sum()),
+      "val_faltas": float(
+          df_div[df_div["_AJUSTE_AT_"] < 0]["_VAL_AJ_AT_"].sum()
+      ),
+      "val_sobras": float(
+          df_div[df_div["_AJUSTE_AT_"] > 0]["_VAL_AJ_AT_"].sum()
+      ),
+      "val_liquido": float(df_div["_VAL_AJ_AT_"].sum()),
   }
 
 
 def _b5_gerar_excel_justificativas(df_just, info_meta, texto_parecer_geral):
   wb = openpyxl.Workbook()
   ws = wb.active
-  ws.title = "Justificativas Pós-Inventário"
+  ws.title = "Pós-Inventário vs Anterior"
   ws.views.sheetView[0].showGridLines = True
 
   fonte_tit = Font(name="Arial", size=13, bold=True, color="1F4E78")
@@ -3257,12 +3274,15 @@ def _b5_gerar_excel_justificativas(df_just, info_meta, texto_parecer_geral):
       bottom=Side(style="thin", color="000000"),
   )
 
-  ws["A1"] = "⚡ GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO & JUSTIFICATIVAS"
+  ws["A1"] = (
+      "⚡ GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO (COMPARATIVO COM INVENTÁRIO"
+      " ANTERIOR)"
+  )
   ws["A1"].font = fonte_tit
   ws["A2"] = (
-      f"Loja: {info_meta.get('loja', 'N/I')} | Data Inventário:"
-      f" {info_meta.get('data', '')} | Emitido em:"
-      f" {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}"
+      f"Loja: {info_meta.get('loja', 'N/I')} | Inventário Atual:"
+      f" {info_meta.get('data_atual', '')} | Inventário Anterior:"
+      f" {info_meta.get('data_anterior', 'N/I')}"
   )
   ws["A2"].font = fonte_sub
   ws["A3"] = f"Parecer Consolidado: {texto_parecer_geral}"
@@ -3294,7 +3314,7 @@ def _b5_gerar_excel_justificativas(df_just, info_meta, texto_parecer_geral):
     for cell in row:
       cell.font = fonte_pad
       cell.border = borda
-      if cell.column in [1, 3, 4, 5, 6, 7, 12]:
+      if cell.column in [1, 3, 4, 5, 6, 8, 9, 10, 13]:
         cell.alignment = Alignment(horizontal="center", vertical="center")
       else:
         cell.alignment = Alignment(
@@ -3306,22 +3326,23 @@ def _b5_gerar_excel_justificativas(df_just, info_meta, texto_parecer_geral):
           cell.fill = fill_falta
         elif "SOBRA" in tipo_val:
           cell.fill = fill_sobra
-      if cell.column == 7 and isinstance(cell.value, (int, float)):
+      if cell.column in [6, 9, 10] and isinstance(cell.value, (int, float)):
         cell.number_format = "R$ #,##0.00"
 
   larguras = {
       1: 14,
-      2: 36,
+      2: 34,
       3: 16,
       4: 13,
-      5: 14,
-      6: 13,
-      7: 16,
-      8: 32,
-      9: 38,
-      10: 42,
-      11: 35,
-      12: 20,
+      5: 15,
+      6: 18,
+      7: 32,
+      8: 16,
+      9: 18,
+      10: 17,
+      11: 42,
+      12: 36,
+      13: 20,
   }
   for idx_c, w_c in larguras.items():
     if idx_c <= len(colunas):
@@ -3386,17 +3407,17 @@ def _b5_gerar_pdf_justificativas(df_just, info_meta, texto_parecer_geral):
 
   story = [
       Paragraph(
-          "<b>GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO & JUSTIFICATIVAS DE"
-          " DIVERGÊNCIAS</b>",
+          "<b>GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO (COMPARATIVO COM"
+          " INVENTÁRIO ANTERIOR)</b>",
           est_tit,
       ),
       Paragraph(
-          f"<b>Loja:</b> {info_meta.get('loja', 'N/I')} | <b>Data"
-          f" Inventário:</b> {info_meta.get('data', '')} | <b>Itens"
-          f" Divergentes:</b> {info_meta.get('total_divergentes', 0)}"
-          f" (Faltas: {info_meta.get('qtd_faltas', 0)} | Sobras:"
-          f" {info_meta.get('qtd_sobras', 0)}) | <b>Ajuste Líquido:</b> R$"
-          f" {info_meta.get('val_liquido', 0):,.2f}",
+          f"<b>Loja:</b> {info_meta.get('loja', 'N/I')} | <b>Atual:</b>"
+          f" {info_meta.get('data_atual', '')} | <b>Anterior:</b>"
+          f" {info_meta.get('data_anterior', 'N/I')} | <b>Divergentes:</b>"
+          f" {info_meta.get('total_divergentes', 0)} (Reincidentes:"
+          f" {info_meta.get('reincidentes_qtd', 0)}) | <b>Ajuste Líquido:</b>"
+          f" R$ {info_meta.get('val_liquido', 0):,.2f}",
           est_sub,
       ),
       Spacer(1, 4),
@@ -3411,12 +3432,10 @@ def _b5_gerar_pdf_justificativas(df_just, info_meta, texto_parecer_geral):
       "Código",
       "Descrição",
       "Tipo",
-      "Sis.",
-      "Fís.",
-      "Aj.",
-      "Valor (R$)",
-      "Evidências Cruzadas",
-      "Justificativa / Causa",
+      "Aj. Atual",
+      "Valor Atual",
+      "Inventário Anterior",
+      "Diagnóstico / Justificativa",
       "Ação Corretiva",
   ]
   dados_tbl = [[Paragraph(h, est_th) for h in headers]]
@@ -3424,17 +3443,17 @@ def _b5_gerar_pdf_justificativas(df_just, info_meta, texto_parecer_geral):
     dados_tbl.append([
         Paragraph(str(r.get("Código", "")), est_td_c),
         Paragraph(str(r.get("Descrição", ""))[:45], est_td),
-        Paragraph(str(r.get("Tipo", "")), est_td_c),
-        Paragraph(f"{float(r.get('Saldo Sistema', 0)):g}", est_td_c),
-        Paragraph(f"{float(r.get('Contagem Física', 0)):g}", est_td_c),
-        Paragraph(f"{float(r.get('Ajuste (Qtd)', 0)):+g}", est_td_c),
-        Paragraph(f"R$ {float(r.get('Valor Ajuste (R$)', 0)):,.2f}", est_td_c),
-        Paragraph(str(r.get("Evidências Cruzadas", "")), est_td),
-        Paragraph(str(r.get("Justificativa / Parecer da Loja", "")), est_td),
+        Paragraph(str(r.get("Tipo Atual", "")), est_td_c),
+        Paragraph(f"{float(r.get('Ajuste Atual (Qtd)', 0)):+g}", est_td_c),
+        Paragraph(
+            f"R$ {float(r.get('Valor Ajuste Atual (R$)', 0)):,.2f}", est_td_c
+        ),
+        Paragraph(str(r.get("Histórico Inventário Anterior", "")), est_td),
+        Paragraph(str(r.get("Diagnóstico / Justificativa", "")), est_td),
         Paragraph(str(r.get("Ação Corretiva", "")), est_td),
     ])
 
-  col_w = [44, 115, 54, 28, 28, 28, 56, 125, 148, 130]
+  col_w = [44, 118, 56, 36, 58, 135, 165, 152]
   tbl = Table(dados_tbl, colWidths=col_w, repeatRows=1)
   tbl.setStyle(
       TableStyle([
@@ -3469,14 +3488,18 @@ def _b5_gerar_pdf_justificativas(df_just, info_meta, texto_parecer_geral):
 def _b5_gerar_docx_justificativas(df_just, info_meta, texto_parecer_geral):
   doc = docx.Document()
   doc.add_heading(
-      "⚡ GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO & JUSTIFICATIVAS", level=1
+      "⚡ GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO (COMPARATIVO COM INVENTÁRIO"
+      " ANTERIOR)",
+      level=1,
   )
   p_meta = doc.add_paragraph()
   p_meta.add_run("Loja: ").bold = True
   p_meta.add_run(f"{info_meta.get('loja', 'N/I')}   |   ")
-  p_meta.add_run("Data do Inventário: ").bold = True
-  p_meta.add_run(f"{info_meta.get('data', '')}\n")
-  p_meta.add_run("Resumo Financeiro: ").bold = True
+  p_meta.add_run("Inventário Atual: ").bold = True
+  p_meta.add_run(f"{info_meta.get('data_atual', '')}   |   ")
+  p_meta.add_run("Inventário Anterior: ").bold = True
+  p_meta.add_run(f"{info_meta.get('data_anterior', 'N/I')}\n")
+  p_meta.add_run("Resumo Financeiro Atual: ").bold = True
   p_meta.add_run(
       f"Faltas: R$ {info_meta.get('val_faltas', 0):,.2f} | Sobras: R$"
       f" +{info_meta.get('val_sobras', 0):,.2f} | Ajuste Líquido: R$"
@@ -3486,18 +3509,19 @@ def _b5_gerar_docx_justificativas(df_just, info_meta, texto_parecer_geral):
   doc.add_heading("1. Parecer Consolidado da Unidade", level=2)
   doc.add_paragraph(texto_parecer_geral)
 
-  doc.add_heading("2. Detalhamento e Justificativas por Item", level=2)
+  doc.add_heading("2. Comparativo e Justificativas por Item", level=2)
   for _, r in df_just.iterrows():
     p = doc.add_paragraph()
-    p.add_run(f"[{r['Tipo']}] {r['Código']} — {r['Descrição']}\n").bold = True
     p.add_run(
-        f"• Sistema: {r['Saldo Sistema']:g} | Físico: {r['Contagem Física']:g}"
-        f" | Ajuste: {r['Ajuste (Qtd)']:+g} un | Impacto: R$"
-        f" {r['Valor Ajuste (R$)']:,.2f}\n"
+        f"[{r['Tipo Atual']}] {r['Código']} — {r['Descrição']}\n"
+    ).bold = True
+    p.add_run(
+        f"• Atual: {r['Ajuste Atual (Qtd)']:+g} un (R$"
+        f" {r['Valor Ajuste Atual (R$)']:,.2f}) | Anterior:"
+        f" {r['Histórico Inventário Anterior']}\n"
     )
-    p.add_run(f"• Evidências: {r['Evidências Cruzadas']}\n")
     p.add_run(
-        f"• Justificativa: {r['Justificativa / Parecer da Loja']}\n"
+        f"• Diagnóstico / Justificativa: {r['Diagnóstico / Justificativa']}\n"
     )
     p.add_run(f"• Ação Corretiva: {r['Ação Corretiva']}")
 
@@ -3520,10 +3544,9 @@ def renderizar_bloco_5_justificar():
       "### 📝 RELATÓRIO PÓS-INVENTÁRIO // JUSTIFICATIVAS DE PERDAS E SOBRAS"
   )
   st.markdown(
-      "Cruze o arquivo oficial do inventário com bases auxiliares"
-      " (Recebimento/NF, Devoluções/Avarias e Transferências) para diagnosticar"
-      " automaticamente causas prováveis, editar justificativas da loja e"
-      " exportar o dossiê completo."
+      "Envie o arquivo principal do inventário atual e o arquivo do"
+      " inventário anterior para comparar divergências, identificar"
+      " reincidências, editar justificativas e exportar o relatório."
   )
 
   c_up1, c_up2 = st.columns(2)
@@ -3533,52 +3556,33 @@ def renderizar_bloco_5_justificar():
         type=["csv", "xlsx", "xls"],
         key="b5_up_inv",
     )
-    arq_dev = st.file_uploader(
-        "3. Base de Devoluções / Avarias (Opcional)",
-        type=["csv", "xlsx", "xls"],
-        key="b5_up_dev",
-    )
   with c_up2:
-    arq_rec = st.file_uploader(
-        "2. Base de Recebimento / NFs / XML (Opcional)",
+    arq_ant = st.file_uploader(
+        "2. Arquivo do Inventário Anterior",
         type=["csv", "xlsx", "xls"],
-        key="b5_up_rec",
-    )
-    arq_trans = st.file_uploader(
-        "4. Base de Transferências entre Lojas/CD (Opcional)",
-        type=["csv", "xlsx", "xls"],
-        key="b5_up_trans",
+        key="b5_up_ant",
     )
 
   if arq_inv is not None:
     if st.button(
-        "⚙️ Processar Cruzamento & Gerar Diagnóstico Pós-Inventário",
+        "⚙️ Gerar Relatório Pós-Inventário (Comparativo com Anterior)",
         use_container_width=True,
         key="b5_btn_processar",
     ):
       try:
-        df_inv_raw = _b5_ler_planilha_flexivel(arq_inv)
-        df_rec_raw = (
-            _b5_ler_planilha_flexivel(arq_rec) if arq_rec is not None else None
+        df_atual_raw = _b5_ler_planilha_flexivel(arq_inv)
+        df_ant_raw = (
+            _b5_ler_planilha_flexivel(arq_ant) if arq_ant is not None else None
         )
-        df_dev_raw = (
-            _b5_ler_planilha_flexivel(arq_dev) if arq_dev is not None else None
-        )
-        df_trans_raw = (
-            _b5_ler_planilha_flexivel(arq_trans)
-            if arq_trans is not None
-            else None
-        )
-        res_b5 = _b5_processar_bases_justificativa(
-            df_inv_raw, df_rec_raw, df_dev_raw, df_trans_raw
-        )
+        res_b5 = _b5_processar_comparativo_anterior(df_atual_raw, df_ant_raw)
         st.session_state.b5_dados_processados = res_b5
         st.success(
-            "✅ Cruzamento concluído! Foram identificados"
-            f" {res_b5['total_divergentes']} item(ns) divergente(s)."
+            "✅ Relatório gerado com sucesso!"
+            f" {res_b5['total_divergentes']} item(ns) divergente(s)"
+            " analisado(s)."
         )
       except Exception as e:
-        st.error(f"❌ Erro ao processar bases: {e}")
+        st.error(f"❌ Erro ao processar arquivos: {e}")
 
   dados_b5 = st.session_state.b5_dados_processados
   if dados_b5 and "df_resultado" in dados_b5:
@@ -3587,19 +3591,18 @@ def renderizar_bloco_5_justificar():
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Itens Divergentes", f"{dados_b5['total_divergentes']:,}")
     k2.metric(
+        "Reincidentes (vs Anterior)", f"{dados_b5['reincidentes_qtd']:,}"
+    )
+    k3.metric(
         "Faltas (Perdas)",
         f"{dados_b5['qtd_faltas']:,} SKUs",
         f"R$ {dados_b5['val_faltas']:,.2f}",
         delta_color="inverse",
     )
-    k3.metric(
+    k4.metric(
         "Sobras",
         f"{dados_b5['qtd_sobras']:,} SKUs",
         f"R$ +{dados_b5['val_sobras']:,.2f}",
-    )
-    k4.metric(
-        "Ajuste Líquido",
-        f"R$ {dados_b5['val_liquido']:,.2f}",
     )
 
     if df_res.empty:
@@ -3616,31 +3619,24 @@ def renderizar_bloco_5_justificar():
       )
     with f_col2:
       busca_b5 = st.text_input(
-          "Buscar por Código, Descrição ou Causa:",
+          "Buscar por Código, Descrição ou Diagnóstico:",
           placeholder="Digite para filtrar...",
           key="b5_busca_item",
       )
 
     df_exibir = df_res.copy()
     if filtro_tipo_b5 == "Apenas Faltas (Perdas)":
-      df_exibir = df_exibir[df_exibir["Tipo"] == "FALTA (PERDA)"]
+      df_exibir = df_exibir[df_exibir["Tipo Atual"] == "FALTA (PERDA)"]
     elif filtro_tipo_b5 == "Apenas Sobras":
-      df_exibir = df_exibir[df_exibir["Tipo"] == "SOBRA"]
+      df_exibir = df_exibir[df_exibir["Tipo Atual"] == "SOBRA"]
 
     if busca_b5.strip():
       t = busca_b5.strip().lower()
       df_exibir = df_exibir[
-          df_exibir.apply(
-              lambda r: t in str(r.values).lower(), axis=1
-          )
+          df_exibir.apply(lambda r: t in str(r.values).lower(), axis=1)
       ]
 
-    st.markdown("#### ✍️ Edição Interativa de Justificativas e Planos de Ação")
-    st.caption(
-        "Você pode editar diretamente na tabela abaixo as colunas"
-        " 'Justificativa / Parecer da Loja', 'Ação Corretiva' e 'Status"
-        " Justificativa'."
-    )
+    st.markdown("#### ✍️ Justificativas e Planos de Ação (Editável)")
     df_editado = st.data_editor(
         df_exibir,
         use_container_width=True,
@@ -3648,17 +3644,18 @@ def renderizar_bloco_5_justificar():
         disabled=[
             "Código",
             "Descrição",
-            "Tipo",
-            "Saldo Sistema",
-            "Contagem Física",
-            "Ajuste (Qtd)",
-            "Valor Ajuste (R$)",
-            "Evidências Cruzadas",
-            "Hipótese / Causa Provável",
+            "Tipo Atual",
+            "Saldo Atual",
+            "Ajuste Atual (Qtd)",
+            "Valor Ajuste Atual (R$)",
+            "Histórico Inventário Anterior",
+            "Ajuste Anterior (Qtd)",
+            "Valor Ajuste Anterior (R$)",
+            "Variação Valor (R$)",
         ],
         column_config={
-            "Status Justificativa": st.column_config.SelectboxColumn(
-                "Status Justificativa",
+            "Status": st.column_config.SelectboxColumn(
+                "Status",
                 options=[
                     "Pendente Validação",
                     "Justificado pela Loja",
@@ -3667,61 +3664,69 @@ def renderizar_bloco_5_justificar():
                 ],
                 required=True,
             ),
-            "Valor Ajuste (R$)": st.column_config.NumberColumn(
-                "Valor Ajuste (R$)", format="R$ %.2f"
+            "Valor Ajuste Atual (R$)": st.column_config.NumberColumn(
+                "Valor Ajuste Atual (R$)", format="R$ %.2f"
+            ),
+            "Valor Ajuste Anterior (R$)": st.column_config.NumberColumn(
+                "Valor Ajuste Anterior (R$)", format="R$ %.2f"
+            ),
+            "Variação Valor (R$)": st.column_config.NumberColumn(
+                "Variação Valor (R$)", format="R$ %.2f"
             ),
         },
         key="b5_editor_justificativas",
     )
 
     parecer_padrao = (
-        f"Após conferência física realizada na Loja {dados_b5['loja']}, foram"
-        f" apurados {dados_b5['total_divergentes']} SKUs divergentes,"
-        f" totalizando R$ {dados_b5['val_faltas']:,.2f} em faltas e R$"
+        f"Na conferência da Loja {dados_b5['loja']} (inventário"
+        f" {dados_b5['data_atual']} vs. anterior"
+        f" {dados_b5['data_anterior']}), foram apurados"
+        f" {dados_b5['total_divergentes']} SKUs divergentes"
+        f" ({dados_b5['reincidentes_qtd']} reincidentes), com R$"
+        f" {dados_b5['val_faltas']:,.2f} em faltas e R$"
         f" +{dados_b5['val_sobras']:,.2f} em sobras (ajuste líquido de R$"
-        f" {dados_b5['val_liquido']:,.2f}). As justificativas e ações"
-        " corretivas encontram-se discriminadas neste relatório."
+        f" {dados_b5['val_liquido']:,.2f})."
     )
     parecer_final_loja = st.text_area(
-        "📄 Parecer Consolidado da Gerência / Auditoria (incluído nos exports):",
+        "📄 Parecer Consolidado da Gerência / Auditoria:",
         value=parecer_padrao,
-        height=100,
+        height=95,
         key="b5_parecer_geral_txt",
     )
 
     st.markdown("---")
-    st.markdown("#### 📥 Exportar Dossiê Pós-Inventário & Justificativas")
+    st.markdown("#### 📥 Exportar Relatório Pós-Inventário")
     dl1, dl2, dl3 = st.columns(3)
     loja_tag = str(dados_b5.get("loja", "Loja")).replace(" ", "_")
     with dl1:
       st.download_button(
-          "📊 Baixar Excel Justificativas (.xlsx)",
+          "📊 Baixar Excel (.xlsx)",
           data=_b5_gerar_excel_justificativas(
               df_editado, dados_b5, parecer_final_loja
           ),
-          file_name=f"PosInventario_Justificativas_{loja_tag}.xlsx",
+          file_name=f"PosInventario_Comparativo_{loja_tag}.xlsx",
           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           use_container_width=True,
           key="b5_dl_xlsx",
       )
     with dl2:
       st.download_button(
-          "📑 Baixar PDF Oficial (.pdf)",
+          "📑 Baixar PDF (.pdf)",
           data=_b5_gerar_pdf_justificativas(
               df_editado, dados_b5, parecer_final_loja
           ),
-          file_name=f"PosInventario_Justificativas_{loja_tag}.pdf",
+          file_name=f"PosInventario_Comparativo_{loja_tag}.pdf",
           mime="application/pdf",
           use_container_width=True,
           key="b5_dl_pdf",
       )
     with dl3:
       st.download_button(
-          "📄 Baixar Word Parecer (.docx)",
+          "📄 Baixar Word (.docx)",
           data=_b5_gerar_docx_justificativas(
               df_editado, dados_b5, parecer_final_loja
           ),
-          file_name=f"PosInventario_Justificativas_{loja_tag}.docx",
+          file_name=f"PosInventario_Comparativo_{loja_tag}.docx",
           mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
           use_container_width=True,
           key="b5_dl_docx",
