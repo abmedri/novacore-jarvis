@@ -6,9 +6,12 @@ import os
 import docx
 from docx.shared import Inches, Pt, RGBColor
 import openpyxl
+from openpyxl.chart import BarChart, Reference
 from openpyxl.drawing.image import Image as OpenpyxlImage
+from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.datavalidation import DataValidation
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -2959,778 +2962,566 @@ def renderizar_bloco_4_agenda():
 
 
 # ====================================================================================
-# BLOCO 5: RELATÓRIO PÓS-INVENTÁRIO // COMPARATIVO COM INVENTÁRIO ANTERIOR (GRUPO KMB)
+# BLOCO 5: AUTOMAÇÃO DE RELATÓRIO DE INVENTÁRIO (MEMÓRIA, JUSTIFICAR & RESUMO)
 # ====================================================================================
-def _b5_limpar_codigo(val):
-  if pd.isna(val):
-    return ""
-  s = str(val).strip()
-  if s.endswith(".0"):
-    s = s[:-2]
-  return s
-
-
-def _b5_ler_planilha_flexivel(arquivo_upload):
-  nome = str(getattr(arquivo_upload, "name", "")).lower()
-  raw = arquivo_upload.getvalue()
-  if nome.endswith(".csv"):
-    for enc in ["utf-8-sig", "utf-8", "latin-1", "cp1252", "iso-8859-1"]:
-      for sep in [";", ",", "\t"]:
-        try:
-          df_tmp = pd.read_csv(
-              io.BytesIO(raw), encoding=enc, sep=sep, low_memory=False
-          )
-          if df_tmp.shape[1] > 1:
-            return df_tmp
-        except Exception:
-          continue
-    raise ValueError("Não foi possível decodificar o arquivo CSV.")
-  else:
-    return pd.read_excel(io.BytesIO(raw))
-
-
-def _b5_buscar_col(df, palavras_chave):
-  for col in df.columns:
-    c_low = str(col).strip().lower()
-    for p in palavras_chave:
-      if p in c_low:
-        return col
-  return None
-
-
-def _b5_conv_num(serie):
-  s = (
-      serie.astype(str)
-      .str.replace("R$", "", regex=False)
-      .str.replace(" ", "", regex=False)
-  )
-  s = s.apply(
-      lambda x: x.replace(".", "").replace(",", ".")
-      if ("," in x and "." in x)
-      else (x.replace(",", ".") if "," in x else x)
-  )
-  return pd.to_numeric(s, errors="coerce").fillna(0.0)
-
-
-def _b5_garantir_estado():
-  if "b5_dados_processados" not in st.session_state:
-    st.session_state.b5_dados_processados = {}
-
-
-def _b5_processar_comparativo_anterior(df_atual_raw, df_ant_raw):
-  df_atual = limpar_colunas_duplicadas(df_atual_raw.copy())
-  col_cod_at = _b5_buscar_col(
-      df_atual, ["código do produto", "codigo do produto", "código", "codigo"]
-  )
-  col_desc_at = _b5_buscar_col(
-      df_atual,
-      ["descrição do produto", "descricao do produto", "descrição", "descricao"],
-  )
-  col_ajuste_at = _b5_buscar_col(df_atual, ["ajuste"])
-  col_saldo_at = _b5_buscar_col(
-      df_atual, ["saldo em estoque", "saldo", "estoque"]
-  )
-  col_custo_at = _b5_buscar_col(df_atual, ["custo"])
-  col_val_aj_at = _b5_buscar_col(
-      df_atual, ["valor de ajuste", "valor ajuste"]
-  )
-  col_loja_at = _b5_buscar_col(df_atual, ["loja"])
-  col_data_at = _b5_buscar_col(
-      df_atual, ["data de abertura", "data de finalização", "data"]
+def _b5_ler_csv_inventario(uploaded_file):
+  """Lê o arquivo CSV exportado do sistema tratando codificação, separador e colunas monetárias."""
+  raw_bytes = uploaded_file.getvalue()
+  for enc in ["latin1", "cp1252", "utf-8-sig", "utf-8"]:
+    try:
+      df = pd.read_csv(io.BytesIO(raw_bytes), sep=";", encoding=enc)
+      if "Código do Produto" in df.columns:
+        for col in [
+            "Custo (R$)",
+            "Valor de Ajuste (R$)",
+            "Valor de Estoque (R$)",
+        ]:
+          if col in df.columns:
+            df[col] = (
+                pd.to_numeric(
+                    df[col]
+                    .astype(str)
+                    .str.replace(".", "", regex=False)
+                    .str.replace(",", ".", regex=False),
+                    errors="coerce",
+                )
+                .fillna(0.0)
+            )
+        return df
+    except Exception:
+      continue
+  raise ValueError(
+      "Não foi possível ler o CSV. Verifique se o separador é ';' e se a"
+      " coluna 'Código do Produto' existe."
   )
 
-  if not col_cod_at or not col_ajuste_at:
+
+def _b5_ler_inventario_anterior(uploaded_excel):
+  """Lê o Excel do inventário anterior (1ª aba) e retorna um dicionário {Código: Ajuste}."""
+  if uploaded_excel is None:
+    return {}
+  raw_bytes = uploaded_excel.getvalue()
+  xls = pd.ExcelFile(io.BytesIO(raw_bytes))
+  df_ant = pd.read_excel(io.BytesIO(raw_bytes), sheet_name=xls.sheet_names[0])
+  if (
+      "Código do Produto" not in df_ant.columns
+      or "Ajuste" not in df_ant.columns
+  ):
     raise ValueError(
-        "O arquivo principal do inventário precisa conter as colunas de"
-        " Código e Ajuste."
+        "O arquivo do inventário anterior precisa ter as colunas 'Código do"
+        " Produto' e 'Ajuste' na primeira aba."
     )
+  df_ant = df_ant.drop_duplicates(subset=["Código do Produto"], keep="last")
+  return df_ant.set_index("Código do Produto")["Ajuste"].to_dict()
 
-  df_atual["_COD_"] = df_atual[col_cod_at].apply(_b5_limpar_codigo)
-  df_atual["_DESC_"] = (
-      df_atual[col_desc_at].astype(str).str.strip()
-      if col_desc_at
-      else "Produto sem descrição"
+
+def _b5_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
+  nome_aba_base = os.path.splitext(nome_arquivo_csv)[0][:31]
+
+  # Regra da aba JUSTIFICAR:
+  # Negativos (< 0), Sobras (> 0) ou Congelado == 0
+  condicao = (
+      (df_atual["Ajuste"] < 0)
+      | (df_atual["Ajuste"] > 0)
+      | (df_atual["Congelado"] == 0)
   )
-  df_atual["_AJUSTE_AT_"] = _b5_conv_num(df_atual[col_ajuste_at])
-  df_atual["_SALDO_AT_"] = (
-      _b5_conv_num(df_atual[col_saldo_at]) if col_saldo_at else 0.0
-  )
-  df_atual["_CUSTO_AT_"] = (
-      _b5_conv_num(df_atual[col_custo_at]) if col_custo_at else 0.0
-  )
-  if col_val_aj_at:
-    df_atual["_VAL_AJ_AT_"] = _b5_conv_num(df_atual[col_val_aj_at])
-  else:
-    df_atual["_VAL_AJ_AT_"] = df_atual["_AJUSTE_AT_"] * df_atual["_CUSTO_AT_"]
+  df_just = df_atual[condicao].copy()
+  df_just = df_just.sort_values(
+      by=["Ajuste", "Descrição do Produto"], ascending=[True, True]
+  ).reset_index(drop=True)
 
-  loja_detectada = (
-      str(df_atual[col_loja_at].dropna().iloc[0]).strip()
-      if col_loja_at and not df_atual[col_loja_at].dropna().empty
-      else "N/I"
-  )
-  data_atual_det = (
-      str(df_atual[col_data_at].dropna().iloc[0]).strip()
-      if col_data_at and not df_atual[col_data_at].dropna().empty
-      else pd.Timestamp.now().strftime("%d/%m/%Y")
-  )
-
-  mapa_ant = {}
-  data_ant_det = "N/I"
-  if df_ant_raw is not None:
-    df_ant = limpar_colunas_duplicadas(df_ant_raw.copy())
-    col_cod_an = _b5_buscar_col(
-        df_ant, ["código do produto", "codigo do produto", "código", "codigo"]
-    )
-    col_aj_an = _b5_buscar_col(df_ant, ["ajuste"])
-    col_val_aj_an = _b5_buscar_col(
-        df_ant, ["valor de ajuste", "valor ajuste"]
-    )
-    col_custo_an = _b5_buscar_col(df_ant, ["custo"])
-    col_saldo_an = _b5_buscar_col(
-        df_ant, ["saldo em estoque", "saldo", "estoque"]
-    )
-    col_data_an = _b5_buscar_col(
-        df_ant, ["data de abertura", "data de finalização", "data"]
-    )
-    if col_data_an and not df_ant[col_data_an].dropna().empty:
-      data_ant_det = str(df_ant[col_data_an].dropna().iloc[0]).strip()
-
-    if col_cod_an:
-      df_ant["_COD_"] = df_ant[col_cod_an].apply(_b5_limpar_codigo)
-      df_ant["_AJ_AN_"] = (
-          _b5_conv_num(df_ant[col_aj_an]) if col_aj_an else 0.0
-      )
-      df_ant["_CUSTO_AN_"] = (
-          _b5_conv_num(df_ant[col_custo_an]) if col_custo_an else 0.0
-      )
-      if col_val_aj_an:
-        df_ant["_VAL_AJ_AN_"] = _b5_conv_num(df_ant[col_val_aj_an])
-      else:
-        df_ant["_VAL_AJ_AN_"] = df_ant["_AJ_AN_"] * df_ant["_CUSTO_AN_"]
-      df_ant["_SALDO_AN_"] = (
-          _b5_conv_num(df_ant[col_saldo_an]) if col_saldo_an else 0.0
-      )
-
-      for _, r_an in df_ant.iterrows():
-        c_an = r_an["_COD_"]
-        if not c_an:
-          continue
-        if c_an not in mapa_ant:
-          mapa_ant[c_an] = {
-              "ajuste_ant": r_an["_AJ_AN_"],
-              "val_aj_ant": r_an["_VAL_AJ_AN_"],
-              "saldo_ant": r_an["_SALDO_AN_"],
-          }
-        else:
-          mapa_ant[c_an]["ajuste_ant"] += r_an["_AJ_AN_"]
-          mapa_ant[c_an]["val_aj_ant"] += r_an["_VAL_AJ_AN_"]
-          mapa_ant[c_an]["saldo_ant"] += r_an["_SALDO_AN_"]
-
-  df_div = df_atual[df_atual["_AJUSTE_AT_"] != 0].copy()
-  df_div["_ABS_VAL_"] = df_div["_VAL_AJ_AT_"].abs()
-  df_div = df_div.sort_values(by="_ABS_VAL_", ascending=False)
-
-  registros = []
-  reincidentes_qtd = 0
-  for _, row in df_div.iterrows():
-    cod = row["_COD_"]
-    desc = row["_DESC_"]
-    aj_at = row["_AJUSTE_AT_"]
-    val_at = row["_VAL_AJ_AT_"]
-    saldo_at = row["_SALDO_AT_"]
-    tipo_at = "FALTA (PERDA)" if aj_at < 0 else "SOBRA"
-
-    info_an = mapa_ant.get(cod)
-    if info_an is not None:
-      aj_an = info_an["ajuste_ant"]
-      val_an = info_an["val_aj_ant"]
-      if aj_an < 0:
-        hist_str = f"Falta anterior ({aj_an:g} un | R$ {val_an:,.2f})"
-      elif aj_an > 0:
-        hist_str = f"Sobra anterior (+{aj_an:g} un | R$ +{val_an:,.2f})"
-      else:
-        hist_str = "Sem divergência no anterior (0 un)"
-    else:
-      aj_an = 0.0
-      val_an = 0.0
-      hist_str = "Não constava / Sem divergência no anterior"
-
-    if aj_at < 0 and aj_an < 0:
-      reincidentes_qtd += 1
-      hipotese = (
-          "Reincidência de falta em relação ao inventário anterior — falha"
-          " crônica de controle, registro ou extravio contínuo."
-      )
-      acao = (
-          "Auditar histórico de movimentações entre inventários, revisar"
-          " endereço/exposição e aplicar contagem cíclica."
-      )
-    elif aj_at > 0 and aj_an > 0:
-      reincidentes_qtd += 1
-      hipotese = (
-          "Reincidência de sobra em relação ao inventário anterior — possível"
-          " falha recorrente de entrada, embalagem ou código correlato."
-      )
-      acao = (
-          "Conferir fator de embalagem, itens de mesma família e registros de"
-          " entrada desde o último inventário."
-      )
-    elif (aj_at < 0 and aj_an > 0) or (aj_at > 0 and aj_an < 0):
-      hipotese = (
-          "Inversão de divergência frente ao inventário anterior (sobra virou"
-          " falta ou vice-versa) — possível compensação/erro de contagem."
-      )
-      acao = (
-          "Realizar recontagem física conferida e auditar ajustes do"
-          " inventário anterior."
-      )
-    elif abs(aj_at) in [6, 12, 24, 36]:
-      hipotese = (
-          "Divergência em múltiplo de caixa fechada — possível erro de"
-          " embalagem ou movimentação por caixa."
-      )
-      acao = "Conferir cadastro de embalagem (EMB) e contagem por caixa."
-    elif abs(val_at) >= 200 and aj_at < 0:
-      hipotese = (
-          "Perda financeira relevante no inventário atual — avaliar extravio,"
-          " quebra ou falha de movimentação."
-      )
-      acao = (
-          "Priorizar investigação do item, recontagem e validação pela"
-          " gerência da loja."
-      )
-    else:
-      hipotese = (
-          "Divergência pontual apurada no inventário atual frente ao"
-          " histórico anterior."
-      )
-      acao = (
-          "Realizar recontagem do saldo físico e registrar justificativa da"
-          " operação."
-      )
-
-    registros.append({
-        "Código": cod,
-        "Descrição": desc,
-        "Tipo Atual": tipo_at,
-        "Saldo Atual": saldo_at,
-        "Ajuste Atual (Qtd)": aj_at,
-        "Valor Ajuste Atual (R$)": val_at,
-        "Histórico Inventário Anterior": hist_str,
-        "Ajuste Anterior (Qtd)": aj_an,
-        "Valor Ajuste Anterior (R$)": val_an,
-        "Variação Valor (R$)": val_at - val_an,
-        "Diagnóstico / Justificativa": hipotese,
-        "Ação Corretiva": acao,
-        "Status": "Pendente Validação",
-    })
-
-  df_resultado = pd.DataFrame(registros)
-  return {
-      "df_resultado": df_resultado,
-      "loja": loja_detectada,
-      "data_atual": data_atual_det,
-      "data_anterior": data_ant_det,
-      "total_skus_inv": len(df_atual),
-      "total_divergentes": len(df_resultado),
-      "reincidentes_qtd": reincidentes_qtd,
-      "qtd_faltas": int((df_div["_AJUSTE_AT_"] < 0).sum()),
-      "qtd_sobras": int((df_div["_AJUSTE_AT_"] > 0).sum()),
-      "val_faltas": float(
-          df_div[df_div["_AJUSTE_AT_"] < 0]["_VAL_AJ_AT_"].sum()
-      ),
-      "val_sobras": float(
-          df_div[df_div["_AJUSTE_AT_"] > 0]["_VAL_AJ_AT_"].sum()
-      ),
-      "val_liquido": float(df_div["_VAL_AJ_AT_"].sum()),
-  }
-
-
-def _b5_gerar_excel_justificativas(df_just, info_meta, texto_parecer_geral):
   wb = openpyxl.Workbook()
-  ws = wb.active
-  ws.title = "Pós-Inventário vs Anterior"
-  ws.views.sheetView[0].showGridLines = True
 
-  fonte_tit = Font(name="Arial", size=13, bold=True, color="1F4E78")
-  fonte_sub = Font(name="Arial", size=10, bold=True, color="334155")
-  fonte_cab = Font(name="Arial", size=9.5, bold=True, color="FFFFFF")
-  fonte_pad = Font(name="Arial", size=9)
-  fonte_neg = Font(name="Arial", size=9, bold=True)
+  # Paleta de estilos
+  navy_dark = "1E3A5F"
+  zebra_fill_hex = "F7FAFC"
+  border_gray = "CBD5E0"
+  total_fill_hex = "E2E8F0"
+  ant_header_fill = "FEF3C7"
+  ant_header_font = "92400E"
+  ant_cell_fill = "FFFBEB"
 
-  fill_cab = PatternFill(
-      start_color="1F4E78", end_color="1F4E78", fill_type="solid"
+  font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+  fill_header = PatternFill(
+      fill_type="solid", start_color=navy_dark, end_color=navy_dark
   )
-  fill_falta = PatternFill(
-      start_color="FEE2E2", end_color="FEE2E2", fill_type="solid"
+  font_data = Font(name="Calibri", size=11, color="1A202C")
+  font_bold = Font(name="Calibri", size=11, bold=True, color="1A202C")
+  fill_zebra = PatternFill(
+      fill_type="solid", start_color=zebra_fill_hex, end_color=zebra_fill_hex
   )
-  fill_sobra = PatternFill(
-      start_color="DCFCE7", end_color="DCFCE7", fill_type="solid"
-  )
-  borda = Border(
-      left=Side(style="thin", color="000000"),
-      right=Side(style="thin", color="000000"),
-      top=Side(style="thin", color="000000"),
-      bottom=Side(style="thin", color="000000"),
+  fill_total = PatternFill(
+      fill_type="solid", start_color=total_fill_hex, end_color=total_fill_hex
   )
 
-  ws["A1"] = (
-      "⚡ GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO (COMPARATIVO COM INVENTÁRIO"
-      " ANTERIOR)"
+  thin_border = Border(
+      left=Side(style="thin", color=border_gray),
+      right=Side(style="thin", color=border_gray),
+      top=Side(style="thin", color=border_gray),
+      bottom=Side(style="thin", color=border_gray),
   )
-  ws["A1"].font = fonte_tit
-  ws["A2"] = (
-      f"Loja: {info_meta.get('loja', 'N/I')} | Inventário Atual:"
-      f" {info_meta.get('data_atual', '')} | Inventário Anterior:"
-      f" {info_meta.get('data_anterior', 'N/I')}"
+  total_border = Border(
+      top=Side(style="medium", color=navy_dark),
+      bottom=Side(style="medium", color=navy_dark),
+      left=Side(style="thin", color=border_gray),
+      right=Side(style="thin", color=border_gray),
   )
-  ws["A2"].font = fonte_sub
-  ws["A3"] = f"Parecer Consolidado: {texto_parecer_geral}"
-  ws["A3"].font = fonte_pad
 
-  ws.append([])
-  colunas = list(df_just.columns)
-  ws.append(colunas)
-  header_row = 5
-  for col_idx in range(1, len(colunas) + 1):
-    c = ws.cell(row=header_row, column=col_idx)
-    c.font = fonte_cab
-    c.fill = fill_cab
+  # =========================================================================
+  # ABA 1: CÓPIA DO ARQUIVO CSV
+  # =========================================================================
+  ws_base = wb.active
+  ws_base.title = nome_aba_base
+
+  headers_base = list(df_atual.columns)
+  ws_base.append(headers_base)
+  for col_idx in range(1, len(headers_base) + 1):
+    c = ws_base.cell(1, col_idx)
+    c.font = font_header
+    c.fill = fill_header
     c.alignment = Alignment(
         horizontal="center", vertical="center", wrap_text=True
     )
-    c.border = borda
+    c.border = thin_border
+  ws_base.row_dimensions[1].height = 26
 
-  for _, r in df_just.iterrows():
-    ws.append([r[c] for c in colunas])
+  for row_data in df_atual.itertuples(index=False):
+    ws_base.append(list(row_data))
 
-  for row in ws.iter_rows(
-      min_row=header_row + 1,
-      max_row=ws.max_row,
-      min_col=1,
-      max_col=len(colunas),
-  ):
-    tipo_val = str(row[2].value or "")
-    for cell in row:
-      cell.font = fonte_pad
-      cell.border = borda
-      if cell.column in [1, 3, 4, 5, 6, 8, 9, 10, 13]:
+  for r_idx in range(2, ws_base.max_row + 1):
+    for c_idx in range(1, ws_base.max_column + 1):
+      c = ws_base.cell(r_idx, c_idx)
+      c.font = font_data
+      c.border = thin_border
+      if r_idx % 2 == 1:
+        c.fill = fill_zebra
+      if c_idx in [1, 3, 4, 5, 6, 7, 13]:
+        c.alignment = Alignment(horizontal="center", vertical="center")
+      elif c_idx in [8, 9, 10]:
+        c.number_format = "R$ #,##0.00"
+        c.alignment = Alignment(horizontal="right", vertical="center")
+
+  ws_base.freeze_panes = "A2"
+  ws_base.auto_filter.ref = (
+      f"A1:{get_column_letter(ws_base.max_column)}{ws_base.max_row}"
+  )
+
+  larguras_base = [
+      18,
+      42,
+      8,
+      12,
+      11,
+      10,
+      18,
+      14,
+      19,
+      19,
+      36,
+      12,
+      13,
+      18,
+      22,
+      13,
+  ]
+  for i, w in enumerate(larguras_base[: ws_base.max_column], start=1):
+    ws_base.column_dimensions[get_column_letter(i)].width = w
+
+  # =========================================================================
+  # ABA 2: JUSTIFICAR
+  # =========================================================================
+  ws_just = wb.create_sheet(title="JUSTIFICAR")
+
+  headers_just = [
+      "Código do Produto",
+      "Descrição do Produto",
+      "Emb",
+      "Congelado",
+      "Digitado",
+      "Ajuste",
+      "Saldo em Estoque",
+      "Ajuste Inventario Anterior",
+      "JUSTIFICAR",
+      "LOGISTICA",
+  ]
+  ws_just.append(headers_just)
+
+  for col_idx in range(1, len(headers_just) + 1):
+    c = ws_just.cell(1, col_idx)
+    if col_idx == 8:
+      c.fill = PatternFill(
+          fill_type="solid", start_color=ant_header_fill, end_color=ant_header_fill
+      )
+      c.font = Font(name="Calibri", size=11, bold=True, color=ant_header_font)
+    else:
+      c.fill = fill_header
+      c.font = font_header
+    c.alignment = Alignment(
+        horizontal="center", vertical="center", wrap_text=True
+    )
+    c.border = thin_border
+  ws_just.row_dimensions[1].height = 28
+
+  max_base_row = ws_base.max_row
+  sheet_ref = f"'{nome_aba_base}'"
+
+  for idx, row in df_just.iterrows():
+    r_excel = idx + 2
+    cod = int(row["Código do Produto"])
+    ajuste_ant = mapa_anterior.get(cod, 0)
+    ajuste_ant = 0 if pd.isna(ajuste_ant) else int(ajuste_ant)
+
+    row_vals = [
+        cod,
+        (
+            f"=INDEX({sheet_ref}!$B$2:$B${max_base_row},"
+            f" MATCH(A{r_excel}, {sheet_ref}!$A$2:$A${max_base_row}, 0))"
+        ),
+        (
+            f"=INDEX({sheet_ref}!$C$2:$C${max_base_row},"
+            f" MATCH(A{r_excel}, {sheet_ref}!$A$2:$A${max_base_row}, 0))"
+        ),
+        (
+            f"=INDEX({sheet_ref}!$D$2:$D${max_base_row},"
+            f" MATCH(A{r_excel}, {sheet_ref}!$A$2:$A${max_base_row}, 0))"
+        ),
+        (
+            f"=INDEX({sheet_ref}!$E$2:$E${max_base_row},"
+            f" MATCH(A{r_excel}, {sheet_ref}!$A$2:$A${max_base_row}, 0))"
+        ),
+        (
+            f"=INDEX({sheet_ref}!$F$2:$F${max_base_row},"
+            f" MATCH(A{r_excel}, {sheet_ref}!$A$2:$A${max_base_row}, 0))"
+        ),
+        (
+            f"=INDEX({sheet_ref}!$G$2:$G${max_base_row},"
+            f" MATCH(A{r_excel}, {sheet_ref}!$A$2:$A${max_base_row}, 0))"
+        ),
+        ajuste_ant,
+        None,
+        None,
+    ]
+    ws_just.append(row_vals)
+
+    for c_idx in range(1, 11):
+      cell = ws_just.cell(r_excel, c_idx)
+      cell.border = thin_border
+      if c_idx == 8:
+        cell.font = Font(
+            name="Calibri", size=11, bold=True, color=ant_header_font
+        )
+        cell.fill = PatternFill(
+            fill_type="solid", start_color=ant_cell_fill, end_color=ant_cell_fill
+        )
         cell.alignment = Alignment(horizontal="center", vertical="center")
       else:
-        cell.alignment = Alignment(
-            horizontal="left", vertical="center", wrap_text=True
-        )
-      if cell.column == 3:
-        cell.font = fonte_neg
-        if "FALTA" in tipo_val:
-          cell.fill = fill_falta
-        elif "SOBRA" in tipo_val:
-          cell.fill = fill_sobra
-      if cell.column in [6, 9, 10] and isinstance(cell.value, (int, float)):
-        cell.number_format = "R$ #,##0.00"
+        cell.font = font_data
+        if idx % 2 == 1:
+          cell.fill = fill_zebra
+        if c_idx in [1, 3, 4, 5, 6, 7]:
+          cell.alignment = Alignment(horizontal="center", vertical="center")
+        else:
+          cell.alignment = Alignment(horizontal="left", vertical="center")
 
-  larguras = {
-      1: 14,
-      2: 34,
-      3: 16,
-      4: 13,
-      5: 15,
-      6: 18,
-      7: 32,
-      8: 16,
-      9: 18,
-      10: 17,
-      11: 42,
-      12: 36,
-      13: 20,
-  }
-  for idx_c, w_c in larguras.items():
-    if idx_c <= len(colunas):
-      ws.column_dimensions[get_column_letter(idx_c)].width = w_c
+  total_row = ws_just.max_row + 1
+  ws_just.cell(total_row, 1, "TOTAL").font = font_bold
+  ws_just.cell(total_row, 1).alignment = Alignment(
+      horizontal="center", vertical="center"
+  )
+  ws_just.cell(
+      total_row, 2, f'=COUNTA(A2:A{total_row-1}) & " itens"'
+  ).font = font_bold
 
-  buf = io.BytesIO()
-  wb.save(buf)
-  buf.seek(0)
-  return buf
+  for c_idx in [4, 5, 6, 7, 8]:
+    col_let = get_column_letter(c_idx)
+    c = ws_just.cell(
+        total_row, c_idx, f"=SUM({col_let}2:{col_let}{total_row-1})"
+    )
+    c.font = font_bold
+    c.alignment = Alignment(horizontal="center", vertical="center")
 
+  for c_idx in range(1, 11):
+    cell = ws_just.cell(total_row, c_idx)
+    cell.fill = fill_total
+    cell.border = total_border
 
-def _b5_gerar_pdf_justificativas(df_just, info_meta, texto_parecer_geral):
-  buf = io.BytesIO()
-  doc = SimpleDocTemplate(
-      buf,
-      pagesize=landscape(letter),
-      rightMargin=18,
-      leftMargin=18,
-      topMargin=22,
-      bottomMargin=28,
+  red_fill = PatternFill(
+      start_color="FEE2E2", end_color="FEE2E2", fill_type="solid"
   )
-  styles = getSampleStyleSheet()
-  est_tit = ParagraphStyle(
-      "B5Tit",
-      parent=styles["Heading1"],
-      fontName="Helvetica-Bold",
-      fontSize=12,
-      textColor=colors.HexColor("#1F4E78"),
+  red_font = Font(color="991B1B", bold=True)
+  green_fill = PatternFill(
+      start_color="DCFCE7", end_color="DCFCE7", fill_type="solid"
   )
-  est_sub = ParagraphStyle(
-      "B5Sub",
-      parent=styles["Normal"],
-      fontName="Helvetica",
-      fontSize=8.5,
-      leading=11,
-      textColor=colors.HexColor("#1E293B"),
-  )
-  est_th = ParagraphStyle(
-      "B5TH",
-      fontName="Helvetica-Bold",
-      fontSize=6.5,
-      leading=8,
-      textColor=colors.white,
-      alignment=1,
-  )
-  est_td = ParagraphStyle(
-      "B5TD",
-      fontName="Helvetica",
-      fontSize=6.5,
-      leading=8,
-      textColor=colors.HexColor("#0F172A"),
-      alignment=0,
-  )
-  est_td_c = ParagraphStyle(
-      "B5TDC",
-      fontName="Helvetica",
-      fontSize=6.5,
-      leading=8,
-      textColor=colors.HexColor("#0F172A"),
-      alignment=1,
-  )
+  green_font = Font(color="166534", bold=True)
 
-  story = [
-      Paragraph(
-          "<b>GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO (COMPARATIVO COM"
-          " INVENTÁRIO ANTERIOR)</b>",
-          est_tit,
+  ws_just.conditional_formatting.add(
+      f"F2:F{total_row-1}",
+      CellIsRule(
+          operator="lessThan", formula=["0"], fill=red_fill, font=red_font
       ),
-      Paragraph(
-          f"<b>Loja:</b> {info_meta.get('loja', 'N/I')} | <b>Atual:</b>"
-          f" {info_meta.get('data_atual', '')} | <b>Anterior:</b>"
-          f" {info_meta.get('data_anterior', 'N/I')} | <b>Divergentes:</b>"
-          f" {info_meta.get('total_divergentes', 0)} (Reincidentes:"
-          f" {info_meta.get('reincidentes_qtd', 0)}) | <b>Ajuste Líquido:</b>"
-          f" R$ {info_meta.get('val_liquido', 0):,.2f}",
-          est_sub,
+  )
+  ws_just.conditional_formatting.add(
+      f"F2:F{total_row-1}",
+      CellIsRule(
+          operator="greaterThan",
+          formula=["0"],
+          fill=green_fill,
+          font=green_font,
       ),
-      Spacer(1, 4),
-      Paragraph(
-          f"<b>Parecer Executivo da Unidade:</b> {texto_parecer_geral}",
-          est_sub,
+  )
+
+  dv_just = DataValidation(
+      type="list",
+      formula1=(
+          '"Furto / Perda,Erro de Contagem / Bipagem,Avaria /'
+          " Vencido,Divergência de Recebimento,Troca / Devolução não"
+          ' lançada,Produto sem saldo (Congelado 0),Outros"'
       ),
-      Spacer(1, 8),
-  ]
+      allow_blank=True,
+  )
+  ws_just.add_data_validation(dv_just)
+  dv_just.add(f"I2:I{total_row-1}")
 
-  headers = [
-      "Código",
-      "Descrição",
-      "Tipo",
-      "Aj. Atual",
-      "Valor Atual",
-      "Inventário Anterior",
-      "Diagnóstico / Justificativa",
-      "Ação Corretiva",
-  ]
-  dados_tbl = [[Paragraph(h, est_th) for h in headers]]
-  for _, r in df_just.iterrows():
-    dados_tbl.append([
-        Paragraph(str(r.get("Código", "")), est_td_c),
-        Paragraph(str(r.get("Descrição", ""))[:45], est_td),
-        Paragraph(str(r.get("Tipo Atual", "")), est_td_c),
-        Paragraph(f"{float(r.get('Ajuste Atual (Qtd)', 0)):+g}", est_td_c),
-        Paragraph(
-            f"R$ {float(r.get('Valor Ajuste Atual (R$)', 0)):,.2f}", est_td_c
-        ),
-        Paragraph(str(r.get("Histórico Inventário Anterior", "")), est_td),
-        Paragraph(str(r.get("Diagnóstico / Justificativa", "")), est_td),
-        Paragraph(str(r.get("Ação Corretiva", "")), est_td),
-    ])
+  larguras_just = [18, 44, 8, 12, 11, 10, 18, 25, 32, 30]
+  for i, w in enumerate(larguras_just, start=1):
+    ws_just.column_dimensions[get_column_letter(i)].width = w
 
-  col_w = [44, 118, 56, 36, 58, 135, 165, 152]
-  tbl = Table(dados_tbl, colWidths=col_w, repeatRows=1)
-  tbl.setStyle(
-      TableStyle([
-          ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
-          ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#000000")),
-          ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+  ws_just.freeze_panes = "A2"
+  ws_just.auto_filter.ref = f"A1:J{total_row-1}"
+
+  # =========================================================================
+  # ABA 3: RESUMO (Valores calculados em Python para funcionar em PC e Celular)
+  # =========================================================================
+  ws_res = wb.create_sheet(title="RESUMO")
+
+  loja_titulo = (
+      str(df_atual["Loja"].iloc[0])
+      if "Loja" in df_atual.columns and len(df_atual) > 0
+      else nome_aba_base
+  )
+  ws_res["A1"] = f"RESUMO DO INVENTÁRIO — {loja_titulo}"
+  ws_res["A1"].font = Font(
+      name="Calibri", size=13, bold=True, color=navy_dark
+  )
+  ws_res.merge_cells("A1:D1")
+
+  res_headers = ["Indicador", "Qtd. Itens", "Qtd. Unidades", "Valor (R$)"]
+  ws_res.append([])
+  ws_res.append(res_headers)
+  for c_idx in range(1, 5):
+    c = ws_res.cell(3, c_idx)
+    c.font = font_header
+    c.fill = fill_header
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    c.border = thin_border
+
+  sem_div_df = df_atual[df_atual["Ajuste"] == 0]
+  faltas_df = df_atual[df_atual["Ajuste"] < 0]
+  sobras_df = df_atual[df_atual["Ajuste"] > 0]
+  cong_zero_df = df_atual[df_atual["Congelado"] == 0]
+
+  val_est_col = (
+      "Valor de Estoque (R$)"
+      if "Valor de Estoque (R$)" in df_atual.columns
+      else None
+  )
+  val_aju_col = (
+      "Valor de Ajuste (R$)"
+      if "Valor de Ajuste (R$)" in df_atual.columns
+      else None
+  )
+
+  rows_resumo = [
+      (
+          "Total de SKUs Inventariados",
+          int(len(df_atual)),
+          int(df_atual["Digitado"].sum()),
+          round(float(df_atual[val_est_col].sum()), 2) if val_est_col else 0.0,
+      ),
+      (
+          "Itens sem Divergência (Ajuste = 0)",
+          int(len(sem_div_df)),
+          int(sem_div_df["Digitado"].sum()),
           (
-              "ROWBACKGROUNDS",
-              (0, 1),
-              (-1, -1),
-              [colors.white, colors.HexColor("#F8FAFC")],
+              round(float(sem_div_df[val_est_col].sum()), 2)
+              if val_est_col
+              else 0.0
           ),
-          ("TOPPADDING", (0, 0), (-1, -1), 3),
-          ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-      ])
-  )
-  story.append(tbl)
-  story.append(Spacer(1, 14))
-  story.append(
-      Paragraph(
-          "<b>Assinatura Gerente da Loja:</b> _______________________________"
-          " &nbsp;&nbsp;&nbsp;&nbsp; <b>Auditoria / Inventário KMB:</b>"
-          " _______________________________",
-          est_sub,
-      )
-  )
-  doc.build(story, canvasmaker=NumberedCanvas)
-  buf.seek(0)
-  return buf
+      ),
+      (
+          "Faltas (Ajuste Negativo)",
+          int(len(faltas_df)),
+          int(faltas_df["Ajuste"].sum()),
+          (
+              round(float(faltas_df[val_aju_col].sum()), 2)
+              if val_aju_col
+              else 0.0
+          ),
+      ),
+      (
+          "Sobras (Ajuste Positivo)",
+          int(len(sobras_df)),
+          int(sobras_df["Ajuste"].sum()),
+          (
+              round(float(sobras_df[val_aju_col].sum()), 2)
+              if val_aju_col
+              else 0.0
+          ),
+      ),
+      (
+          "Itens com Congelado = 0",
+          int(len(cong_zero_df)),
+          int(cong_zero_df["Digitado"].sum()),
+          (
+              round(float(cong_zero_df[val_est_col].sum()), 2)
+              if val_est_col
+              else 0.0
+          ),
+      ),
+      (
+          "Total de Itens na Aba JUSTIFICAR",
+          int(len(df_just)),
+          int(df_just["Ajuste"].sum()),
+          (
+              round(float(df_just[val_aju_col].sum()), 2)
+              if val_aju_col
+              else 0.0
+          ),
+      ),
+  ]
 
+  for idx, r_vals in enumerate(rows_resumo, start=4):
+    ws_res.append(list(r_vals))
+    for c_idx in range(1, 5):
+      cell = ws_res.cell(idx, c_idx)
+      cell.font = font_bold if idx == 9 else font_data
+      cell.border = thin_border
+      if idx == 9:
+        cell.fill = fill_total
+      elif idx % 2 == 1:
+        cell.fill = fill_zebra
+      if c_idx == 1:
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+      elif c_idx in [2, 3]:
+        cell.number_format = "#,##0"
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+      elif c_idx == 4:
+        cell.number_format = "R$ #,##0.00"
+        cell.alignment = Alignment(horizontal="right", vertical="center")
 
-def _b5_gerar_docx_justificativas(df_just, info_meta, texto_parecer_geral):
-  doc = docx.Document()
-  doc.add_heading(
-      "⚡ GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO (COMPARATIVO COM INVENTÁRIO"
-      " ANTERIOR)",
-      level=1,
-  )
-  p_meta = doc.add_paragraph()
-  p_meta.add_run("Loja: ").bold = True
-  p_meta.add_run(f"{info_meta.get('loja', 'N/I')}   |   ")
-  p_meta.add_run("Inventário Atual: ").bold = True
-  p_meta.add_run(f"{info_meta.get('data_atual', '')}   |   ")
-  p_meta.add_run("Inventário Anterior: ").bold = True
-  p_meta.add_run(f"{info_meta.get('data_anterior', 'N/I')}\n")
-  p_meta.add_run("Resumo Financeiro Atual: ").bold = True
-  p_meta.add_run(
-      f"Faltas: R$ {info_meta.get('val_faltas', 0):,.2f} | Sobras: R$"
-      f" +{info_meta.get('val_sobras', 0):,.2f} | Ajuste Líquido: R$"
-      f" {info_meta.get('val_liquido', 0):,.2f}"
-  )
+  chart = BarChart()
+  chart.type = "col"
+  chart.style = 10
+  chart.title = "Divergências por Tipo (Qtd. de Itens)"
+  chart.y_axis.title = "Qtd. Itens"
+  chart.x_axis.title = "Categoria"
+  data_ref = Reference(ws_res, min_col=2, min_row=5, max_row=8)
+  cats_ref = Reference(ws_res, min_col=1, min_row=6, max_row=8)
+  chart.add_data(data_ref, titles_from_data=False)
+  chart.set_categories(cats_ref)
+  chart.legend = None
+  chart.width = 16
+  chart.height = 10
+  ws_res.add_chart(chart, "A12")
 
-  doc.add_heading("1. Parecer Consolidado da Unidade", level=2)
-  doc.add_paragraph(texto_parecer_geral)
+  ws_res.column_dimensions["A"].width = 36
+  ws_res.column_dimensions["B"].width = 16
+  ws_res.column_dimensions["C"].width = 18
+  ws_res.column_dimensions["D"].width = 20
 
-  doc.add_heading("2. Comparativo e Justificativas por Item", level=2)
-  for _, r in df_just.iterrows():
-    p = doc.add_paragraph()
-    p.add_run(
-        f"[{r['Tipo Atual']}] {r['Código']} — {r['Descrição']}\n"
-    ).bold = True
-    p.add_run(
-        f"• Atual: {r['Ajuste Atual (Qtd)']:+g} un (R$"
-        f" {r['Valor Ajuste Atual (R$)']:,.2f}) | Anterior:"
-        f" {r['Histórico Inventário Anterior']}\n"
-    )
-    p.add_run(
-        f"• Diagnóstico / Justificativa: {r['Diagnóstico / Justificativa']}\n"
-    )
-    p.add_run(f"• Ação Corretiva: {r['Ação Corretiva']}")
-
-  doc.add_heading("3. Homologação", level=2)
-  doc.add_paragraph(
-      "\n________________________________________          "
-      " ________________________________________\n"
-      "Gerente Responsável pela Loja                      "
-      " Auditoria Patrimonial / Time de Inventário KMB"
-  )
-  buf = io.BytesIO()
-  doc.save(buf)
-  buf.seek(0)
-  return buf
+  output_buffer = io.BytesIO()
+  wb.save(output_buffer)
+  output_buffer.seek(0)
+  return output_buffer, df_just
 
 
 def renderizar_bloco_5_justificar():
-  _b5_garantir_estado()
+  st.markdown("### 📦 AUTOMAÇÃO DE RELATÓRIO DE INVENTÁRIO (BLOCO 5)")
   st.markdown(
-      "### 📝 RELATÓRIO PÓS-INVENTÁRIO // JUSTIFICATIVAS DE PERDAS E SOBRAS"
-  )
-  st.markdown(
-      "Envie o arquivo principal do inventário atual e o arquivo do"
-      " inventário anterior para comparar divergências, identificar"
-      " reincidências, editar justificativas e exportar o relatório."
+      "Faça o upload dos arquivos abaixo e clique no botão para gerar a"
+      " planilha Excel pronta para justificar."
   )
 
-  c_up1, c_up2 = st.columns(2)
-  with c_up1:
-    arq_inv = st.file_uploader(
-        "1. Arquivo Principal do Inventário (Obrigatório) *",
-        type=["csv", "xlsx", "xls"],
-        key="b5_up_inv",
-    )
-  with c_up2:
-    arq_ant = st.file_uploader(
-        "2. Arquivo do Inventário Anterior",
-        type=["csv", "xlsx", "xls"],
-        key="b5_up_ant",
+  col1, col2 = st.columns(2)
+
+  with col1:
+    arquivo_csv = st.file_uploader(
+        "1. Arquivo CSV do Inventário Atual (Obrigatório)",
+        type=["csv"],
+        help="Ex: 11021.23.11.2026.csv",
+        key="b5_arquivo_csv",
     )
 
-  if arq_inv is not None:
-    if st.button(
-        "⚙️ Gerar Relatório Pós-Inventário (Comparativo com Anterior)",
-        use_container_width=True,
-        key="b5_btn_processar",
-    ):
+  with col2:
+    arquivo_anterior = st.file_uploader(
+        "2. Excel do Inventário Anterior (Opcional)",
+        type=["xlsx", "xls"],
+        help="Para cruzar a coluna 'Ajuste Inventario Anterior'",
+        key="b5_arquivo_anterior",
+    )
+
+  st.divider()
+
+  if st.button(
+      "🚀 Gerar Relatório de Inventário",
+      type="primary",
+      use_container_width=True,
+      key="b5_btn_gerar",
+  ):
+    if arquivo_csv is None:
+      st.warning(
+          "⚠️ Por favor, faça o upload do arquivo CSV do inventário atual"
+          " primeiro."
+      )
+    else:
       try:
-        df_atual_raw = _b5_ler_planilha_flexivel(arq_inv)
-        df_ant_raw = (
-            _b5_ler_planilha_flexivel(arq_ant) if arq_ant is not None else None
-        )
-        res_b5 = _b5_processar_comparativo_anterior(df_atual_raw, df_ant_raw)
-        st.session_state.b5_dados_processados = res_b5
+        with st.spinner("Processando arquivos e gerando planilha..."):
+          df_atual = _b5_ler_csv_inventario(arquivo_csv)
+          mapa_anterior = _b5_ler_inventario_anterior(arquivo_anterior)
+          excel_bytes, df_just = _b5_gerar_excel_memoria(
+              df_atual, mapa_anterior, arquivo_csv.name
+          )
+
+          df_preview = df_just[[
+              "Código do Produto",
+              "Descrição do Produto",
+              "Emb",
+              "Congelado",
+              "Digitado",
+              "Ajuste",
+              "Saldo em Estoque",
+          ]].copy()
+          df_preview["Ajuste Inventario Anterior"] = (
+              df_preview["Código do Produto"]
+              .map(mapa_anterior)
+              .fillna(0)
+              .astype(int)
+          )
+
         st.success(
-            "✅ Relatório gerado com sucesso!"
-            f" {res_b5['total_divergentes']} item(ns) divergente(s)"
-            " analisado(s)."
+            f"✅ Relatório gerado! **{len(df_just)} itens** filtrados para"
+            f" justificativa (de {len(df_atual)} itens totais)."
         )
+
+        nome_saida = (
+            f"Relatorio_Inventario_{os.path.splitext(arquivo_csv.name)[0]}.xlsx"
+        )
+        st.download_button(
+            label="📥 Baixar Planilha Excel (.xlsx)",
+            data=excel_bytes,
+            file_name=nome_saida,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="b5_btn_download",
+        )
+
+        with st.expander(
+            "👀 Pré-visualizar itens da aba JUSTIFICAR", expanded=True
+        ):
+          st.dataframe(df_preview, use_container_width=True, hide_index=True)
+
       except Exception as e:
-        st.error(f"❌ Erro ao processar arquivos: {e}")
-
-  dados_b5 = st.session_state.b5_dados_processados
-  if dados_b5 and "df_resultado" in dados_b5:
-    df_res = dados_b5["df_resultado"]
-    st.markdown("---")
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Itens Divergentes", f"{dados_b5['total_divergentes']:,}")
-    k2.metric(
-        "Reincidentes (vs Anterior)", f"{dados_b5['reincidentes_qtd']:,}"
-    )
-    k3.metric(
-        "Faltas (Perdas)",
-        f"{dados_b5['qtd_faltas']:,} SKUs",
-        f"R$ {dados_b5['val_faltas']:,.2f}",
-        delta_color="inverse",
-    )
-    k4.metric(
-        "Sobras",
-        f"{dados_b5['qtd_sobras']:,} SKUs",
-        f"R$ +{dados_b5['val_sobras']:,.2f}",
-    )
-
-    if df_res.empty:
-      st.info("🎉 Nenhuma divergência encontrada neste inventário (100% exato).")
-      return
-
-    st.markdown("---")
-    f_col1, f_col2 = st.columns([1.2, 2.8])
-    with f_col1:
-      filtro_tipo_b5 = st.selectbox(
-          "Filtrar Divergências:",
-          ["Todos os Divergentes", "Apenas Faltas (Perdas)", "Apenas Sobras"],
-          key="b5_filtro_tipo",
-      )
-    with f_col2:
-      busca_b5 = st.text_input(
-          "Buscar por Código, Descrição ou Diagnóstico:",
-          placeholder="Digite para filtrar...",
-          key="b5_busca_item",
-      )
-
-    df_exibir = df_res.copy()
-    if filtro_tipo_b5 == "Apenas Faltas (Perdas)":
-      df_exibir = df_exibir[df_exibir["Tipo Atual"] == "FALTA (PERDA)"]
-    elif filtro_tipo_b5 == "Apenas Sobras":
-      df_exibir = df_exibir[df_exibir["Tipo Atual"] == "SOBRA"]
-
-    if busca_b5.strip():
-      t = busca_b5.strip().lower()
-      df_exibir = df_exibir[
-          df_exibir.apply(lambda r: t in str(r.values).lower(), axis=1)
-      ]
-
-    st.markdown("#### ✍️ Justificativas e Planos de Ação (Editável)")
-    df_editado = st.data_editor(
-        df_exibir,
-        use_container_width=True,
-        height=430,
-        disabled=[
-            "Código",
-            "Descrição",
-            "Tipo Atual",
-            "Saldo Atual",
-            "Ajuste Atual (Qtd)",
-            "Valor Ajuste Atual (R$)",
-            "Histórico Inventário Anterior",
-            "Ajuste Anterior (Qtd)",
-            "Valor Ajuste Anterior (R$)",
-            "Variação Valor (R$)",
-        ],
-        column_config={
-            "Status": st.column_config.SelectboxColumn(
-                "Status",
-                options=[
-                    "Pendente Validação",
-                    "Justificado pela Loja",
-                    "Em Investigação",
-                    "Aprovado Auditoria",
-                ],
-                required=True,
-            ),
-            "Valor Ajuste Atual (R$)": st.column_config.NumberColumn(
-                "Valor Ajuste Atual (R$)", format="R$ %.2f"
-            ),
-            "Valor Ajuste Anterior (R$)": st.column_config.NumberColumn(
-                "Valor Ajuste Anterior (R$)", format="R$ %.2f"
-            ),
-            "Variação Valor (R$)": st.column_config.NumberColumn(
-                "Variação Valor (R$)", format="R$ %.2f"
-            ),
-        },
-        key="b5_editor_justificativas",
-    )
-
-    parecer_padrao = (
-        f"Na conferência da Loja {dados_b5['loja']} (inventário"
-        f" {dados_b5['data_atual']} vs. anterior"
-        f" {dados_b5['data_anterior']}), foram apurados"
-        f" {dados_b5['total_divergentes']} SKUs divergentes"
-        f" ({dados_b5['reincidentes_qtd']} reincidentes), com R$"
-        f" {dados_b5['val_faltas']:,.2f} em faltas e R$"
-        f" +{dados_b5['val_sobras']:,.2f} em sobras (ajuste líquido de R$"
-        f" {dados_b5['val_liquido']:,.2f})."
-    )
-    parecer_final_loja = st.text_area(
-        "📄 Parecer Consolidado da Gerência / Auditoria:",
-        value=parecer_padrao,
-        height=95,
-        key="b5_parecer_geral_txt",
-    )
-
-    st.markdown("---")
-    st.markdown("#### 📥 Exportar Relatório Pós-Inventário")
-    dl1, dl2, dl3 = st.columns(3)
-    loja_tag = str(dados_b5.get("loja", "Loja")).replace(" ", "_")
-    with dl1:
-      st.download_button(
-          "📊 Baixar Excel (.xlsx)",
-          data=_b5_gerar_excel_justificativas(
-              df_editado, dados_b5, parecer_final_loja
-          ),
-          file_name=f"PosInventario_Comparativo_{loja_tag}.xlsx",
-          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          use_container_width=True,
-          key="b5_dl_xlsx",
-      )
-    with dl2:
-      st.download_button(
-          "📑 Baixar PDF (.pdf)",
-          data=_b5_gerar_pdf_justificativas(
-              df_editado, dados_b5, parecer_final_loja
-          ),
-          file_name=f"PosInventario_Comparativo_{loja_tag}.pdf",
-          mime="application/pdf",
-          use_container_width=True,
-          key="b5_dl_pdf",
-      )
-    with dl3:
-      st.download_button(
-          "📄 Baixar Word (.docx)",
-          data=_b5_gerar_docx_justificativas(
-              df_editado, dados_b5, parecer_final_loja
-          ),
-          file_name=f"PosInventario_Comparativo_{loja_tag}.docx",
-          mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          use_container_width=True,
-          key="b5_dl_docx",
-      )
+        st.error(f"❌ Erro ao processar os arquivos: {e}")
 
 
 def main():
@@ -3802,7 +3593,7 @@ def main():
             "Modo Planilha de Conferência",
             "Gerador de Etiquetas QR Code",
             "Agenda & Automação",
-            "Relatório Pós-Inventário (Justificar)",
+            "Justificar & Memória (Bloco 5)",
         ],
         key="radio_modo_operacao",
     )
@@ -3819,7 +3610,7 @@ def main():
     """,
       unsafe_allow_html=True,
   )
-  if modo_operacao == "Relatório Pós-Inventário (Justificar)":
+  if modo_operacao == "Justificar & Memória (Bloco 5)":
     renderizar_bloco_5_justificar()
     return
   if modo_operacao == "Agenda & Automação":
