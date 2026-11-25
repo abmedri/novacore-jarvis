@@ -2958,6 +2958,776 @@ def renderizar_bloco_4_agenda():
         st.caption(log_entry)
 
 
+# ====================================================================================
+# BLOCO 5: RELATÓRIO PÓS-INVENTÁRIO / JUSTIFICATIVAS DE PERDAS E SOBRAS (GRUPO KMB)
+# ====================================================================================
+def _b5_limpar_codigo(val):
+  if pd.isna(val):
+    return ""
+  s = str(val).strip()
+  if s.endswith(".0"):
+    s = s[:-2]
+  return s
+
+
+def _b5_ler_planilha_flexivel(arquivo_upload):
+  nome = str(getattr(arquivo_upload, "name", "")).lower()
+  raw = arquivo_upload.getvalue()
+  if nome.endswith(".csv"):
+    for enc in ["utf-8-sig", "utf-8", "latin-1", "cp1252", "iso-8859-1"]:
+      for sep in [";", ",", "\t"]:
+        try:
+          df_tmp = pd.read_csv(
+              io.BytesIO(raw), encoding=enc, sep=sep, low_memory=False
+          )
+          if df_tmp.shape[1] > 1:
+            return df_tmp
+        except Exception:
+          continue
+    raise ValueError("Não foi possível decodificar o arquivo CSV.")
+  else:
+    return pd.read_excel(io.BytesIO(raw))
+
+
+def _b5_buscar_col(df, palavras_chave):
+  for col in df.columns:
+    c_low = str(col).strip().lower()
+    for p in palavras_chave:
+      if p in c_low:
+        return col
+  return None
+
+
+def _b5_garantir_estado():
+  if "b5_dados_processados" not in st.session_state:
+    st.session_state.b5_dados_processados = {}
+
+
+def _b5_processar_bases_justificativa(
+    df_inv_raw, df_rec_raw, df_dev_raw, df_trans_raw
+):
+  df_inv = limpar_colunas_duplicadas(df_inv_raw.copy())
+  col_cod_inv = _b5_buscar_col(
+      df_inv, ["código do produto", "codigo do produto", "código", "codigo"]
+  )
+  col_desc_inv = _b5_buscar_col(
+      df_inv, ["descrição do produto", "descricao do produto", "descrição", "descricao"]
+  )
+  col_ajuste = _b5_buscar_col(df_inv, ["ajuste"])
+  col_saldo_inv = _b5_buscar_col(
+      df_inv, ["saldo em estoque", "saldo", "estoque"]
+  )
+  col_custo = _b5_buscar_col(df_inv, ["custo"])
+  col_val_ajuste = _b5_buscar_col(
+      df_inv, ["valor de ajuste", "valor ajuste"]
+  )
+  col_loja_inv = _b5_buscar_col(df_inv, ["loja"])
+  col_data_inv = _b5_buscar_col(
+      df_inv, ["data de abertura", "data de finalização", "data"]
+  )
+
+  if not col_cod_inv or not col_ajuste:
+    raise ValueError(
+        "A planilha principal de Inventário precisa ter as colunas 'Código' e"
+        " 'Ajuste'."
+    )
+
+  df_inv["_COD_"] = df_inv[col_cod_inv].apply(_b5_limpar_codigo)
+  df_inv["_DESC_"] = (
+      df_inv[col_desc_inv].astype(str).str.strip()
+      if col_desc_inv
+      else "Produto sem descrição"
+  )
+
+  def _conv_num(serie):
+    s = (
+        serie.astype(str)
+        .str.replace("R$", "", regex=False)
+        .str.replace(" ", "", regex=False)
+    )
+    # Se contiver vírgula como decimal brasileiro
+    s = s.apply(
+        lambda x: x.replace(".", "").replace(",", ".")
+        if ("," in x and "." in x)
+        else (x.replace(",", ".") if "," in x else x)
+    )
+    return pd.to_numeric(s, errors="coerce").fillna(0.0)
+
+  df_inv["_AJUSTE_"] = _conv_num(df_inv[col_ajuste])
+  df_inv["_SALDO_SIS_"] = (
+      _conv_num(df_inv[col_saldo_inv]) if col_saldo_inv else 0.0
+  )
+  df_inv["_CUSTO_"] = _conv_num(df_inv[col_custo]) if col_custo else 0.0
+  if col_val_ajuste:
+    df_inv["_VAL_AJUSTE_"] = _conv_num(df_inv[col_val_ajuste])
+  else:
+    df_inv["_VAL_AJUSTE_"] = df_inv["_AJUSTE_"] * df_inv["_CUSTO_"]
+
+  loja_detectada = (
+      str(df_inv[col_loja_inv].dropna().iloc[0]).strip()
+      if col_loja_inv and not df_inv[col_loja_inv].dropna().empty
+      else "N/I"
+  )
+  data_detectada = (
+      str(df_inv[col_data_inv].dropna().iloc[0]).strip()
+      if col_data_inv and not df_inv[col_data_inv].dropna().empty
+      else pd.Timestamp.now().strftime("%d/%m/%Y")
+  )
+
+  # Mapear Recebimentos / NFs / XML (se fornecido)
+  mapa_rec = {}
+  if df_rec_raw is not None:
+    df_rec = limpar_colunas_duplicadas(df_rec_raw.copy())
+    c_cod_r = _b5_buscar_col(
+        df_rec, ["código", "codigo", "cod", "produto", "item"]
+    )
+    c_qtd_r = _b5_buscar_col(
+        df_rec, ["qtd", "quantidade", "volume", "entrada"]
+    )
+    c_doc_r = _b5_buscar_col(
+        df_rec, ["nf", "nota", "documento", "xml", "chave", "número", "numero"]
+    )
+    c_dat_r = _b5_buscar_col(df_rec, ["data", "emissão", "emissao", "entrada"])
+    if c_cod_r:
+      for _, r in df_rec.iterrows():
+        cod = _b5_limpar_codigo(r.get(c_cod_r))
+        if not cod:
+          continue
+        qtd = _conv_num(pd.Series([r.get(c_qtd_r, 0)])).iloc[0] if c_qtd_r else 0
+        doc = str(r.get(c_doc_r, "")).strip() if c_doc_r else ""
+        dat = str(r.get(c_dat_r, "")).strip() if c_dat_r else ""
+        mapa_rec.setdefault(cod, []).append(
+            f"NF/Doc: {doc or 'S/N'} ({qtd:g} un - {dat or 'S/D'})"
+        )
+
+  # Mapear Devoluções / Trocas / Avarias (se fornecido)
+  mapa_dev = {}
+  if df_dev_raw is not None:
+    df_dev = limpar_colunas_duplicadas(df_dev_raw.copy())
+    c_cod_d = _b5_buscar_col(
+        df_dev, ["código", "codigo", "cod", "produto", "item"]
+    )
+    c_qtd_d = _b5_buscar_col(df_dev, ["qtd", "quantidade", "volume"])
+    c_mot_d = _b5_buscar_col(
+        df_dev, ["motivo", "tipo", "observação", "observacao", "status", "ocorrência"]
+    )
+    if c_cod_d:
+      for _, r in df_dev.iterrows():
+        cod = _b5_limpar_codigo(r.get(c_cod_d))
+        if not cod:
+          continue
+        qtd = _conv_num(pd.Series([r.get(c_qtd_d, 0)])).iloc[0] if c_qtd_d else 0
+        mot = str(r.get(c_mot_d, "")).strip() if c_mot_d else "Devolução/Avaria"
+        mapa_dev.setdefault(cod, []).append(f"{mot} ({qtd:g} un)")
+
+  # Mapear Transferências entre Lojas / CD (se fornecido)
+  mapa_trans = {}
+  if df_trans_raw is not None:
+    df_tr = limpar_colunas_duplicadas(df_trans_raw.copy())
+    c_cod_t = _b5_buscar_col(
+        df_tr, ["código", "codigo", "cod", "produto", "item"]
+    )
+    c_qtd_t = _b5_buscar_col(df_tr, ["qtd", "quantidade", "volume"])
+    c_ori_t = _b5_buscar_col(
+        df_tr, ["origem", "destino", "loja", "filial", "documento", "romaneio"]
+    )
+    if c_cod_t:
+      for _, r in df_tr.iterrows():
+        cod = _b5_limpar_codigo(r.get(c_cod_t))
+        if not cod:
+          continue
+        qtd = _conv_num(pd.Series([r.get(c_qtd_t, 0)])).iloc[0] if c_qtd_t else 0
+        ori = str(r.get(c_ori_t, "")).strip() if c_ori_t else "Mov. Transferência"
+        mapa_trans.setdefault(cod, []).append(f"{ori} ({qtd:g} un)")
+
+  # Filtrar apenas itens divergentes (Ajuste != 0)
+  df_div = df_inv[df_inv["_AJUSTE_"] != 0].copy()
+  df_div["_ABS_VAL_"] = df_div["_VAL_AJUSTE_"].abs()
+  df_div = df_div.sort_values(by="_ABS_VAL_", ascending=False)
+
+  registros = []
+  for _, row in df_div.iterrows():
+    cod = row["_COD_"]
+    desc = row["_DESC_"]
+    ajuste = row["_AJUSTE_"]
+    saldo_sis = row["_SALDO_SIS_"]
+    saldo_fis = saldo_sis + ajuste
+    val_aj = row["_VAL_AJUSTE_"]
+    tipo_div = "FALTA (PERDA)" if ajuste < 0 else "SOBRA"
+
+    evidencias = []
+    hipotese = ""
+    acao_recomendada = ""
+
+    if cod in mapa_rec:
+      evidencias.append("Recebimento/NF: " + "; ".join(mapa_rec[cod][:2]))
+    if cod in mapa_dev:
+      evidencias.append("Devolução/Avaria: " + "; ".join(mapa_dev[cod][:2]))
+    if cod in mapa_trans:
+      evidencias.append("Transferência: " + "; ".join(mapa_trans[cod][:2]))
+
+    if ajuste < 0:
+      if cod in mapa_trans:
+        hipotese = "Possível saída/transferência não baixada ou pendência de romaneio entre lojas."
+        acao_recomendada = "Conferir romaneio de transferência e aceite no destino."
+      elif cod in mapa_dev:
+        hipotese = "Quebra/avaria ou devolução pendente de baixa sistêmica."
+        acao_recomendada = "Validar área de avarias e lançar nota de devolução/perda."
+      elif cod in mapa_rec:
+        hipotese = "Divergência na conferência física de recebimento (NF lançada a maior)."
+        acao_recomendada = "Auditar canhoto/XML da NF e acionar fornecedor/transportadora."
+      elif abs(ajuste) in [6, 12, 24, 36]:
+        hipotese = "Erro de fator de conversão / caixa fechada na movimentação ou venda."
+        acao_recomendada = "Revisar cadastro de embalagem (EMB) e últimas vendas PDV."
+      elif abs(val_aj) >= 200:
+        hipotese = "Perda crítica de alto valor (extravio, furto ou falha grave de expedição)."
+        acao_recomendada = "Abrir sindicância interna, revisar CFTV e movimentações recentes."
+      else:
+        hipotese = "Quebra operacional / falha de registro no PDV ou separação."
+        acao_recomendada = "Realizar recontagem direcionada no endereço e ajustar saldo."
+    else:
+      if cod in mapa_rec:
+        hipotese = "Mercadoria recebida fisicamente sem entrada fiscal/sistêmica concluída."
+        acao_recomendada = "Verificar NFs pendentes de lançamento no ERP."
+      elif cod in mapa_trans:
+        hipotese = "Transferência recebida fisicamente sem confirmação de entrada."
+        acao_recomendada = "Confirmar recebimento de transferência no sistema."
+      elif abs(ajuste) in [6, 12, 24, 36]:
+        hipotese = "Erro de multiplicador de caixa na contagem anterior ou entrada."
+        acao_recomendada = "Conferir fator de embalagem e validar saldo físico."
+      else:
+        hipotese = "Sobra operacional (possível inversão de código semelhante na venda/entrada)."
+        acao_recomendada = "Checar itens correlatos/mesma família com falta equivalente."
+
+    registros.append({
+        "Código": cod,
+        "Descrição": desc,
+        "Tipo": tipo_div,
+        "Saldo Sistema": saldo_sis,
+        "Contagem Física": saldo_fis,
+        "Ajuste (Qtd)": ajuste,
+        "Valor Ajuste (R$)": val_aj,
+        "Evidências Cruzadas": " | ".join(evidencias) if evidencias else "Sem vínculo externo nas bases",
+        "Hipótese / Causa Provável": hipotese,
+        "Justificativa / Parecer da Loja": hipotese,
+        "Ação Corretiva": acao_recomendada,
+        "Status Justificativa": "Pendente Validação",
+    })
+
+  df_resultado = pd.DataFrame(registros)
+  return {
+      "df_resultado": df_resultado,
+      "loja": loja_detectada,
+      "data": data_detectada,
+      "total_skus_inv": len(df_inv),
+      "total_divergentes": len(df_resultado),
+      "qtd_faltas": int((df_div["_AJUSTE_"] < 0).sum()),
+      "qtd_sobras": int((df_div["_AJUSTE_"] > 0).sum()),
+      "val_faltas": float(df_div[df_div["_AJUSTE_"] < 0]["_VAL_AJUSTE_"].sum()),
+      "val_sobras": float(df_div[df_div["_AJUSTE_"] > 0]["_VAL_AJUSTE_"].sum()),
+      "val_liquido": float(df_div["_VAL_AJUSTE_"].sum()),
+  }
+
+
+def _b5_gerar_excel_justificativas(df_just, info_meta, texto_parecer_geral):
+  wb = openpyxl.Workbook()
+  ws = wb.active
+  ws.title = "Justificativas Pós-Inventário"
+  ws.views.sheetView[0].showGridLines = True
+
+  fonte_tit = Font(name="Arial", size=13, bold=True, color="1F4E78")
+  fonte_sub = Font(name="Arial", size=10, bold=True, color="334155")
+  fonte_cab = Font(name="Arial", size=9.5, bold=True, color="FFFFFF")
+  fonte_pad = Font(name="Arial", size=9)
+  fonte_neg = Font(name="Arial", size=9, bold=True)
+
+  fill_cab = PatternFill(
+      start_color="1F4E78", end_color="1F4E78", fill_type="solid"
+  )
+  fill_falta = PatternFill(
+      start_color="FEE2E2", end_color="FEE2E2", fill_type="solid"
+  )
+  fill_sobra = PatternFill(
+      start_color="DCFCE7", end_color="DCFCE7", fill_type="solid"
+  )
+  borda = Border(
+      left=Side(style="thin", color="000000"),
+      right=Side(style="thin", color="000000"),
+      top=Side(style="thin", color="000000"),
+      bottom=Side(style="thin", color="000000"),
+  )
+
+  ws["A1"] = "⚡ GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO & JUSTIFICATIVAS"
+  ws["A1"].font = fonte_tit
+  ws["A2"] = (
+      f"Loja: {info_meta.get('loja', 'N/I')} | Data Inventário:"
+      f" {info_meta.get('data', '')} | Emitido em:"
+      f" {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}"
+  )
+  ws["A2"].font = fonte_sub
+  ws["A3"] = f"Parecer Consolidado: {texto_parecer_geral}"
+  ws["A3"].font = fonte_pad
+
+  ws.append([])
+  colunas = list(df_just.columns)
+  ws.append(colunas)
+  header_row = 5
+  for col_idx in range(1, len(colunas) + 1):
+    c = ws.cell(row=header_row, column=col_idx)
+    c.font = fonte_cab
+    c.fill = fill_cab
+    c.alignment = Alignment(
+        horizontal="center", vertical="center", wrap_text=True
+    )
+    c.border = borda
+
+  for _, r in df_just.iterrows():
+    ws.append([r[c] for c in colunas])
+
+  for row in ws.iter_rows(
+      min_row=header_row + 1,
+      max_row=ws.max_row,
+      min_col=1,
+      max_col=len(colunas),
+  ):
+    tipo_val = str(row[2].value or "")
+    for cell in row:
+      cell.font = fonte_pad
+      cell.border = borda
+      if cell.column in [1, 3, 4, 5, 6, 7, 12]:
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+      else:
+        cell.alignment = Alignment(
+            horizontal="left", vertical="center", wrap_text=True
+        )
+      if cell.column == 3:
+        cell.font = fonte_neg
+        if "FALTA" in tipo_val:
+          cell.fill = fill_falta
+        elif "SOBRA" in tipo_val:
+          cell.fill = fill_sobra
+      if cell.column == 7 and isinstance(cell.value, (int, float)):
+        cell.number_format = "R$ #,##0.00"
+
+  larguras = {
+      1: 14,
+      2: 36,
+      3: 16,
+      4: 13,
+      5: 14,
+      6: 13,
+      7: 16,
+      8: 32,
+      9: 38,
+      10: 42,
+      11: 35,
+      12: 20,
+  }
+  for idx_c, w_c in larguras.items():
+    if idx_c <= len(colunas):
+      ws.column_dimensions[get_column_letter(idx_c)].width = w_c
+
+  buf = io.BytesIO()
+  wb.save(buf)
+  buf.seek(0)
+  return buf
+
+
+def _b5_gerar_pdf_justificativas(df_just, info_meta, texto_parecer_geral):
+  buf = io.BytesIO()
+  doc = SimpleDocTemplate(
+      buf,
+      pagesize=landscape(letter),
+      rightMargin=18,
+      leftMargin=18,
+      topMargin=22,
+      bottomMargin=28,
+  )
+  styles = getSampleStyleSheet()
+  est_tit = ParagraphStyle(
+      "B5Tit",
+      parent=styles["Heading1"],
+      fontName="Helvetica-Bold",
+      fontSize=12,
+      textColor=colors.HexColor("#1F4E78"),
+  )
+  est_sub = ParagraphStyle(
+      "B5Sub",
+      parent=styles["Normal"],
+      fontName="Helvetica",
+      fontSize=8.5,
+      leading=11,
+      textColor=colors.HexColor("#1E293B"),
+  )
+  est_th = ParagraphStyle(
+      "B5TH",
+      fontName="Helvetica-Bold",
+      fontSize=6.5,
+      leading=8,
+      textColor=colors.white,
+      alignment=1,
+  )
+  est_td = ParagraphStyle(
+      "B5TD",
+      fontName="Helvetica",
+      fontSize=6.5,
+      leading=8,
+      textColor=colors.HexColor("#0F172A"),
+      alignment=0,
+  )
+  est_td_c = ParagraphStyle(
+      "B5TDC",
+      fontName="Helvetica",
+      fontSize=6.5,
+      leading=8,
+      textColor=colors.HexColor("#0F172A"),
+      alignment=1,
+  )
+
+  story = [
+      Paragraph(
+          "<b>GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO & JUSTIFICATIVAS DE"
+          " DIVERGÊNCIAS</b>",
+          est_tit,
+      ),
+      Paragraph(
+          f"<b>Loja:</b> {info_meta.get('loja', 'N/I')} | <b>Data"
+          f" Inventário:</b> {info_meta.get('data', '')} | <b>Itens"
+          f" Divergentes:</b> {info_meta.get('total_divergentes', 0)}"
+          f" (Faltas: {info_meta.get('qtd_faltas', 0)} | Sobras:"
+          f" {info_meta.get('qtd_sobras', 0)}) | <b>Ajuste Líquido:</b> R$"
+          f" {info_meta.get('val_liquido', 0):,.2f}",
+          est_sub,
+      ),
+      Spacer(1, 4),
+      Paragraph(
+          f"<b>Parecer Executivo da Unidade:</b> {texto_parecer_geral}",
+          est_sub,
+      ),
+      Spacer(1, 8),
+  ]
+
+  headers = [
+      "Código",
+      "Descrição",
+      "Tipo",
+      "Sis.",
+      "Fís.",
+      "Aj.",
+      "Valor (R$)",
+      "Evidências Cruzadas",
+      "Justificativa / Causa",
+      "Ação Corretiva",
+  ]
+  dados_tbl = [[Paragraph(h, est_th) for h in headers]]
+  for _, r in df_just.iterrows():
+    dados_tbl.append([
+        Paragraph(str(r.get("Código", "")), est_td_c),
+        Paragraph(str(r.get("Descrição", ""))[:45], est_td),
+        Paragraph(str(r.get("Tipo", "")), est_td_c),
+        Paragraph(f"{float(r.get('Saldo Sistema', 0)):g}", est_td_c),
+        Paragraph(f"{float(r.get('Contagem Física', 0)):g}", est_td_c),
+        Paragraph(f"{float(r.get('Ajuste (Qtd)', 0)):+g}", est_td_c),
+        Paragraph(f"R$ {float(r.get('Valor Ajuste (R$)', 0)):,.2f}", est_td_c),
+        Paragraph(str(r.get("Evidências Cruzadas", "")), est_td),
+        Paragraph(str(r.get("Justificativa / Parecer da Loja", "")), est_td),
+        Paragraph(str(r.get("Ação Corretiva", "")), est_td),
+    ])
+
+  col_w = [44, 115, 54, 28, 28, 28, 56, 125, 148, 130]
+  tbl = Table(dados_tbl, colWidths=col_w, repeatRows=1)
+  tbl.setStyle(
+      TableStyle([
+          ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
+          ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#000000")),
+          ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+          (
+              "ROWBACKGROUNDS",
+              (0, 1),
+              (-1, -1),
+              [colors.white, colors.HexColor("#F8FAFC")],
+          ),
+          ("TOPPADDING", (0, 0), (-1, -1), 3),
+          ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+      ])
+  )
+  story.append(tbl)
+  story.append(Spacer(1, 14))
+  story.append(
+      Paragraph(
+          "<b>Assinatura Gerente da Loja:</b> _______________________________"
+          " &nbsp;&nbsp;&nbsp;&nbsp; <b>Auditoria / Inventário KMB:</b>"
+          " _______________________________",
+          est_sub,
+      )
+  )
+  doc.build(story, canvasmaker=NumberedCanvas)
+  buf.seek(0)
+  return buf
+
+
+def _b5_gerar_docx_justificativas(df_just, info_meta, texto_parecer_geral):
+  doc = docx.Document()
+  doc.add_heading(
+      "⚡ GRUPO KMB // RELATÓRIO PÓS-INVENTÁRIO & JUSTIFICATIVAS", level=1
+  )
+  p_meta = doc.add_paragraph()
+  p_meta.add_run("Loja: ").bold = True
+  p_meta.add_run(f"{info_meta.get('loja', 'N/I')}   |   ")
+  p_meta.add_run("Data do Inventário: ").bold = True
+  p_meta.add_run(f"{info_meta.get('data', '')}\n")
+  p_meta.add_run("Resumo Financeiro: ").bold = True
+  p_meta.add_run(
+      f"Faltas: R$ {info_meta.get('val_faltas', 0):,.2f} | Sobras: R$"
+      f" +{info_meta.get('val_sobras', 0):,.2f} | Ajuste Líquido: R$"
+      f" {info_meta.get('val_liquido', 0):,.2f}"
+  )
+
+  doc.add_heading("1. Parecer Consolidado da Unidade", level=2)
+  doc.add_paragraph(texto_parecer_geral)
+
+  doc.add_heading("2. Detalhamento e Justificativas por Item", level=2)
+  for _, r in df_just.iterrows():
+    p = doc.add_paragraph()
+    p.add_run(f"[{r['Tipo']}] {r['Código']} — {r['Descrição']}\n").bold = True
+    p.add_run(
+        f"• Sistema: {r['Saldo Sistema']:g} | Físico: {r['Contagem Física']:g}"
+        f" | Ajuste: {r['Ajuste (Qtd)']:+g} un | Impacto: R$"
+        f" {r['Valor Ajuste (R$)']:,.2f}\n"
+    )
+    p.add_run(f"• Evidências: {r['Evidências Cruzadas']}\n")
+    p.add_run(
+        f"• Justificativa: {r['Justificativa / Parecer da Loja']}\n"
+    )
+    p.add_run(f"• Ação Corretiva: {r['Ação Corretiva']}")
+
+  doc.add_heading("3. Homologação", level=2)
+  doc.add_paragraph(
+      "\n________________________________________          "
+      " ________________________________________\n"
+      "Gerente Responsável pela Loja                      "
+      " Auditoria Patrimonial / Time de Inventário KMB"
+  )
+  buf = io.BytesIO()
+  doc.save(buf)
+  buf.seek(0)
+  return buf
+
+
+def renderizar_bloco_5_justificar():
+  _b5_garantir_estado()
+  st.markdown(
+      "### 📝 RELATÓRIO PÓS-INVENTÁRIO // JUSTIFICATIVAS DE PERDAS E SOBRAS"
+  )
+  st.markdown(
+      "Cruze o arquivo oficial do inventário com bases auxiliares"
+      " (Recebimento/NF, Devoluções/Avarias e Transferências) para diagnosticar"
+      " automaticamente causas prováveis, editar justificativas da loja e"
+      " exportar o dossiê completo."
+  )
+
+  c_up1, c_up2 = st.columns(2)
+  with c_up1:
+    arq_inv = st.file_uploader(
+        "1. Arquivo Principal do Inventário (Obrigatório) *",
+        type=["csv", "xlsx", "xls"],
+        key="b5_up_inv",
+    )
+    arq_dev = st.file_uploader(
+        "3. Base de Devoluções / Avarias (Opcional)",
+        type=["csv", "xlsx", "xls"],
+        key="b5_up_dev",
+    )
+  with c_up2:
+    arq_rec = st.file_uploader(
+        "2. Base de Recebimento / NFs / XML (Opcional)",
+        type=["csv", "xlsx", "xls"],
+        key="b5_up_rec",
+    )
+    arq_trans = st.file_uploader(
+        "4. Base de Transferências entre Lojas/CD (Opcional)",
+        type=["csv", "xlsx", "xls"],
+        key="b5_up_trans",
+    )
+
+  if arq_inv is not None:
+    if st.button(
+        "⚙️ Processar Cruzamento & Gerar Diagnóstico Pós-Inventário",
+        use_container_width=True,
+        key="b5_btn_processar",
+    ):
+      try:
+        df_inv_raw = _b5_ler_planilha_flexivel(arq_inv)
+        df_rec_raw = (
+            _b5_ler_planilha_flexivel(arq_rec) if arq_rec is not None else None
+        )
+        df_dev_raw = (
+            _b5_ler_planilha_flexivel(arq_dev) if arq_dev is not None else None
+        )
+        df_trans_raw = (
+            _b5_ler_planilha_flexivel(arq_trans)
+            if arq_trans is not None
+            else None
+        )
+        res_b5 = _b5_processar_bases_justificativa(
+            df_inv_raw, df_rec_raw, df_dev_raw, df_trans_raw
+        )
+        st.session_state.b5_dados_processados = res_b5
+        st.success(
+            "✅ Cruzamento concluído! Foram identificados"
+            f" {res_b5['total_divergentes']} item(ns) divergente(s)."
+        )
+      except Exception as e:
+        st.error(f"❌ Erro ao processar bases: {e}")
+
+  dados_b5 = st.session_state.b5_dados_processados
+  if dados_b5 and "df_resultado" in dados_b5:
+    df_res = dados_b5["df_resultado"]
+    st.markdown("---")
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Itens Divergentes", f"{dados_b5['total_divergentes']:,}")
+    k2.metric(
+        "Faltas (Perdas)",
+        f"{dados_b5['qtd_faltas']:,} SKUs",
+        f"R$ {dados_b5['val_faltas']:,.2f}",
+        delta_color="inverse",
+    )
+    k3.metric(
+        "Sobras",
+        f"{dados_b5['qtd_sobras']:,} SKUs",
+        f"R$ +{dados_b5['val_sobras']:,.2f}",
+    )
+    k4.metric(
+        "Ajuste Líquido",
+        f"R$ {dados_b5['val_liquido']:,.2f}",
+    )
+
+    if df_res.empty:
+      st.info("🎉 Nenhuma divergência encontrada neste inventário (100% exato).")
+      return
+
+    st.markdown("---")
+    f_col1, f_col2 = st.columns([1.2, 2.8])
+    with f_col1:
+      filtro_tipo_b5 = st.selectbox(
+          "Filtrar Divergências:",
+          ["Todos os Divergentes", "Apenas Faltas (Perdas)", "Apenas Sobras"],
+          key="b5_filtro_tipo",
+      )
+    with f_col2:
+      busca_b5 = st.text_input(
+          "Buscar por Código, Descrição ou Causa:",
+          placeholder="Digite para filtrar...",
+          key="b5_busca_item",
+      )
+
+    df_exibir = df_res.copy()
+    if filtro_tipo_b5 == "Apenas Faltas (Perdas)":
+      df_exibir = df_exibir[df_exibir["Tipo"] == "FALTA (PERDA)"]
+    elif filtro_tipo_b5 == "Apenas Sobras":
+      df_exibir = df_exibir[df_exibir["Tipo"] == "SOBRA"]
+
+    if busca_b5.strip():
+      t = busca_b5.strip().lower()
+      df_exibir = df_exibir[
+          df_exibir.apply(
+              lambda r: t in str(r.values).lower(), axis=1
+          )
+      ]
+
+    st.markdown("#### ✍️ Edição Interativa de Justificativas e Planos de Ação")
+    st.caption(
+        "Você pode editar diretamente na tabela abaixo as colunas"
+        " 'Justificativa / Parecer da Loja', 'Ação Corretiva' e 'Status"
+        " Justificativa'."
+    )
+    df_editado = st.data_editor(
+        df_exibir,
+        use_container_width=True,
+        height=430,
+        disabled=[
+            "Código",
+            "Descrição",
+            "Tipo",
+            "Saldo Sistema",
+            "Contagem Física",
+            "Ajuste (Qtd)",
+            "Valor Ajuste (R$)",
+            "Evidências Cruzadas",
+            "Hipótese / Causa Provável",
+        ],
+        column_config={
+            "Status Justificativa": st.column_config.SelectboxColumn(
+                "Status Justificativa",
+                options=[
+                    "Pendente Validação",
+                    "Justificado pela Loja",
+                    "Em Investigação",
+                    "Aprovado Auditoria",
+                ],
+                required=True,
+            ),
+            "Valor Ajuste (R$)": st.column_config.NumberColumn(
+                "Valor Ajuste (R$)", format="R$ %.2f"
+            ),
+        },
+        key="b5_editor_justificativas",
+    )
+
+    parecer_padrao = (
+        f"Após conferência física realizada na Loja {dados_b5['loja']}, foram"
+        f" apurados {dados_b5['total_divergentes']} SKUs divergentes,"
+        f" totalizando R$ {dados_b5['val_faltas']:,.2f} em faltas e R$"
+        f" +{dados_b5['val_sobras']:,.2f} em sobras (ajuste líquido de R$"
+        f" {dados_b5['val_liquido']:,.2f}). As justificativas e ações"
+        " corretivas encontram-se discriminadas neste relatório."
+    )
+    parecer_final_loja = st.text_area(
+        "📄 Parecer Consolidado da Gerência / Auditoria (incluído nos exports):",
+        value=parecer_padrao,
+        height=100,
+        key="b5_parecer_geral_txt",
+    )
+
+    st.markdown("---")
+    st.markdown("#### 📥 Exportar Dossiê Pós-Inventário & Justificativas")
+    dl1, dl2, dl3 = st.columns(3)
+    loja_tag = str(dados_b5.get("loja", "Loja")).replace(" ", "_")
+    with dl1:
+      st.download_button(
+          "📊 Baixar Excel Justificativas (.xlsx)",
+          data=_b5_gerar_excel_justificativas(
+              df_editado, dados_b5, parecer_final_loja
+          ),
+          file_name=f"PosInventario_Justificativas_{loja_tag}.xlsx",
+          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          use_container_width=True,
+          key="b5_dl_xlsx",
+      )
+    with dl2:
+      st.download_button(
+          "📑 Baixar PDF Oficial (.pdf)",
+          data=_b5_gerar_pdf_justificativas(
+              df_editado, dados_b5, parecer_final_loja
+          ),
+          file_name=f"PosInventario_Justificativas_{loja_tag}.pdf",
+          mime="application/pdf",
+          use_container_width=True,
+          key="b5_dl_pdf",
+      )
+    with dl3:
+      st.download_button(
+          "📄 Baixar Word Parecer (.docx)",
+          data=_b5_gerar_docx_justificativas(
+              df_editado, dados_b5, parecer_final_loja
+          ),
+          file_name=f"PosInventario_Justificativas_{loja_tag}.docx",
+          mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          use_container_width=True,
+          key="b5_dl_docx",
+      )
+
+
 def main():
   st.set_page_config(
       page_title="GRUPO KMB // TIME DE INVENTÁRIO", page_icon="⚡", layout="wide"
@@ -3027,6 +3797,7 @@ def main():
             "Modo Planilha de Conferência",
             "Gerador de Etiquetas QR Code",
             "Agenda & Automação",
+            "Relatório Pós-Inventário (Justificar)",
         ],
         key="radio_modo_operacao",
     )
@@ -3043,6 +3814,9 @@ def main():
     """,
       unsafe_allow_html=True,
   )
+  if modo_operacao == "Relatório Pós-Inventário (Justificar)":
+    renderizar_bloco_5_justificar()
+    return
   if modo_operacao == "Agenda & Automação":
     renderizar_bloco_4_agenda()
     return
