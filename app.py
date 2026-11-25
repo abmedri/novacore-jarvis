@@ -2,6 +2,7 @@
 # ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO OFICIAL UNIFICADA COMPLETA - CORRIGIDA)
 # ====================================================================================
 import io
+import json
 import os
 import docx
 from docx.shared import Inches, Pt, RGBColor
@@ -2088,6 +2089,34 @@ def gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos):
 # ====================================================================================
 # BLOCO 4: AGENDA INTERATIVA DIÁRIA & AUTOMAÇÕES (WHATSAPP, E-MAIL, EXCEL, PDF)
 # ====================================================================================
+B4_ARQUIVO_AGENDA = "agenda_bloco4.json"
+
+
+def _b4_carregar_compromissos_disco():
+  if os.path.exists(B4_ARQUIVO_AGENDA):
+    try:
+      with open(B4_ARQUIVO_AGENDA, "r", encoding="utf-8") as f:
+        dados = json.load(f)
+      if isinstance(dados, list):
+        return dados
+    except Exception:
+      pass
+  return None
+
+
+def _b4_salvar_compromissos_disco():
+  try:
+    with open(B4_ARQUIVO_AGENDA, "w", encoding="utf-8") as f:
+      json.dump(
+          st.session_state.get("b4_compromissos", []),
+          f,
+          ensure_ascii=False,
+          indent=2,
+      )
+  except Exception as e:
+    st.warning(f"Não foi possível salvar a agenda em disco: {e}")
+
+
 def _b4_agora_br():
   try:
     return pd.Timestamp.now(tz="America/Sao_Paulo").tz_localize(None)
@@ -2098,35 +2127,42 @@ def _b4_agora_br():
 def _b4_garantir_estado_agenda():
   agora_br = _b4_agora_br()
   if "b4_compromissos" not in st.session_state:
-    hoje_str = agora_br.strftime("%Y-%m-%d")
-    st.session_state.b4_compromissos = [
-        {
-            "id": "EVT-101",
-            "data": hoje_str,
-            "hora": "09:00",
-            "titulo": "Briefing Diário de Inventário & Auditoria",
-            "categoria": "Trabalho",
-            "prioridade": "Alta",
-            "status": "Confirmado",
-            "aviso_min": 15,
-            "destino_wa": "",
-            "destino_email": "",
-            "notas": "Revisar divergências críticas e confirmar rondas das lojas.",
-        },
-        {
-            "id": "EVT-102",
-            "data": hoje_str,
-            "hora": "14:30",
-            "titulo": "Fechamento de Conferência e Relatórios C-Level",
-            "categoria": "Urgente",
-            "prioridade": "Alta",
-            "status": "Pendente",
-            "aviso_min": 10,
-            "destino_wa": "",
-            "destino_email": "",
-            "notas": "Exportar PDF/Excel e disparar resumo para liderança.",
-        },
-    ]
+    carregados = _b4_carregar_compromissos_disco()
+    if carregados is not None:
+      st.session_state.b4_compromissos = carregados
+    else:
+      hoje_str = agora_br.strftime("%Y-%m-%d")
+      st.session_state.b4_compromissos = [
+          {
+              "id": "EVT-101",
+              "data": hoje_str,
+              "hora": "09:00",
+              "titulo": "Briefing Diário de Inventário & Auditoria",
+              "categoria": "Trabalho",
+              "prioridade": "Alta",
+              "status": "Confirmado",
+              "aviso_min": 15,
+              "destino_wa": "",
+              "destino_email": "",
+              "notas": (
+                  "Revisar divergências críticas e confirmar rondas das lojas."
+              ),
+          },
+          {
+              "id": "EVT-102",
+              "data": hoje_str,
+              "hora": "14:30",
+              "titulo": "Fechamento de Conferência e Relatórios C-Level",
+              "categoria": "Urgente",
+              "prioridade": "Alta",
+              "status": "Pendente",
+              "aviso_min": 10,
+              "destino_wa": "",
+              "destino_email": "",
+              "notas": "Exportar PDF/Excel e disparar resumo para liderança.",
+          },
+      ]
+      _b4_salvar_compromissos_disco()
   if "b4_novo_data" not in st.session_state:
     st.session_state.b4_novo_data = agora_br.date()
   if "b4_novo_hora" not in st.session_state:
@@ -2520,6 +2556,8 @@ def _b4_importar_compromissos_excel(arquivo_upload):
       })
       chaves_existentes.add(chave_item)
       adicionados += 1
+    if adicionados > 0:
+      _b4_salvar_compromissos_disco()
     return adicionados, None
   except Exception as e:
     return 0, str(e)
@@ -2673,6 +2711,7 @@ def renderizar_bloco_4_agenda():
               for real_c in st.session_state.b4_compromissos:
                 if real_c["id"] == comp["id"]:
                   real_c["status"] = novo_status
+              _b4_salvar_compromissos_disco()
               st.rerun()
             if st.button(
                 "🗑️ Remover",
@@ -2684,6 +2723,7 @@ def renderizar_bloco_4_agenda():
                   for real_c in st.session_state.b4_compromissos
                   if real_c["id"] != comp["id"]
               ]
+              _b4_salvar_compromissos_disco()
               st.rerun()
   with aba_novo:
     with st.form("b4_form_novo_compromisso", clear_on_submit=True):
@@ -2752,6 +2792,7 @@ def renderizar_bloco_4_agenda():
               "destino_email": n_email.strip(),
               "notas": n_notas.strip(),
           })
+          _b4_salvar_compromissos_disco()
           st.session_state.b4_novo_data = n_data
           st.session_state.b4_novo_hora = n_hora.replace(
               second=0, microsecond=0
@@ -2929,7 +2970,6 @@ def renderizar_bloco_4_agenda():
           st.warning("Informe uma URL de webhook para disparo automático.")
         else:
           try:
-            import json
             import urllib.request
 
             payload = json.dumps({
@@ -3618,7 +3658,7 @@ def main():
             "Modo Planilha de Conferência",
             "Gerador de Etiquetas QR Code",
             "Agenda & Automação",
-            "Relatório de Inventário",
+            "Justificar & Memória (Bloco 5)",
         ],
         key="radio_modo_operacao",
     )
@@ -3635,7 +3675,7 @@ def main():
     """,
       unsafe_allow_html=True,
   )
-  if modo_operacao == "Relatório de Inventário":
+  if modo_operacao == "Justificar & Memória (Bloco 5)":
     renderizar_bloco_5_justificar()
     return
   if modo_operacao == "Agenda & Automação":
