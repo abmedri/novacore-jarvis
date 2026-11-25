@@ -1,0 +1,28 @@
+[
+  {
+    "id": "EVT-101",
+    "data": "2026-11-25",
+    "hora": "09:00",
+    "titulo": "Briefing Diário de Inventário & Auditoria",
+    "categoria": "Trabalho",
+    "prioridade": "Alta",
+    "status": "Confirmado",
+    "aviso_min": 15,
+    "destino_wa": "",
+    "destino_email": "",
+    "notas": "Revisar divergências críticas e confirmar rondas das lojas."
+  },
+  {
+    "id": "EVT-102",
+    "data": "2026-11-25",
+    "hora": "14:30",
+    "titulo": "Fechamento de Conferência e Relatórios C-Level",
+    "categoria": "Urgente",
+    "prioridade": "Alta",
+    "status": "Pendente",
+    "aviso_min": 10,
+    "destino_wa": "",
+    "destino_email": "",
+    "notas": "Exportar PDF/Excel e disparar resumo para liderança."
+  }
+]
