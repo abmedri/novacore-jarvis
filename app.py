@@ -2996,21 +2996,46 @@ def _b5_ler_csv_inventario(uploaded_file):
   )
 
 
-def _b5_ler_inventario_anterior(uploaded_excel):
-  """Lê o Excel do inventário anterior (1ª aba) e retorna um dicionário {Código: Ajuste}."""
-  if uploaded_excel is None:
+def _b5_ler_inventario_anterior(uploaded_file):
+  """Lê o arquivo CSV (ou Excel) do inventário anterior e retorna um dicionário {Código: Ajuste}."""
+  if uploaded_file is None:
     return {}
-  raw_bytes = uploaded_excel.getvalue()
-  xls = pd.ExcelFile(io.BytesIO(raw_bytes))
-  df_ant = pd.read_excel(io.BytesIO(raw_bytes), sheet_name=xls.sheet_names[0])
-  if (
-      "Código do Produto" not in df_ant.columns
-      or "Ajuste" not in df_ant.columns
-  ):
-    raise ValueError(
-        "O arquivo do inventário anterior precisa ter as colunas 'Código do"
-        " Produto' e 'Ajuste' na primeira aba."
-    )
+  raw_bytes = uploaded_file.getvalue()
+  nome_arq = str(getattr(uploaded_file, "name", "")).lower()
+
+  if nome_arq.endswith(".csv"):
+    df_ant = None
+    for enc in ["latin1", "cp1252", "utf-8-sig", "utf-8"]:
+      for sep in [";", ","]:
+        try:
+          temp = pd.read_csv(io.BytesIO(raw_bytes), sep=sep, encoding=enc)
+          if (
+              "Código do Produto" in temp.columns
+              and "Ajuste" in temp.columns
+          ):
+            df_ant = temp
+            break
+        except Exception:
+          continue
+      if df_ant is not None:
+        break
+    if df_ant is None:
+      raise ValueError(
+          "O arquivo CSV do inventário anterior precisa ter as colunas"
+          " 'Código do Produto' e 'Ajuste' (separador ';' ou ',')."
+      )
+  else:
+    xls = pd.ExcelFile(io.BytesIO(raw_bytes))
+    df_ant = pd.read_excel(io.BytesIO(raw_bytes), sheet_name=xls.sheet_names[0])
+    if (
+        "Código do Produto" not in df_ant.columns
+        or "Ajuste" not in df_ant.columns
+    ):
+      raise ValueError(
+          "O arquivo do inventário anterior precisa ter as colunas 'Código do"
+          " Produto' e 'Ajuste' na primeira aba."
+      )
+
   df_ant = df_ant.drop_duplicates(subset=["Código do Produto"], keep="last")
   return df_ant.set_index("Código do Produto")["Ajuste"].to_dict()
 
@@ -3454,8 +3479,8 @@ def renderizar_bloco_5_justificar():
 
   with col2:
     arquivo_anterior = st.file_uploader(
-        "2. Excel do Inventário Anterior (Opcional)",
-        type=["xlsx", "xls"],
+        "2. CSV do Inventário Anterior (Opcional)",
+        type=["csv", "xlsx", "xls"],
         help="Para cruzar a coluna 'Ajuste Inventario Anterior'",
         key="b5_arquivo_anterior",
     )
