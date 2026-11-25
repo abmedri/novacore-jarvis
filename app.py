@@ -3618,7 +3618,7 @@ def main():
             "Modo Planilha de Conferência",
             "Gerador de Etiquetas QR Code",
             "Agenda & Automação",
-            "Justificar & Memória (Bloco 5)",
+            "Relatório de Inventário",
         ],
         key="radio_modo_operacao",
     )
@@ -3635,7 +3635,7 @@ def main():
     """,
       unsafe_allow_html=True,
   )
-  if modo_operacao == "Justificar & Memória (Bloco 5)":
+  if modo_operacao == "Relatório de Inventário":
     renderizar_bloco_5_justificar()
     return
   if modo_operacao == "Agenda & Automação":
