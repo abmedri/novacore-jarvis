@@ -2,6 +2,7 @@
 # ⚡ GRUPO KMB // PROTOCOLO J.A.R.V.I.S. (VERSÃO OFICIAL UNIFICADA COMPLETA - CORRIGIDA)
 # ====================================================================================
 import io
+import json
 import os
 import docx
 from docx.shared import Inches, Pt, RGBColor
