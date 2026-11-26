@@ -3480,13 +3480,18 @@ def _b5_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
   chart.title = "Divergências por Tipo (Qtd. de Itens)"
   chart.y_axis.title = "Qtd. Itens"
   chart.x_axis.title = "Categoria"
+  
+  # Dados pegam as quantidades da coluna B (linhas 5 a 8)
   data_ref = Reference(ws_res, min_col=2, min_row=5, max_row=8)
-  cats_ref = Reference(ws_res, min_col=1, min_row=6, max_row=8)
+  
+  # Categorias pegam os nomes na coluna A (linhas 5 a 8) exatamente na mesma altura dos dados
+  cats_ref = Reference(ws_res, min_col=1, min_row=5, max_row=8)
+  
   chart.add_data(data_ref, titles_from_data=False)
   chart.set_categories(cats_ref)
   chart.legend = None
-  chart.width = 16
-  chart.height = 10
+  chart.width = 18
+  chart.height = 12
   ws_res.add_chart(chart, "A12")
 
   ws_res.column_dimensions["A"].width = 36
