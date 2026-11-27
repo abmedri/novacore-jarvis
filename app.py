@@ -38,7 +38,6 @@ COR_ZEBRA_EXCEL = "F7FAFC"
 COR_BORDA_EXCEL = "CBD5E0"
 COR_TOTAL_EXCEL = "E2E8F0"
 
-
 def limpar_colunas_duplicadas(df):
     novas_colunas = []
     contagem = {}
@@ -46,86 +45,17 @@ def limpar_colunas_duplicadas(df):
         col_str = str(col).strip()
         if col_str in contagem:
             contagem[col_str] += 1
-            novas_colunas.append(f"{col_str}_{contagem[col_str]}")
+            nome_final = f"{col_str}_{contagem[col_str]}"
+            while nome_final in contagem or nome_final in novas_colunas:
+                contagem[col_str] += 1
+                nome_final = f"{col_str}_{contagem[col_str]}"
+            novas_colunas.append(nome_final)
         else:
             contagem[col_str] = 0
             novas_colunas.append(col_str)
+    df = df.copy()
     df.columns = novas_colunas
     return df
-
-
-def _converter_serie_moeda_ptbr(serie):
-    return pd.to_numeric(
-        serie.astype(str)
-        .str.strip()
-        .str.replace("R$", "", regex=False)
-        .str.replace(" ", "", regex=False)
-        .str.replace(".", "", regex=False)
-        .str.replace(",", ".", regex=False),
-        errors="coerce",
-    ).fillna(0.0)
-
-
-def _ler_csv_com_fallback(conteudo_bytes, separadores=(";", ","), encodings=("utf-8-sig", "utf-8", "latin-1", "cp1252", "iso-8859-1")):
-    ultimo_erro = None
-    for enc in encodings:
-        for sep in separadores:
-            try:
-                df = pd.read_csv(
-                    io.BytesIO(conteudo_bytes),
-                    encoding=enc,
-                    sep=sep,
-                    low_memory=False,
-                )
-                if df.shape[1] > 0:
-                    return df
-            except Exception as exc:
-                ultimo_erro = exc
-                continue
-    raise ValueError(
-        f"Não foi possível ler o ficheiro CSV ({ultimo_erro or 'codificação ou separador inválido'})."
-    )
-
-
-def _obter_caminho_brasao():
-    for candidato in ("brasao_sem_fundo.png", "1000352084.jpg"):
-        if os.path.exists(candidato):
-            return candidato
-    return None
-
-
-def _escapar_xml_reportlab(texto):
-    if texto is None:
-        return ""
-    return html.escape(str(texto), quote=True)
-
-
-def _sanitizar_nome_aba_excel(nome, fallback="Dados"):
-    limpo = "".join(ch for ch in str(nome or "") if ch not in r"[]:*?/\\").strip()
-    if not limpo:
-        limpo = fallback
-    return limpo[:31]
-
-
-def _formatar_codigo_excel(val):
-    if pd.isna(val):
-        return ""
-    if isinstance(val, (int, float)) and not isinstance(val, bool):
-        if float(val).is_integer():
-            return int(float(val))
-    texto = str(val).strip()
-    if texto.endswith(".0") and texto[:-2].isdigit():
-        return int(texto[:-2])
-    return texto
-
-
-def _normalizar_chave_codigo(val):
-    if pd.isna(val):
-        return ""
-    texto = str(val).strip()
-    if texto.endswith(".0") and texto[:-2].isdigit():
-        return texto[:-2]
-    return texto
 
 
 @st.cache_data
@@ -137,7 +67,7 @@ def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
             df = limpar_colunas_duplicadas(df)
             col_mapping = {}
             for col in df.columns:
-                col_lower = col.lower().strip()
+                col_lower = str(col).lower().strip()
                 if "custo" in col_lower:
                     col_mapping[col] = "Custo (R$)"
                 elif "valor de ajuste" in col_lower:
@@ -146,6 +76,7 @@ def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
                     col_mapping[col] = "Valor de Estoque (R$)"
             if col_mapping:
                 df = df.rename(columns=col_mapping)
+                df = limpar_colunas_duplicadas(df)
 
             colunas_texto = {
                 "código do produto",
@@ -162,11 +93,13 @@ def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
                 "data de finalizacao",
                 "tipo",
             }
-            for col in df.columns:
-                if col.lower().strip() not in colunas_texto:
+            for col in list(df.columns):
+                if str(col).lower().strip() not in colunas_texto:
+                    alvo = df[col]
+                    if isinstance(alvo, pd.DataFrame):
+                        continue
                     serie_str = (
-                        df[col]
-                        .astype(str)
+                        alvo.astype(str)
                         .str.strip()
                         .str.replace(".", "", regex=False)
                         .str.replace(",", ".", regex=False)
@@ -184,7 +117,6 @@ def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
         return None, "Formato não suportado."
     except Exception as e:
         return None, "Erro ao processar ficheiro: " + str(e)
-
 
 def identificar_coluna_ideal(colunas_numericas, palavras_alvo):
     for palavra in palavras_alvo:
