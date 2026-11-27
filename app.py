@@ -38,6 +38,7 @@ COR_ZEBRA_EXCEL = "F7FAFC"
 COR_BORDA_EXCEL = "CBD5E0"
 COR_TOTAL_EXCEL = "E2E8F0"
 
+
 def limpar_colunas_duplicadas(df):
     novas_colunas = []
     contagem = {}
@@ -56,6 +57,84 @@ def limpar_colunas_duplicadas(df):
     df = df.copy()
     df.columns = novas_colunas
     return df
+
+
+def _converter_serie_moeda_ptbr(serie):
+    return pd.to_numeric(
+        serie.astype(str)
+        .str.strip()
+        .str.replace("R$", "", regex=False)
+        .str.replace(" ", "", regex=False)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False),
+        errors="coerce",
+    ).fillna(0.0)
+
+
+def _ler_csv_com_fallback(
+    conteudo_bytes,
+    separadores=(";", ","),
+    encodings=("utf-8-sig", "utf-8", "latin-1", "cp1252", "iso-8859-1"),
+):
+    ultimo_erro = None
+    for enc in encodings:
+        for sep in separadores:
+            try:
+                df = pd.read_csv(
+                    io.BytesIO(conteudo_bytes),
+                    encoding=enc,
+                    sep=sep,
+                    low_memory=False,
+                )
+                if df.shape[1] > 0:
+                    return df
+            except Exception as exc:
+                ultimo_erro = exc
+                continue
+    raise ValueError(
+        f"Não foi possível ler o ficheiro CSV ({ultimo_erro or 'codificação ou separador inválido'})."
+    )
+
+
+def _obter_caminho_brasao():
+    for candidato in ("brasao_sem_fundo.png", "1000352084.jpg"):
+        if os.path.exists(candidato):
+            return candidato
+    return None
+
+
+def _escapar_xml_reportlab(texto):
+    if texto is None:
+        return ""
+    return html.escape(str(texto), quote=True)
+
+
+def _sanitizar_nome_aba_excel(nome, fallback="Dados"):
+    limpo = "".join(ch for ch in str(nome or "") if ch not in r"[]:*?/\\").strip()
+    if not limpo:
+        limpo = fallback
+    return limpo[:31]
+
+
+def _formatar_codigo_excel(val):
+    if pd.isna(val):
+        return ""
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        if float(val).is_integer():
+            return int(float(val))
+    texto = str(val).strip()
+    if texto.endswith(".0") and texto[:-2].isdigit():
+        return int(texto[:-2])
+    return texto
+
+
+def _normalizar_chave_codigo(val):
+    if pd.isna(val):
+        return ""
+    texto = str(val).strip()
+    if texto.endswith(".0") and texto[:-2].isdigit():
+        return texto[:-2]
+    return texto
 
 
 @st.cache_data
@@ -118,6 +197,7 @@ def processar_arquivo_upload(conteudo_bytes, nome_arquivo):
     except Exception as e:
         return None, "Erro ao processar ficheiro: " + str(e)
 
+
 def identificar_coluna_ideal(colunas_numericas, palavras_alvo):
     for palavra in palavras_alvo:
         for idx, col in enumerate(colunas_numericas):
@@ -165,17 +245,25 @@ def calcular_metricas_gerenciais(lista_dfs_tupla, nomes_tupla):
             num_cols, ["valor de estoque", "valor", "saldo"]
         )
         col_val = num_cols[idx_val] if num_cols else None
-        soma_depois = float(df[col_val].fillna(0).sum()) if col_val and col_val in df.columns else 0.0
+        soma_depois = (
+            float(df[col_val].fillna(0).sum())
+            if col_val and col_val in df.columns
+            else 0.0
+        )
         idx_qtd = identificar_coluna_ideal(
             num_cols, ["quantidade", "saldo", "estoque", "fisico", "teorico"]
         )
         col_qtd = num_cols[idx_qtd] if num_cols else None
         qtd_pos = (
-            float(df[col_qtd].fillna(0).sum()) if col_qtd and col_qtd in df.columns else float(total_skus)
+            float(df[col_qtd].fillna(0).sum())
+            if col_qtd and col_qtd in df.columns
+            else float(total_skus)
         )
         col_ajuste = "Ajuste" if "Ajuste" in df.columns else None
         soma_ajuste_qtd = (
-            float(df[col_ajuste].fillna(0).sum()) if col_ajuste and col_ajuste in df.columns else 0.0
+            float(df[col_ajuste].fillna(0).sum())
+            if col_ajuste and col_ajuste in df.columns
+            else 0.0
         )
         qtd_antes = qtd_pos - soma_ajuste_qtd
         if col_qtd and col_qtd in df.columns:
@@ -304,7 +392,9 @@ def limpar_nome_local(val):
 
 def _preparar_itens_conferencia(df_localizacao, df_estoque, tipo_filtro):
     if df_localizacao.empty or df_estoque.empty:
-        raise ValueError("Uma ou ambas as bases de localização e estoque estão vazias.")
+        raise ValueError(
+            "Uma ou ambas as bases de localização e estoque estão vazias."
+        )
 
     col_loc = next(
         (c for c in df_localizacao.columns if "local" in c.lower()),
@@ -314,7 +404,9 @@ def _preparar_itens_conferencia(df_localizacao, df_estoque, tipo_filtro):
         (
             c
             for c in df_localizacao.columns
-            if "codigo" in c.lower() or "código" in c.lower() or "cod" in c.lower()
+            if "codigo" in c.lower()
+            or "código" in c.lower()
+            or "cod" in c.lower()
         ),
         df_localizacao.columns[min(3, len(df_localizacao.columns) - 1)],
     )
@@ -339,7 +431,11 @@ def _preparar_itens_conferencia(df_localizacao, df_estoque, tipo_filtro):
         cod = _normalizar_chave_codigo(row.get(col_cod_loc, ""))
         if not cod:
             continue
-        desc = "" if pd.isna(row.get(col_desc_loc, "")) else str(row.get(col_desc_loc, "")).strip()
+        desc = (
+            ""
+            if pd.isna(row.get(col_desc_loc, ""))
+            else str(row.get(col_desc_loc, "")).strip()
+        )
         try:
             qtd = int(float(row.get(col_qtd_loc, 0)))
         except Exception:
@@ -352,7 +448,11 @@ def _preparar_itens_conferencia(df_localizacao, df_estoque, tipo_filtro):
         soma_comptar_por_produto[cod] += qtd
 
     col_cod_est = next(
-        (c for c in df_estoque.columns if "codigo" in c.lower() or "código" in c.lower()),
+        (
+            c
+            for c in df_estoque.columns
+            if "codigo" in c.lower() or "código" in c.lower()
+        ),
         df_estoque.columns[0],
     )
     col_desc_est = next(
@@ -360,7 +460,11 @@ def _preparar_itens_conferencia(df_localizacao, df_estoque, tipo_filtro):
         df_estoque.columns[min(1, len(df_estoque.columns) - 1)],
     )
     col_est = next(
-        (c for c in df_estoque.columns if "estoque" in c.lower() or "saldo" in c.lower()),
+        (
+            c
+            for c in df_estoque.columns
+            if "estoque" in c.lower() or "saldo" in c.lower()
+        ),
         df_estoque.columns[min(2, len(df_estoque.columns) - 1)],
     )
 
@@ -374,7 +478,9 @@ def _preparar_itens_conferencia(df_localizacao, df_estoque, tipo_filtro):
     if tipo_filtro == "SEM_SALDO":
         for cod, locs in locais_por_produto.items():
             if cod not in codigos_estoque_set:
-                desc_item = descricoes_comptar.get(cod) or "Item Avulso / Sem Cadastro"
+                desc_item = (
+                    descricoes_comptar.get(cod) or "Item Avulso / Sem Cadastro"
+                )
                 soma_comptar_val = soma_comptar_por_produto.get(cod, 0)
                 divergencia_val = soma_comptar_val
                 itens_filtrados_temp.append((
@@ -391,7 +497,11 @@ def _preparar_itens_conferencia(df_localizacao, df_estoque, tipo_filtro):
             cod = _normalizar_chave_codigo(row.get(col_cod_est, ""))
             if not cod or cod in locais_por_produto:
                 continue
-            desc = "" if pd.isna(row.get(col_desc_est, "")) else str(row.get(col_desc_est, "")).strip()
+            desc = (
+                ""
+                if pd.isna(row.get(col_desc_est, ""))
+                else str(row.get(col_desc_est, "")).strip()
+            )
             try:
                 est = int(float(row.get(col_est, 0)))
             except Exception:
@@ -402,7 +512,11 @@ def _preparar_itens_conferencia(df_localizacao, df_estoque, tipo_filtro):
             cod = _normalizar_chave_codigo(row.get(col_cod_est, ""))
             if not cod:
                 continue
-            desc = "" if pd.isna(row.get(col_desc_est, "")) else str(row.get(col_desc_est, "")).strip()
+            desc = (
+                ""
+                if pd.isna(row.get(col_desc_est, ""))
+                else str(row.get(col_desc_est, "")).strip()
+            )
             try:
                 est = int(float(row.get(col_est, 0)))
             except Exception:
@@ -415,8 +529,16 @@ def _preparar_itens_conferencia(df_localizacao, df_estoque, tipo_filtro):
             divergencia_val = soma_comptar_val - est
             incluir = (
                 tipo_filtro == "TODOS"
-                or (tipo_filtro == "FALTAS" and tem_na_comptar and divergencia_val < 0)
-                or (tipo_filtro == "SOBRAS" and tem_na_comptar and divergencia_val > 0)
+                or (
+                    tipo_filtro == "FALTAS"
+                    and tem_na_comptar
+                    and divergencia_val < 0
+                )
+                or (
+                    tipo_filtro == "SOBRAS"
+                    and tem_na_comptar
+                    and divergencia_val > 0
+                )
             )
             if incluir:
                 itens_filtrados_temp.append((
@@ -587,7 +709,9 @@ def gerar_planilha_filtrada_kmb(
         fill_type="solid",
     )
     fill_cinza_claro = PatternFill(
-        start_color=COR_CINZA_CLARO, end_color=COR_CINZA_CLARO, fill_type="solid"
+        start_color=COR_CINZA_CLARO,
+        end_color=COR_CINZA_CLARO,
+        fill_type="solid",
     )
     borda_fina = Border(
         left=Side(style="thin", color="000000"),
@@ -683,7 +807,13 @@ def gerar_planilha_filtrada_kmb(
     ) in itens_filtrados_temp:
         cel_comptar = soma_comptar_val if tem_na_comptar else 0
         cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
-        linha_dados = [_formatar_codigo_excel(cod), desc, est, cel_comptar, cel_divergencia]
+        linha_dados = [
+            _formatar_codigo_excel(cod),
+            desc,
+            est,
+            cel_comptar,
+            cel_divergencia,
+        ]
         if tem_na_comptar:
             contagens_vals = []
             for i in range(max_locais_encontrados):
@@ -701,7 +831,9 @@ def gerar_planilha_filtrada_kmb(
             ]
         else:
             if tipo_filtro == "ZERADOS":
-                contagens_vals = ["0 - Comptar"] + [""] * (max_locais_encontrados - 1)
+                contagens_vals = ["0 - Comptar"] + [""] * (
+                    max_locais_encontrados - 1
+                )
             else:
                 contagens_vals = ["0"] + [""] * (max_locais_encontrados - 1)
             locais_vals = ["Sem local"] + [""] * (max_locais_encontrados - 1)
@@ -714,7 +846,10 @@ def gerar_planilha_filtrada_kmb(
     )
 
     for row in ws_saldo.iter_rows(
-        min_row=5, max_row=ws_saldo.max_row, min_col=1, max_col=len(headers_saldo)
+        min_row=5,
+        max_row=ws_saldo.max_row,
+        min_col=1,
+        max_col=len(headers_saldo),
     ):
         for cell in row:
             if cell.column == 2:
@@ -741,7 +876,9 @@ def gerar_planilha_filtrada_kmb(
                 val_str = str(cell.value)
                 if not val_str.startswith("="):
                     max_len = max(max_len, len(val_str))
-        ws_saldo.column_dimensions[col_letter].width = min(max(max_len + 2, 7), 55)
+        ws_saldo.column_dimensions[col_letter].width = min(
+            max(max_len + 2, 7), 55
+        )
 
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -794,7 +931,8 @@ class NumberedCanvas(canvas.Canvas):
             except Exception:
                 pass
         texto_esquerda = (
-            "GRUPO KMB // Auditoria Patrimonial • Exatidão • Controle • Eficiência"
+            "GRUPO KMB // Auditoria Patrimonial • Exatidão • Controle •"
+            " Eficiência"
         )
         self.drawString(margem + 50, 10, texto_esquerda)
         texto_pagina = f"Página {self._pageNumber} de {page_count}"
@@ -896,14 +1034,22 @@ def gerar_pdf_conferencia_kmb(
     ) in itens_filtrados_temp:
         cel_comptar = soma_comptar_val if tem_na_comptar else 0
         cel_divergencia = divergencia_val if tem_na_comptar else (0 - est)
-        cod_formatado = _escapar_xml_reportlab(str(cod).strip()).replace(" ", "&nbsp;")
-        desc_limpa = _escapar_xml_reportlab(str(desc).strip()).replace(" ", "&nbsp;")
+        cod_formatado = _escapar_xml_reportlab(str(cod).strip()).replace(
+            " ", "&nbsp;"
+        )
+        desc_limpa = _escapar_xml_reportlab(str(desc).strip()).replace(
+            " ", "&nbsp;"
+        )
         linha_celulas = [
             Paragraph(f"<nobr>{cod_formatado}</nobr>", estilo_td_codigo),
             Paragraph(f"<nobr>{desc_limpa}</nobr>", estilo_td_esq),
             Paragraph(f"<nobr>{est}</nobr>", estilo_td_negrito_centro),
-            Paragraph(f"<nobr>{cel_comptar}</nobr>", estilo_td_negrito_centro),
-            Paragraph(f"<nobr>{cel_divergencia}</nobr>", estilo_td_negrito_centro),
+            Paragraph(
+                f"<nobr>{cel_comptar}</nobr>", estilo_td_negrito_centro
+            ),
+            Paragraph(
+                f"<nobr>{cel_divergencia}</nobr>", estilo_td_negrito_centro
+            ),
         ]
         contagens_vals = []
         locais_vals = []
@@ -924,10 +1070,13 @@ def gerar_pdf_conferencia_kmb(
                         max_chars_por_coluna[i], len(val_qtd_str)
                     )
                     nome_loc_original = str(limpar_nome_local(locs_prod[i][0]))
-                    nome_loc_seguro = _escapar_xml_reportlab(nome_loc_original).replace(" ", "&nbsp;")
+                    nome_loc_seguro = _escapar_xml_reportlab(
+                        nome_loc_original
+                    ).replace(" ", "&nbsp;")
                     locais_vals.append(
                         Paragraph(
-                            f"<nobr>{nome_loc_seguro}</nobr>", estilo_td_negrito_centro
+                            f"<nobr>{nome_loc_seguro}</nobr>",
+                            estilo_td_negrito_centro,
                         )
                     )
                     max_chars_por_coluna[max_locais_encontrados + i] = max(
@@ -935,17 +1084,24 @@ def gerar_pdf_conferencia_kmb(
                         len(nome_loc_original),
                     )
                 else:
-                    contagens_vals.append(Paragraph("", estilo_td_negrito_centro))
+                    contagens_vals.append(
+                        Paragraph("", estilo_td_negrito_centro)
+                    )
                     locais_vals.append(Paragraph("", estilo_td_negrito_centro))
         else:
             if tipo_filtro == "ZERADOS":
                 contagens_vals = [
-                    Paragraph("<nobr>0&nbsp;-&nbsp;Comptar</nobr>", estilo_td_negrito_centro)
+                    Paragraph(
+                        "<nobr>0&nbsp;-&nbsp;Comptar</nobr>",
+                        estilo_td_negrito_centro,
+                    )
                 ] + [Paragraph("", estilo_td_negrito_centro)] * (
                     max_locais_encontrados - 1
                 )
                 locais_vals = [
-                    Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_negrito_centro)
+                    Paragraph(
+                        "<nobr>Sem&nbsp;local</nobr>", estilo_td_negrito_centro
+                    )
                 ] + [Paragraph("", estilo_td_negrito_centro)] * (
                     max_locais_encontrados - 1
                 )
@@ -960,7 +1116,9 @@ def gerar_pdf_conferencia_kmb(
                     max_locais_encontrados - 1
                 )
                 locais_vals = [
-                    Paragraph("<nobr>Sem&nbsp;local</nobr>", estilo_td_negrito_centro)
+                    Paragraph(
+                        "<nobr>Sem&nbsp;local</nobr>", estilo_td_negrito_centro
+                    )
                 ] + [Paragraph("", estilo_td_negrito_centro)] * (
                     max_locais_encontrados - 1
                 )
@@ -1175,8 +1333,8 @@ def gerar_pdf_indicadores_tela(resumo_unico, nome_arquivo):
     )
     story.append(
         Paragraph(
-            f"Unidade / Arquivo: {_escapar_xml_reportlab(nome_arquivo)} | Data de Emissão:"
-            f" {pd.Timestamp.now().strftime('%d/%m/%Y')}",
+            f"Unidade / Arquivo: {_escapar_xml_reportlab(nome_arquivo)} | Data de"
+            f" Emissão: {pd.Timestamp.now().strftime('%d/%m/%Y')}",
             estilo_meta_topo,
         )
     )
@@ -1456,10 +1614,16 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
             None,
         )
         for _, row in df.iterrows():
-            ajuste = float(row[col_ajuste]) if col_ajuste and col_ajuste in df.columns and pd.notna(row[col_ajuste]) else 0.0
+            ajuste = (
+                float(row[col_ajuste])
+                if col_ajuste and col_ajuste in df.columns and pd.notna(row[col_ajuste])
+                else 0.0
+            )
             val_aju = (
                 float(row[col_val_aju])
-                if col_val_aju and col_val_aju in df.columns and pd.notna(row[col_val_aju])
+                if col_val_aju
+                and col_val_aju in df.columns
+                and pd.notna(row[col_val_aju])
                 else 0.0
             )
             saldo_sis = row.get("Saldo em Estoque", 0)
@@ -1471,10 +1635,17 @@ def gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos):
                 classificacao = "ESTOQUE CONGELADO ZERO"
             else:
                 classificacao = "CONFORME"
-            data_inv = str(row.get("Data de Abertura", row.get("Data", "N/A")))
-            cod_prod = _formatar_codigo_excel(row.get("Código do Produto", row.get("Codigo", "N/A")))
+            data_inv = str(
+                row.get("Data de Abertura", row.get("Data", "N/A"))
+            )
+            cod_prod = _formatar_codigo_excel(
+                row.get("Código do Produto", row.get("Codigo", "N/A"))
+            )
             desc_prod = str(
-                row.get("Descrição do Produto", row.get("Descricao", "Item Diversos"))
+                row.get(
+                    "Descrição do Produto",
+                    row.get("Descricao", "Item Diversos"),
+                )
             )
             ws2.append([
                 nome_arq,
@@ -1548,7 +1719,12 @@ def gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos):
             total_faltas = len(df[df[col_ajuste].fillna(0) < 0])
             total_sobras = len(df[df[col_ajuste].fillna(0) > 0])
             total_zerados = (
-                len(df[(df[col_ajuste].fillna(0) == 0) & (df.get("Saldo em Estoque", 1).fillna(1) == 0)])
+                len(
+                    df[
+                        (df[col_ajuste].fillna(0) == 0)
+                        & (df.get("Saldo em Estoque", 1).fillna(1) == 0)
+                    ]
+                )
                 if "Saldo em Estoque" in df.columns
                 else len(df[df[col_ajuste].fillna(0) == 0])
             )
@@ -1667,7 +1843,12 @@ def gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos):
             total_faltas = len(df[df[col_ajuste].fillna(0) < 0])
             total_sobras = len(df[df[col_ajuste].fillna(0) > 0])
             total_zerados = (
-                len(df[(df[col_ajuste].fillna(0) == 0) & (df.get("Saldo em Estoque", 1).fillna(1) == 0)])
+                len(
+                    df[
+                        (df[col_ajuste].fillna(0) == 0)
+                        & (df.get("Saldo em Estoque", 1).fillna(1) == 0)
+                    ]
+                )
                 if "Saldo em Estoque" in df.columns
                 else len(df[df[col_ajuste].fillna(0) == 0])
             )
@@ -2029,12 +2210,23 @@ def _b4_ler_csv_inventario(uploaded_file):
     df = limpar_colunas_duplicadas(df)
     if "Código do Produto" not in df.columns:
         raise ValueError(
-            "Não foi possível encontrar a coluna 'Código do Produto' no CSV de inventário."
+            "Não foi possível encontrar a coluna 'Código do Produto' no CSV de"
+            " inventário."
         )
-    for col in ["Custo (R$)", "Valor de Ajuste (R$)", "Valor de Estoque (R$)"]:
+    for col in [
+        "Custo (R$)",
+        "Valor de Ajuste (R$)",
+        "Valor de Estoque (R$)",
+    ]:
         if col in df.columns:
             df[col] = _converter_serie_moeda_ptbr(df[col])
-    for col_int in ["Emb", "Congelado", "Digitado", "Ajuste", "Saldo em Estoque"]:
+    for col_int in [
+        "Emb",
+        "Congelado",
+        "Digitado",
+        "Ajuste",
+        "Saldo em Estoque",
+    ]:
         if col_int in df.columns:
             df[col_int] = pd.to_numeric(df[col_int], errors="coerce").fillna(0)
     return df
@@ -2055,18 +2247,27 @@ def _b4_ler_inventario_anterior(uploaded_file):
         )
     else:
         xls = pd.ExcelFile(io.BytesIO(raw_bytes))
-        df_ant = pd.read_excel(io.BytesIO(raw_bytes), sheet_name=xls.sheet_names[0])
+        df_ant = pd.read_excel(
+            io.BytesIO(raw_bytes), sheet_name=xls.sheet_names[0]
+        )
 
     df_ant = limpar_colunas_duplicadas(df_ant)
-    if "Código do Produto" not in df_ant.columns or "Ajuste" not in df_ant.columns:
+    if (
+        "Código do Produto" not in df_ant.columns
+        or "Ajuste" not in df_ant.columns
+    ):
         raise ValueError(
             "O ficheiro do inventário anterior precisa de conter as colunas"
             " 'Código do Produto' e 'Ajuste'."
         )
 
     df_ant = df_ant.copy()
-    df_ant["_cod_norm"] = df_ant["Código do Produto"].apply(_normalizar_chave_codigo)
-    df_ant["_ajuste_num"] = pd.to_numeric(df_ant["Ajuste"], errors="coerce").fillna(0)
+    df_ant["_cod_norm"] = df_ant["Código do Produto"].apply(
+        _normalizar_chave_codigo
+    )
+    df_ant["_ajuste_num"] = pd.to_numeric(
+        df_ant["Ajuste"], errors="coerce"
+    ).fillna(0)
     df_ant = df_ant[df_ant["_cod_norm"] != ""].drop_duplicates(
         subset=["_cod_norm"], keep="last"
     )
@@ -2078,17 +2279,31 @@ def _b4_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
         os.path.splitext(nome_arquivo_csv)[0], fallback="Inventario_Base"
     )
 
-    ajuste_serie = pd.to_numeric(df_atual.get("Ajuste", 0), errors="coerce").fillna(0)
-    congelado_serie = pd.to_numeric(df_atual.get("Congelado", 1), errors="coerce").fillna(1)
-    condicao = (ajuste_serie < 0) | (ajuste_serie > 0) | (congelado_serie == 0)
+    ajuste_serie = pd.to_numeric(
+        df_atual.get("Ajuste", 0), errors="coerce"
+    ).fillna(0)
+    congelado_serie = pd.to_numeric(
+        df_atual.get("Congelado", 1), errors="coerce"
+    ).fillna(1)
+    condicao = (
+        (ajuste_serie < 0) | (ajuste_serie > 0) | (congelado_serie == 0)
+    )
 
     df_just = df_atual[condicao].copy()
     if "Descrição do Produto" in df_just.columns:
-        df_just["_desc_ord"] = df_just["Descrição do Produto"].astype(str).str.upper()
-        df_just["_aj_ord"] = pd.to_numeric(df_just.get("Ajuste", 0), errors="coerce").fillna(0)
-        df_just = df_just.sort_values(
-            by=["_aj_ord", "_desc_ord"], ascending=[True, True]
-        ).drop(columns=["_desc_ord", "_aj_ord"]).reset_index(drop=True)
+        df_just["_desc_ord"] = (
+            df_just["Descrição do Produto"].astype(str).str.upper()
+        )
+        df_just["_aj_ord"] = pd.to_numeric(
+            df_just.get("Ajuste", 0), errors="coerce"
+        ).fillna(0)
+        df_just = (
+            df_just.sort_values(
+                by=["_aj_ord", "_desc_ord"], ascending=[True, True]
+            )
+            .drop(columns=["_desc_ord", "_aj_ord"])
+            .reset_index(drop=True)
+        )
     else:
         df_just = df_just.reset_index(drop=True)
 
@@ -2096,15 +2311,21 @@ def _b4_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
 
     font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
     fill_header = PatternFill(
-        fill_type="solid", start_color=COR_NAVY_ESCURO, end_color=COR_NAVY_ESCURO
+        fill_type="solid",
+        start_color=COR_NAVY_ESCURO,
+        end_color=COR_NAVY_ESCURO,
     )
     font_data = Font(name="Calibri", size=11, color="1A202C")
     font_bold = Font(name="Calibri", size=11, bold=True, color="1A202C")
     fill_zebra = PatternFill(
-        fill_type="solid", start_color=COR_ZEBRA_EXCEL, end_color=COR_ZEBRA_EXCEL
+        fill_type="solid",
+        start_color=COR_ZEBRA_EXCEL,
+        end_color=COR_ZEBRA_EXCEL,
     )
     fill_total = PatternFill(
-        fill_type="solid", start_color=COR_TOTAL_EXCEL, end_color=COR_TOTAL_EXCEL
+        fill_type="solid",
+        start_color=COR_TOTAL_EXCEL,
+        end_color=COR_TOTAL_EXCEL,
     )
     ant_header_fill = "FEF3C7"
     ant_header_font = "92400E"
@@ -2206,9 +2427,13 @@ def _b4_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
         c = ws_just.cell(1, col_idx)
         if col_idx == 8:
             c.fill = PatternFill(
-                fill_type="solid", start_color=ant_header_fill, end_color=ant_header_fill
+                fill_type="solid",
+                start_color=ant_header_fill,
+                end_color=ant_header_fill,
             )
-            c.font = Font(name="Calibri", size=11, bold=True, color=ant_header_font)
+            c.font = Font(
+                name="Calibri", size=11, bold=True, color=ant_header_font
+            )
         else:
             c.fill = fill_header
             c.font = font_header
@@ -2227,7 +2452,9 @@ def _b4_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
         cod_cell = _formatar_codigo_excel(cod_raw)
         cod_chave = _normalizar_chave_codigo(cod_raw)
         ajuste_ant = mapa_anterior.get(cod_chave, 0)
-        ajuste_ant = 0 if pd.isna(ajuste_ant) else int(round(float(ajuste_ant)))
+        ajuste_ant = (
+            0 if pd.isna(ajuste_ant) else int(round(float(ajuste_ant)))
+        )
 
         row_vals = [
             cod_cell,
@@ -2269,7 +2496,9 @@ def _b4_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
                     name="Calibri", size=11, bold=True, color=ant_header_font
                 )
                 cell.fill = PatternFill(
-                    fill_type="solid", start_color=ant_cell_fill, end_color=ant_cell_fill
+                    fill_type="solid",
+                    start_color=ant_cell_fill,
+                    end_color=ant_cell_fill,
                 )
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             else:
@@ -2277,9 +2506,13 @@ def _b4_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
                 if idx % 2 == 1:
                     cell.fill = fill_zebra
                 if c_idx in [1, 3, 4, 5, 6, 7]:
-                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.alignment = Alignment(
+                        horizontal="center", vertical="center"
+                    )
                 else:
-                    cell.alignment = Alignment(horizontal="left", vertical="center")
+                    cell.alignment = Alignment(
+                        horizontal="left", vertical="center"
+                    )
 
     fim_dados_just = max(ws_just.max_row, 2)
     total_row = ws_just.max_row + 1
@@ -2379,7 +2612,9 @@ def _b4_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
     sobras_df = df_atual[ajuste_serie > 0]
     cong_zero_df = df_atual[congelado_serie == 0]
 
-    digitado_serie = pd.to_numeric(df_atual.get("Digitado", 0), errors="coerce").fillna(0)
+    digitado_serie = pd.to_numeric(
+        df_atual.get("Digitado", 0), errors="coerce"
+    ).fillna(0)
     val_est_col = (
         "Valor de Estoque (R$)"
         if "Valor de Estoque (R$)" in df_atual.columns
@@ -2396,7 +2631,11 @@ def _b4_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
             "Total de SKUs Inventariados",
             int(len(df_atual)),
             int(digitado_serie.sum()),
-            round(float(df_atual[val_est_col].sum()), 2) if val_est_col else 0.0,
+            (
+                round(float(df_atual[val_est_col].sum()), 2)
+                if val_est_col
+                else 0.0
+            ),
         ),
         (
             "Itens sem Divergência (Ajuste = 0)",
@@ -2441,7 +2680,11 @@ def _b4_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
         (
             "Total de Itens na Aba JUSTIFICAR",
             int(len(df_just)),
-            int(pd.to_numeric(df_just.get("Ajuste", 0), errors="coerce").fillna(0).sum()),
+            int(
+                pd.to_numeric(df_just.get("Ajuste", 0), errors="coerce")
+                .fillna(0)
+                .sum()
+            ),
             (
                 round(float(df_just[val_aju_col].sum()), 2)
                 if val_aju_col and val_aju_col in df_just.columns
@@ -2464,7 +2707,9 @@ def _b4_gerar_excel_memoria(df_atual, mapa_anterior, nome_arquivo_csv):
                 cell.alignment = Alignment(horizontal="left", vertical="center")
             elif c_idx in [2, 3]:
                 cell.number_format = "#,##0"
-                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.alignment = Alignment(
+                    horizontal="center", vertical="center"
+                )
             elif c_idx == 4:
                 cell.number_format = "R$ #,##0.00"
                 cell.alignment = Alignment(horizontal="right", vertical="center")
@@ -2539,7 +2784,9 @@ def renderizar_bloco_4_justificar():
             try:
                 with st.spinner("A processar ficheiros e a gerar planilha..."):
                     df_atual = _b4_ler_csv_inventario(arquivo_csv)
-                    mapa_anterior = _b4_ler_inventario_anterior(arquivo_anterior)
+                    mapa_anterior = _b4_ler_inventario_anterior(
+                        arquivo_anterior
+                    )
                     excel_bytes, df_just = _b4_gerar_excel_memoria(
                         df_atual, mapa_anterior, arquivo_csv.name
                     )
@@ -2568,12 +2815,13 @@ def renderizar_bloco_4_justificar():
                         )
 
                     st.success(
-                        f"✅ Relatório gerado! **{len(df_just)} itens** filtrados para"
-                        f" justificativa (de {len(df_atual)} itens totais)."
+                        f"✅ Relatório gerado! **{len(df_just)} itens** filtrados"
+                        f" para justificativa (de {len(df_atual)} itens totais)."
                     )
 
                     nome_saida = (
-                        f"Relatorio_Inventario_{os.path.splitext(arquivo_csv.name)[0]}.xlsx"
+                        "Relatorio_Inventario_"
+                        f"{os.path.splitext(arquivo_csv.name)[0]}.xlsx"
                     )
                     st.download_button(
                         label="📥 Baixar Planilha Excel (.xlsx)",
@@ -2585,9 +2833,14 @@ def renderizar_bloco_4_justificar():
                     )
 
                     with st.expander(
-                        "👀 Pré-visualizar itens da aba JUSTIFICAR", expanded=True
+                        "👀 Pré-visualizar itens da aba JUSTIFICAR",
+                        expanded=True,
                     ):
-                        st.dataframe(df_preview, use_container_width=True, hide_index=True)
+                        st.dataframe(
+                            df_preview,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
 
             except Exception as e:
                 st.error(f"❌ Erro ao processar os ficheiros: {e}")
@@ -2595,7 +2848,9 @@ def renderizar_bloco_4_justificar():
 
 def main():
     st.set_page_config(
-        page_title="GRUPO KMB // TIME DE INVENTÁRIO", page_icon="⚡", layout="wide"
+        page_title="GRUPO KMB // TIME DE INVENTÁRIO",
+        page_icon="⚡",
+        layout="wide",
     )
     SENHA_MESTRE = st.secrets.get("SENHA_MESTRE", "novacore2026")
     if "autenticado" not in st.session_state:
@@ -2736,8 +2991,8 @@ def main():
                     )
             if "pdf_etiquetas_pronto" in st.session_state:
                 st.success(
-                    f"✅ Ficheiro **{st.session_state['pdf_etiquetas_nome']}** pronto"
-                    " para impressão!"
+                    f"✅ Ficheiro **{st.session_state['pdf_etiquetas_nome']}**"
+                    " pronto para impressão!"
                 )
                 st.download_button(
                     label="📥 Baixar PDF de Etiquetas",
@@ -2763,12 +3018,14 @@ def main():
             key="numero_loja_texto_conferencia",
         )
         numero_loja_limpo = numero_loja_texto.strip()
-        loja_valida = numero_loja_limpo.isdigit() and int(numero_loja_limpo) >= 1
+        loja_valida = (
+            numero_loja_limpo.isdigit() and int(numero_loja_limpo) >= 1
+        )
         if not loja_valida:
             if numero_loja_limpo != "":
                 st.warning(
-                    "⚠️ Digite um número de loja válido (apenas números, maior que"
-                    " zero)."
+                    "⚠️ Digite um número de loja válido (apenas números, maior"
+                    " que zero)."
                 )
             else:
                 st.info(
@@ -2823,9 +3080,15 @@ def main():
                 for col in df_preview_exibir.columns:
                     if "Descrição" not in col:
                         df_preview_exibir[col] = df_preview_exibir[col].apply(
-                            lambda x: x[:-2] if isinstance(x, str) and x.endswith(".0") else x
+                            lambda x: (
+                                x[:-2]
+                                if isinstance(x, str) and x.endswith(".0")
+                                else x
+                            )
                         )
-                st.dataframe(df_preview_exibir, use_container_width=True, height=420)
+                st.dataframe(
+                    df_preview_exibir, use_container_width=True, height=420
+                )
                 st.download_button(
                     label="📥 Baixar Pré-visualização em Excel (.xlsx)",
                     data=buf_preview,
@@ -2885,8 +3148,8 @@ def main():
                 data_atual_str = pd.Timestamp.now().strftime("%d.%m.%Y")
                 st.markdown("---")
                 st.markdown(
-                    "### 📄 2. Listas de Conferência em PDF (Títulos Otimizados sem"
-                    " Quebras + Brasão)"
+                    "### 📄 2. Listas de Conferência em PDF (Títulos Otimizados"
+                    " sem Quebras + Brasão)"
                 )
                 c_pdf1, c_pdf2, c_pdf3, c_pdf4 = st.columns(4)
                 with c_pdf1:
@@ -2957,7 +3220,9 @@ def main():
         if lista_dfs:
             if len(lista_dfs) == 1:
                 df_filtrado = lista_dfs[0]
-                num_cols = df_filtrado.select_dtypes(include=["number"]).columns.tolist()
+                num_cols = df_filtrado.select_dtypes(
+                    include=["number"]
+                ).columns.tolist()
                 all_cols = df_filtrado.columns.tolist()
                 resumo_unico = calcular_metricas_gerenciais(
                     tuple(lista_dfs), tuple(nomes_arquivos)
@@ -3001,7 +3266,8 @@ def main():
                     )
                     st.markdown(
                         formatar_kpi_html(
-                            "Volume Físico Total de Divergências (Sobra + Falta)",
+                            "Volume Físico Total de Divergências (Sobra +"
+                            " Falta)",
                             (
                                 f"{resumo_unico['vol_div_total']:,.0f} unidades"
                                 f" ({resumo_unico['perc_vol_div']:.2f}%)"
@@ -3073,8 +3339,12 @@ def main():
                                 "Ajuste Líquido: R$"
                                 f" {resumo_unico['val_ajuste_liquido']:,.2f}"
                             ),
-                            eh_negativo=(resumo_unico["impacto_sobre_antes_pct"] < 0),
-                            eh_positivo=(resumo_unico["impacto_sobre_antes_pct"] >= 0),
+                            eh_negativo=(
+                                resumo_unico["impacto_sobre_antes_pct"] < 0
+                            ),
+                            eh_positivo=(
+                                resumo_unico["impacto_sobre_antes_pct"] >= 0
+                            ),
                         ),
                         unsafe_allow_html=True,
                     )
@@ -3094,7 +3364,9 @@ def main():
                             f"R$ {resumo_unico['val_ajuste_liquido']:,.2f}",
                             "Variação Apurada",
                             eh_negativo=(resumo_unico["val_ajuste_liquido"] < 0),
-                            eh_positivo=(resumo_unico["val_ajuste_liquido"] >= 0),
+                            eh_positivo=(
+                                resumo_unico["val_ajuste_liquido"] >= 0
+                            ),
                         ),
                         unsafe_allow_html=True,
                     )
@@ -3105,14 +3377,16 @@ def main():
                     label="📑 Baixar Relatório de Indicadores em PDF",
                     data=buf_pdf_indicadores,
                     file_name=(
-                        f"Relatorio_Indicadores_{nomes_arquivos[0].rsplit('.', 1)[0]}.pdf"
+                        "Relatorio_Indicadores_"
+                        f"{nomes_arquivos[0].rsplit('.', 1)[0]}.pdf"
                     ),
                     mime="application/pdf",
                     use_container_width=True,
                 )
                 st.markdown("---")
                 with st.expander(
-                    "🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto 80/20)",
+                    "🎯 ETAPA 2: Concentração Financeira & Curva ABC (Pareto"
+                    " 80/20)",
                     expanded=True,
                 ):
                     if len(num_cols) >= 1 and len(all_cols) > 0:
@@ -3135,7 +3409,11 @@ def main():
                             eixo_y_escolhido = st.selectbox(
                                 "Métrica Principal (Eixo Y):",
                                 options=num_cols,
-                                index=idx_padrao_y if idx_padrao_y < len(num_cols) else 0,
+                                index=(
+                                    idx_padrao_y
+                                    if idx_padrao_y < len(num_cols)
+                                    else 0
+                                ),
                                 key="abc_eixo_y",
                             )
                         with col_sel3:
@@ -3153,16 +3431,26 @@ def main():
                         df_abc = df_filtrado.sort_values(
                             by=eixo_y_escolhido, ascending=False
                         ).copy()
-                        df_abc["Soma_Acumulada"] = df_abc[eixo_y_escolhido].fillna(0).cumsum()
-                        soma_total = float(df_abc[eixo_y_escolhido].fillna(0).sum())
+                        df_abc["Soma_Acumulada"] = (
+                            df_abc[eixo_y_escolhido].fillna(0).cumsum()
+                        )
+                        soma_total = float(
+                            df_abc[eixo_y_escolhido].fillna(0).sum()
+                        )
                         if soma_total > 0:
                             df_abc["%_Acumulado"] = (
                                 df_abc["Soma_Acumulada"] / soma_total
                             ) * 100
                             df_abc["Classe_ABC"] = df_abc["%_Acumulado"].apply(
-                                lambda p: "Classe A (80%)"
-                                if p <= 80
-                                else ("Classe B (95%)" if p <= 95 else "Classe C (100%)")
+                                lambda p: (
+                                    "Classe A (80%)"
+                                    if p <= 80
+                                    else (
+                                        "Classe B (95%)"
+                                        if p <= 95
+                                        else "Classe C (100%)"
+                                    )
+                                )
                             )
                             if filtro_classe_abc != "Todas as Classes (Geral)":
                                 df_abc_filtrado = df_abc[
@@ -3179,7 +3467,9 @@ def main():
                                         y=df_plot[eixo_y_escolhido],
                                         name=eixo_y_escolhido,
                                         marker=dict(
-                                            color=df_plot[eixo_y_escolhido].fillna(0),
+                                            color=df_plot[eixo_y_escolhido].fillna(
+                                                0
+                                            ),
                                             colorscale=[
                                                 [0, "#1e3a8a"],
                                                 [0.5, "#3b82f6"],
@@ -3212,9 +3502,13 @@ def main():
                                         showgrid=False,
                                     ),
                                 )
-                                st.plotly_chart(fig_abc, use_container_width=True)
+                                st.plotly_chart(
+                                    fig_abc, use_container_width=True
+                                )
                         else:
-                            st.info("A métrica selecionada possui soma igual a zero.")
+                            st.info(
+                                "A métrica selecionada possui soma igual a zero."
+                            )
 
                 with st.expander(
                     "🚨 ETAPA 3: Matriz de Criticidade & Discrepância Financeira",
@@ -3227,7 +3521,13 @@ def main():
                             else all_cols[0]
                         )
                         idx_val_div = identificar_coluna_ideal(
-                            num_cols, ["valor de ajuste", "ajuste", "valor", "divergencia"]
+                            num_cols,
+                            [
+                                "valor de ajuste",
+                                "ajuste",
+                                "valor",
+                                "divergencia",
+                            ],
                         )
                         col_val_div = (
                             num_cols[idx_val_div]
@@ -3235,7 +3535,9 @@ def main():
                             else num_cols[0]
                         )
                         df_critico = df_filtrado.copy()
-                        df_critico["Impacto_Absoluto"] = df_critico[col_val_div].fillna(0).abs()
+                        df_critico["Impacto_Absoluto"] = (
+                            df_critico[col_val_div].fillna(0).abs()
+                        )
                         df_critico = df_critico.sort_values(
                             by="Impacto_Absoluto", ascending=False
                         ).head(50)
@@ -3247,14 +3549,20 @@ def main():
                                 title="Top 50 Maiores Desvios Financeiros (R$)",
                                 template="plotly_dark",
                                 color=col_val_div,
-                                color_continuous_scale=["#ef4444", "#f59e0b", "#3b82f6"],
+                                color_continuous_scale=[
+                                    "#ef4444",
+                                    "#f59e0b",
+                                    "#3b82f6",
+                                ],
                             )
                             fig_critico.update_layout(
                                 paper_bgcolor="rgba(11, 15, 25, 0.9)",
                                 plot_bgcolor="rgba(11, 15, 25, 0.9)",
                                 height=480,
                             )
-                            st.plotly_chart(fig_critico, use_container_width=True)
+                            st.plotly_chart(
+                                fig_critico, use_container_width=True
+                            )
 
                 with st.expander(
                     "🛡️ ETAPA 4: Matriz de Risco & Acurácia Ponderada por Impacto",
@@ -3269,7 +3577,8 @@ def main():
                                 (
                                     c
                                     for c in num_cols
-                                    if "ajuste" in c.lower() and "valor" in c.lower()
+                                    if "ajuste" in c.lower()
+                                    and "valor" in c.lower()
                                 ),
                                 num_cols[0],
                             )
@@ -3280,23 +3589,38 @@ def main():
                             else all_cols[0]
                         )
                         df_risco["Categoria_Prod"] = (
-                            df_risco[col_base_cat].astype(str).str.split().str[0].fillna("Geral")
+                            df_risco[col_base_cat]
+                            .astype(str)
+                            .str.split()
+                            .str[0]
+                            .fillna("Geral")
                         )
                         df_agrupado_val = (
-                            df_risco.groupby("Categoria_Prod")[col_val_aju_etapa4]
+                            df_risco.groupby("Categoria_Prod")[
+                                col_val_aju_etapa4
+                            ]
                             .sum()
                             .reset_index()
-                            .sort_values(by=col_val_aju_etapa4, ascending=True)
+                            .sort_values(
+                                by=col_val_aju_etapa4, ascending=True
+                            )
                             .head(15)
                         )
                         fig_risco = px.bar(
                             df_agrupado_val,
                             x="Categoria_Prod",
                             y=col_val_aju_etapa4,
-                            title="Balanço Líquido de Divergências por Categoria (R$)",
+                            title=(
+                                "Balanço Líquido de Divergências por Categoria"
+                                " (R$)"
+                            ),
                             template="plotly_dark",
                             color=col_val_aju_etapa4,
-                            color_continuous_scale=["#ef4444", "#3b82f6", "#10b981"],
+                            color_continuous_scale=[
+                                "#ef4444",
+                                "#3b82f6",
+                                "#10b981",
+                            ],
                         )
                         fig_risco.update_layout(
                             paper_bgcolor="rgba(11, 15, 25, 0.9)",
@@ -3323,23 +3647,32 @@ def main():
                             (
                                 c
                                 for c in num_cols
-                                if "ajuste" in c.lower() and "valor" in c.lower()
+                                if "ajuste" in c.lower()
+                                and "valor" in c.lower()
                             ),
                             num_cols[0] if num_cols else None,
                         )
                     )
-                    col_ajuste_e5 = "Ajuste" if "Ajuste" in df_filtrado.columns else None
+                    col_ajuste_e5 = (
+                        "Ajuste" if "Ajuste" in df_filtrado.columns else None
+                    )
                     df_causa = df_filtrado.copy()
                     if col_ajuste_e5:
-                        df_causa["_aj_num"] = pd.to_numeric(df_causa[col_ajuste_e5], errors="coerce").fillna(0)
+                        df_causa["_aj_num"] = pd.to_numeric(
+                            df_causa[col_ajuste_e5], errors="coerce"
+                        ).fillna(0)
                     else:
                         df_causa["_aj_num"] = 0.0
                     if col_val_aju_e5:
-                        df_causa["_val_num"] = pd.to_numeric(df_causa[col_val_aju_e5], errors="coerce").fillna(0.0)
+                        df_causa["_val_num"] = pd.to_numeric(
+                            df_causa[col_val_aju_e5], errors="coerce"
+                        ).fillna(0.0)
                     else:
                         df_causa["_val_num"] = 0.0
                     if "Saldo em Estoque" in df_causa.columns:
-                        df_causa["_saldo_num"] = pd.to_numeric(df_causa["Saldo em Estoque"], errors="coerce").fillna(1)
+                        df_causa["_saldo_num"] = pd.to_numeric(
+                            df_causa["Saldo em Estoque"], errors="coerce"
+                        ).fillna(1)
                     else:
                         df_causa["_saldo_num"] = 1.0
 
@@ -3357,8 +3690,14 @@ def main():
                             return "🔄 Divergência Operacional / Quebra Padrão"
                         return "✅ Conforme"
 
-                    df_causa["Perfil_Causa"] = df_causa.apply(classificar_causa, axis=1)
-                    col_cod_e5 = "Código do Produto" if "Código do Produto" in df_causa.columns else all_cols[0]
+                    df_causa["Perfil_Causa"] = df_causa.apply(
+                        classificar_causa, axis=1
+                    )
+                    col_cod_e5 = (
+                        "Código do Produto"
+                        if "Código do Produto" in df_causa.columns
+                        else all_cols[0]
+                    )
 
                     with tab_e5_1:
                         resumo_causas = (
@@ -3370,9 +3709,10 @@ def main():
                             .reset_index()
                         )
                         st.dataframe(
-                            resumo_causas.style.format(
-                                {"SKUs": "{:,}", "Impacto_Financeiro": "R$ {:,.2f}"}
-                            ),
+                            resumo_causas.style.format({
+                                "SKUs": "{:,}",
+                                "Impacto_Financeiro": "R$ {:,.2f}",
+                            }),
                             use_container_width=True,
                         )
 
@@ -3384,7 +3724,8 @@ def main():
                             )
                             hover_col = (
                                 "Descrição do Produto"
-                                if "Descrição do Produto" in df_scatter.columns
+                                if "Descrição do Produto"
+                                in df_scatter.columns
                                 else col_cod_e5
                             )
                             fig_4d = px.scatter(
@@ -3396,14 +3737,18 @@ def main():
                                 hover_name=hover_col,
                                 labels={
                                     "_saldo_num": "Saldo em Estoque",
-                                    "_val_num": col_val_aju_e5 or "Valor de Ajuste",
+                                    "_val_num": col_val_aju_e5
+                                    or "Valor de Ajuste",
                                 },
                                 template="plotly_dark",
                                 height=450,
                             )
                             st.plotly_chart(fig_4d, use_container_width=True)
                         else:
-                            st.info("Não há itens com divergência para exibir no Quadrante 4D.")
+                            st.info(
+                                "Não há itens com divergência para exibir no"
+                                " Quadrante 4D."
+                            )
 
                     with tab_e5_3:
                         c_sim1, c_sim2 = st.columns(2)
@@ -3455,13 +3800,20 @@ def main():
                                 else {}
                             )
                             st.dataframe(
-                                df_plano[cols_plano].style.format(formatos_plano),
+                                df_plano[cols_plano].style.format(
+                                    formatos_plano
+                                ),
                                 use_container_width=True,
                             )
                         else:
-                            st.info("Não há itens em falta para compor o plano de ação prioritário.")
+                            st.info(
+                                "Não há itens em falta para compor o plano de"
+                                " ação prioritário."
+                            )
             else:
-                st.markdown("## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO C-LEVEL")
+                st.markdown(
+                    "## ⚡ AUDITORIA COMPARATIVA MULTI-INVENTÁRIO C-LEVEL"
+                )
                 resumos = calcular_metricas_gerenciais(
                     tuple(lista_dfs), tuple(nomes_arquivos)
                 )
@@ -3473,7 +3825,10 @@ def main():
                             st.markdown(
                                 formatar_kpi_html(
                                     "Total SKUs Auditados",
-                                    f"{r['total_skus']:,} (Pré: {r['skus_pre_inventario']:,})",
+                                    (
+                                        f"{r['total_skus']:,} (Pré:"
+                                        f" {r['skus_pre_inventario']:,})"
+                                    ),
                                     (
                                         f"SKUs Pré: {r['skus_pre_inventario']:,} | Pré:"
                                         f" {r['qtd_antes']:,.0f} un | Pós:"
@@ -3527,7 +3882,8 @@ def main():
                             )
                             st.markdown(
                                 formatar_kpi_html(
-                                    "Volume Físico Total Divergências (Sobra + Falta)",
+                                    "Volume Físico Total Divergências (Sobra +"
+                                    " Falta)",
                                     (
                                         f"{r['vol_div_total']:,.0f} unidades"
                                         f" ({r['perc_vol_div']:.2f}%)"
@@ -3573,9 +3929,16 @@ def main():
                                 formatar_kpi_html(
                                     "Impacto Geral",
                                     f"{r['impacto_sobre_antes_pct']:.2f}%",
-                                    f"Ajuste Líquido: R$ {r['val_ajuste_liquido']:,.2f}",
-                                    eh_negativo=(r["impacto_sobre_antes_pct"] < 0),
-                                    eh_positivo=(r["impacto_sobre_antes_pct"] >= 0),
+                                    (
+                                        "Ajuste Líquido: R$"
+                                        f" {r['val_ajuste_liquido']:,.2f}"
+                                    ),
+                                    eh_negativo=(
+                                        r["impacto_sobre_antes_pct"] < 0
+                                    ),
+                                    eh_positivo=(
+                                        r["impacto_sobre_antes_pct"] >= 0
+                                    ),
                                 ),
                                 unsafe_allow_html=True,
                             )
@@ -3630,28 +3993,36 @@ def main():
                 with col_e1:
                     st.download_button(
                         "📊 Excel Gerencial",
-                        data=gerar_excel_gerencial_avancado(lista_dfs, nomes_arquivos),
+                        data=gerar_excel_gerencial_avancado(
+                            lista_dfs, nomes_arquivos
+                        ),
                         file_name="Relatorio_GrupoKMB.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     )
                 with col_e2:
                     st.download_button(
                         "📄 Word Gerencial",
-                        data=gerar_docx_gerencial_avancado(lista_dfs, nomes_arquivos),
+                        data=gerar_docx_gerencial_avancado(
+                            lista_dfs, nomes_arquivos
+                        ),
                         file_name="Relatorio_GrupoKMB.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     )
                 with col_e3:
                     st.download_button(
                         "📑 PDF Gerencial",
-                        data=gerar_pdf_gerencial_avancado(lista_dfs, nomes_arquivos),
+                        data=gerar_pdf_gerencial_avancado(
+                            lista_dfs, nomes_arquivos
+                        ),
                         file_name="Relatorio_GrupoKMB.pdf",
                         mime="application/pdf",
                     )
                 with col_e4:
                     st.download_button(
                         "📊 Apresentação PPTX",
-                        data=gerar_pptx_gerencial_avancado(lista_dfs, nomes_arquivos),
+                        data=gerar_pptx_gerencial_avancado(
+                            lista_dfs, nomes_arquivos
+                        ),
                         file_name="Apresentacao_GrupoKMB.pptx",
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     )
